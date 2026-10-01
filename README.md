@@ -7,6 +7,18 @@ AI 媒体库的桌面端与 Web 前端源码。项目使用
 > 大型分类器、下载器、模型、FFmpeg 运行时和安装包不进入 Git。
 > 需要打包时请先按 [BUNDLED.md](BUNDLED.md) 恢复并核验对应运行时。
 
+## 开发基线
+
+本仓库已纳入客户端源码，来源、范围和原始验证结果见 [导入记录](IMPORT_SNAPSHOT.md)。
+后续开发从最新 `main` 建立任务分支，沿用现有源码。
+协作配置与检查范围见 [团队协作流程](docs/team-workflow.md)。当前必需 CI 仅检查仓库规范，不代表应用功能或安装包验证通过。
+
+## 分支流程
+
+1. `main`：已确认的源码基线。
+2. `codex/client-source-import-20261001`：本次客户端源码导入分支。
+3. 后续功能使用 `codex/<任务名>`，通过 Pull Request 合并。
+
 ## Prerequisites
 
 - Node.js `>=22.13.0`

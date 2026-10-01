@@ -1,10 +1,8 @@
 name: Build Windows and macOS installers
 
 on:
+  # Installer publication is an explicit release operation, not a development push.
   workflow_dispatch:
-  push:
-    branches:
-      - "codex/**"
 
 permissions:
   contents: write

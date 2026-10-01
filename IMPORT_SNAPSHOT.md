@@ -26,3 +26,18 @@ and the large bundled classifier/downloader/model/tool runtimes described in
   return `expired` where the tests expect `active`.
 - Focused Xiaohongshu parser/redirect regressions: 6 passed
 - `git diff --check`: passed before commit
+
+## Main branch integration (2026-10-01)
+
+- Original import commit: `c30e554e50d11db81cd6279928ff9f390efc599c`.
+- Integrated the repository workflow baseline from `c000233`; retained the
+  imported application source and resolved the README overlap with the branch rules.
+- Required `repository-checks` verifies repository hygiene only. The historical
+  application results above are not a claim that all application tests pass.
+- Both macOS installer jobs in [run 36838284542](https://github.com/szhou4622/ai-meitiku/actions/runs/36838284542)
+  failed at Electron packaging with `spawn pnpm ENOENT`. Installer generation
+  remains unverified and requires a separate release task.
+- The installer workflow is now manual-only because it publishes release assets.
+  Development pushes and this source integration must not publish installers.
+- No production deployment, service restart, database migration, or production
+  configuration change is part of this integration.
