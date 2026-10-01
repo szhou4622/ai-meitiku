@@ -65,6 +65,7 @@ export class FeiguaBrowser {
     try { result = await this.window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
     catch { throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
     if (result?.authRequired) throw issue('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
+    if (command !== 'auth' && result?.actionRequired) throw issue('请在飞瓜窗口本人阅读并处理数据使用限制声明，完成后再采集', 'FEIGUA_USER_ACTION_REQUIRED');
     if (result?.error) throw issue(result.error);
     return result;
   }
@@ -86,7 +87,7 @@ export class FeiguaBrowser {
     this.ensureWindow(true);
     if (!isFeiguaDataUrl(this.window.webContents.getURL())) await this.navigate(FEIGUA_HOME);
     const auth = await this.execute('auth');
-    if (!auth.authenticated && !auth.workspaceAvailable) await this.execute('login');
+    if (!auth.authenticated && !auth.workspaceAvailable && !auth.actionRequired) await this.execute('login');
     this.startLoginWatch();
   }
 
@@ -105,6 +106,10 @@ export class FeiguaBrowser {
       try {
         if (!isFeiguaDataUrl(loginWindow.webContents.getURL())) return;
         const auth = await this.execute('auth');
+        if (auth.actionRequired) {
+          this.onAuthChange?.({ status: 'action_required', message: '飞瓜需要你本人阅读并处理数据使用限制声明' });
+          return;
+        }
         if (!auth.authenticated && auth.workspaceAvailable) {
           const currentUrl = loginWindow.webContents.getURL();
           if (enteredUrls.has(currentUrl)) return;
@@ -135,6 +140,7 @@ export class FeiguaBrowser {
       await this.enterWorkspace();
       auth = await this.waitForWorkspace();
     }
+    if (auth.actionRequired) return { status: 'action_required', message: '请点击登录飞瓜，本人阅读并处理数据使用限制声明' };
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
     return { status: this.wasAuthenticated ? 'expired' : 'signed_out', message: this.wasAuthenticated ? '飞瓜登录已失效，请重新登录' : '请先在飞瓜窗口完成登录' };
   }
@@ -149,7 +155,7 @@ export class FeiguaBrowser {
     while (Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
       const auth = await this.execute('auth');
-      if (auth.authenticated || auth.loginVisible) return auth;
+      if (auth.authenticated || auth.loginVisible || auth.actionRequired) return auth;
       await delay(300, undefined, { signal });
     }
     throw issue('未能进入飞瓜工作台，请打开登录窗口核对页面', 'FEIGUA_WORKSPACE_UNAVAILABLE');

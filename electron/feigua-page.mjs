@@ -18,8 +18,9 @@ export function feiguaPage(command, argument = {}) {
     const loginDialog = elements('input[type="password"], iframe').some(node => node.tagName === 'INPUT' || /login|qrcode/i.test(node.getAttribute('src') || ''))
       || /微信扫码登录|扫码登录\/注册|登录已过期|请重新登录/.test(body);
     const loginVisible = loginDialog || exact('注册 / 登录').length > 0 || exact('登录').length > 0;
-    return { authenticated: hasShell && !loginDialog, loginVisible,
-      workspaceAvailable: !hasShell && !loginVisible && exact('进入工作台').length === 1 };
+    const actionRequired = body.includes('数据使用限制声明') && exact('同意并继续使用').length > 0 ? 'terms' : null;
+    return { authenticated: hasShell && !loginDialog && !actionRequired, loginVisible, actionRequired,
+      workspaceAvailable: !hasShell && !loginVisible && !actionRequired && exact('进入工作台').length === 1 };
   };
   const authenticated = () => authState().authenticated;
   const failure = message => ({ error: message });
@@ -33,6 +34,7 @@ export function feiguaPage(command, argument = {}) {
     return null;
   };
   if (command === 'auth') return authState();
+  if (authState().actionRequired) return { actionRequired: 'terms' };
   if (command === 'enter-workspace') {
     if (!authState().workspaceAvailable) return failure('尚未发现登录后的工作台入口');
     const entry = exact('进入工作台')[0];

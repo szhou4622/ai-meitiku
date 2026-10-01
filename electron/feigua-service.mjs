@@ -127,6 +127,9 @@ export class FeiguaService {
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }
+        if (error.code === 'FEIGUA_USER_ACTION_REQUIRED') {
+          this.auth = { status: 'action_required', message: error.publicMessage }; stop = true;
+        }
       }
       await this.persist();
     }

@@ -219,3 +219,26 @@ test('persisted homepage session is resolved to the workspace during login check
   assert.equal((await browser.checkLogin()).status, 'authenticated');
   assert.equal(entered, true);
 });
+
+test('provider agreement requires user action and keeps the login window open', async () => {
+  let closed = 0, notified;
+  const browser = new FeiguaBrowser({});
+  browser.ensureWindow = () => {};
+  browser.window = { isDestroyed: () => false, webContents: { getURL: () => 'https://dy.feigua.cn/app/' }, close: () => { closed++; } };
+  browser.execute = async () => ({ authenticated: false, actionRequired: 'terms' });
+  browser.onAuthChange = state => { notified = state; };
+  assert.equal((await browser.checkLogin()).status, 'action_required');
+  browser.startLoginWatch();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(closed, 0); assert.equal(notified.status, 'action_required');
+  browser.stopLoginWatch();
+});
+
+test('agreement appearing during a run stops remaining reads without claiming success', async () => {
+  const { service, calls } = fixture({ collect: async () => { throw Object.assign(new Error('terms'), { code: 'FEIGUA_USER_ACTION_REQUIRED', publicMessage: '请本人处理声明' }); } });
+  await service.start(); await service.job;
+  const state = await service.state();
+  assert.equal(state.auth.status, 'action_required'); assert.equal(calls.length, 1);
+  assert.equal(state.runs[0].status, 'failed');
+  assert.equal(state.runs[0].groups[1].status, 'skipped');
+});

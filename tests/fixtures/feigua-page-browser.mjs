@@ -18,6 +18,9 @@ try {
   assert('使用页面真实工作台链接', run('enter-workspace').url === 'https://dy.feigua.cn/synthetic/workspace');
   await mount('<header><a>进入工作台</a><a>注册 / 登录</a></header>');
   assert('仍有登录入口时不误判已完成登录', run('auth').workspaceAvailable === false);
+  await mount(shell + '<div role="dialog"><h2>数据使用限制声明</h2><button>同意并继续使用</button><button>拒绝并退出</button></div>');
+  assert('声明弹窗阻止后台登录就绪判定', run('auth').authenticated === false && run('auth').actionRequired === 'terms');
+  assert('声明未处理时拒绝采集', run('capture', {kind:'music'}).actionRequired === 'terms');
   await mount(shell + `<div><span>视频标签</span><a class="active"><span>全部</span></a><a>时尚</a></div>
     <table><thead><tr><th>音乐</th><th>总使用人数</th><th aria-sort="descending">昨日使用人数</th></tr></thead>
     <tbody><tr><td><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></td><td>100w</td><td>3w</td></tr></tbody></table>`);
