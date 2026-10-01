@@ -1,0 +1,73 @@
+export const FEIGUA_HOME = 'https://dy.feigua.cn/';
+export const FEIGUA_SOURCES = Object.freeze({
+  music: { label: '本周爆款 BGM Top5', navigation: ['热门音乐'], sort: '昨日使用人数', period: '昨日使用人数', fields: ['title', 'author', 'totalUsers', 'yesterdayUsers'] },
+  topics: { label: '本周话题热点 Top5', navigation: ['热门话题榜', '热门话题'], sort: '参与人数增长率', period: '周榜', fields: ['title', 'author', 'followers', 'participantGrowth', 'playGrowth'] },
+  hotspots: { label: '全网热点 Top5', navigation: ['抖音热点库'], sort: '峰值热度', period: '近7天', fields: ['title', 'peakHeat'] },
+  videos: { label: '关键词带货视频 Top5', navigation: ['带货视频库'], sort: '视频销售额', period: '近7天', fields: ['title', 'products', 'author', 'followers', 'plays', 'likes', 'sales', 'publishedAt'] },
+});
+
+export function isFeiguaDataUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port && /^dy\d*\.feigua\.cn$/.test(url.hostname);
+  } catch { return false; }
+}
+
+export function normalizeKeywords(input) {
+  if (!Array.isArray(input) || input.length > 50) throw new Error('最多配置 50 个关键词');
+  const result = [];
+  for (const item of input) {
+    if (typeof item !== 'string') throw new Error('关键词必须是文字');
+    const keyword = item.trim();
+    if (!keyword) continue;
+    if (keyword.length > 60 || /[\r\n\u0000-\u001f]/.test(keyword)) throw new Error('每个关键词限 60 字，不含换行或控制字符');
+    if (!result.includes(keyword)) result.push(keyword);
+  }
+  return result;
+}
+
+function value(input, max = 1000) {
+  return typeof input === 'string' ? input.trim().slice(0, max) || null : null;
+}
+
+// Whitelist provider data before it crosses IPC or reaches the local store.
+export function validateCapture(kind, keyword, capture) {
+  const source = FEIGUA_SOURCES[kind];
+  if (!source || !capture || !isFeiguaDataUrl(capture.url)) throw new Error('飞瓜来源校验失败');
+  if (capture.sort !== source.sort || capture.direction !== 'desc' || capture.period !== source.period || capture.filtersVerified !== true) {
+    throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
+  }
+  if (kind === 'videos' && capture.keyword !== keyword) throw new Error('关键词筛选与当前采集组不一致');
+  if (['topics', 'videos'].includes(kind) && !value(capture.dateRange, 100)) throw new Error('未取得实际统计日期，本组未保存');
+  if (!Array.isArray(capture.rows) || (!capture.rows.length && capture.emptyVerified !== true)) throw new Error('未读到榜单，不能将未加载页面保存为空榜单');
+  const seen = new Set();
+  const rows = [];
+  for (const row of capture.rows) {
+    if (!row || !value(row.title)) throw new Error('榜单缺少标题，页面结构可能已变化');
+    const metric = { music: 'yesterdayUsers', topics: 'participantGrowth', hotspots: 'peakHeat', videos: 'sales' }[kind];
+    if (!value(row[metric])) throw new Error('榜单缺少排名指标，本组未保存');
+    const url = isFeiguaDataUrl(row.url) ? row.url : null;
+    const id = value(row.id, 200) || url;
+    // Do not collapse unrelated videos solely because they share a title.
+    if (!id) throw new Error('榜单缺少可核验的来源标识，已停止本组采集');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const clean = { id, url, rank: rows.length + 1 };
+    for (const field of source.fields) {
+      clean[field] = field === 'products'
+        ? (Array.isArray(row.products) ? row.products.slice(0, 30).map(product => ({ title: value(product?.title), commission: value(product?.commission, 60) })).filter(product => product.title) : [])
+        : value(row[field]);
+    }
+    clean.missingFields = source.fields.filter(field => field === 'products' ? !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
+    rows.push(clean);
+    if (rows.length === 5) break;
+  }
+  return {
+    kind, keyword: kind === 'videos' ? keyword : null,
+    sourceUrl: capture.url, collectedAt: new Date().toISOString(),
+    sort: source.sort, direction: 'desc', period: source.period,
+    dateRange: value(capture.dateRange, 100),
+    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : { category: '全部' },
+    rows,
+  };
+}

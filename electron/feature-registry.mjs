@@ -13,6 +13,7 @@ export function registerVipFeature(definition) {
 export const featureDefinitions = Object.freeze([
   registerFreeFeature({ id: "media", label: "媒体库", enabled: true, ipcPrefixes: ["media-"], ipcChannels: ["choose-directory", "open-local-path"], httpPrefixes: ["/__media/"] }),
   registerFreeFeature({ id: "qianchuan-videos", label: "千川视频库", enabled: true, ipcPrefixes: ["qianchuan-"], httpPrefixes: ["/__qianchuan_preview/"] }),
+  registerFreeFeature({ id: "feigua-trends", label: "热点采集", enabled: true, ipcPrefixes: ["feigua-"] }),
   registerVipFeature({
     id: "viral-visuals",
     label: "爆款画面库",

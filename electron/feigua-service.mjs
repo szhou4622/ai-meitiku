@@ -1,0 +1,147 @@
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { FEIGUA_SOURCES, normalizeKeywords, validateCapture } from './feigua-contract.mjs';
+
+const initial = () => ({ version: 1, keywords: [], runs: [] });
+
+export class FeiguaService {
+  constructor({ userDataPath, browser, storage }) {
+    this.browser = browser;
+    this.data = initial();
+    this.auth = { status: 'unknown', message: '请登录飞瓜后检查登录状态' };
+    this.browser.onAuthChange = auth => { this.auth = auth; };
+    this.controller = null;
+    this.writeQueue = Promise.resolve();
+    this.configQueue = Promise.resolve();
+    this.operation = null;
+    const filename = path.join(userDataPath, 'feigua-trends', 'state.json');
+    this.storage = storage || {
+      read: async () => {
+        try { return JSON.parse(await readFile(filename, 'utf8')); }
+        catch (error) { if (error.code === 'ENOENT') return initial(); throw new Error('热点数据读取失败，已保留原文件，请检查本机存储'); }
+      },
+      write: async data => {
+        await mkdir(path.dirname(filename), { recursive: true });
+        await writeFile(`${filename}.tmp`, JSON.stringify(data), { mode: 0o600 });
+        await rename(`${filename}.tmp`, filename);
+      },
+    };
+    this.ready = this.load();
+    this.ready.catch(() => {}); // State calls report initialization errors to the UI.
+  }
+
+  async load() {
+    const data = await this.storage.read();
+    if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
+    this.data = { version: 1, keywords: normalizeKeywords(data.keywords), runs: data.runs.slice(0, 12) };
+    let recovered = false;
+    for (const run of this.data.runs) {
+      if (run.status === 'running') {
+        run.status = 'interrupted';
+        run.message = '上次采集被中断，已保留完成的组；请重新发起采集';
+        for (const group of run.groups) if (['pending', 'running'].includes(group.status)) group.status = 'interrupted';
+        recovered = true;
+      }
+    }
+    if (recovered) await this.persist();
+  }
+
+  persist() {
+    const write = this.writeQueue.then(() => this.storage.write(structuredClone(this.data)));
+    this.writeQueue = write.catch(() => {});
+    return write;
+  }
+
+  async state() {
+    await this.ready;
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller) });
+  }
+
+  async exclusive(action) {
+    await this.ready;
+    if (this.operation || this.controller) throw new Error('正在执行飞瓜操作，请稍后再试');
+    this.operation = Promise.resolve().then(action);
+    try { return await this.operation; } finally { this.operation = null; }
+  }
+
+  async saveKeywords(input) {
+    await this.ready;
+    const keywords = normalizeKeywords(input);
+    const save = this.writeQueue.then(async () => {
+      await this.storage.write({ ...structuredClone(this.data), keywords });
+      this.data.keywords = keywords;
+    });
+    this.writeQueue = save.catch(() => {});
+    this.configQueue = save.catch(() => {});
+    await save;
+    return this.state();
+  }
+
+  async login() {
+    await this.exclusive(() => this.browser.openLogin());
+    return this.state();
+  }
+
+  async checkLogin() {
+    await this.exclusive(async () => { this.auth = await this.browser.checkLogin(); });
+    return this.state();
+  }
+
+  async start() {
+    await this.exclusive(async () => {
+      await this.configQueue;
+      this.auth = await this.browser.checkLogin();
+      if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
+      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending' }));
+      groups.push(...this.data.keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
+      const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords: [...this.data.keywords], groups, message: '准备采集' };
+      this.data.runs.unshift(run);
+      this.data.runs = this.data.runs.slice(0, 12);
+      try { await this.persist(); } catch (error) { this.data.runs.shift(); throw error; }
+      this.controller = new AbortController();
+      // Intent is durable before the first provider read. State is polled via IPC.
+      this.job = this.execute(run, this.controller.signal).catch(() => {
+        run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
+      }).finally(() => { this.controller = null; });
+    });
+    return this.state();
+  }
+
+  async execute(run, signal) {
+    let stop = false;
+    for (const group of run.groups) {
+      if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; continue; }
+      group.status = 'running';
+      run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}`;
+      await this.persist();
+      try {
+        const capture = await this.browser.collect(group.kind, group.keyword, signal);
+        if (signal.aborted) { group.status = 'cancelled'; continue; }
+        group.result = validateCapture(group.kind, group.keyword, capture);
+        group.status = 'completed';
+      } catch (error) {
+        group.status = signal.aborted ? 'cancelled' : 'failed';
+        // Only adapter-owned messages are exposed, never raw browser/network errors.
+        group.message = signal.aborted ? '已取消' : error.publicMessage || '本组采集未通过校验，请打开飞瓜核对页面后重试';
+        if (error.code === 'FEIGUA_AUTH_REQUIRED') {
+          this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
+        }
+      }
+      await this.persist();
+    }
+    const completed = run.groups.filter(group => group.status === 'completed').length;
+    run.status = signal.aborted ? 'cancelled' : completed === run.groups.length ? 'completed' : completed ? 'partial' : 'failed';
+    run.finishedAt = new Date().toISOString();
+    run.message = `${signal.aborted ? '已取消；' : ''}完成 ${completed}/${run.groups.length} 组`;
+    await this.persist();
+  }
+
+  async cancel() {
+    this.controller?.abort();
+    this.browser.stop?.();
+    return this.state();
+  }
+
+  dispose() { this.controller?.abort(); this.browser.dispose?.(); }
+}
