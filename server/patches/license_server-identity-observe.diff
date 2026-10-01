@@ -1,0 +1,57 @@
+--- /Users/a1-6/Documents/ChatGPT/媒体库/server-fixes/ai-media-license-error-log-20260916/candidate/license_server.py	2026-09-16 21:28:31
++++ /private/tmp/claude-501/-Users-a1-6-Documents-ChatGPT-----source-AI-----------Mac---20260819/d4c16c21-e707-4d19-8566-211da5f1af73/scratchpad/4b/license_server.py	2026-09-17 14:51:16
+@@ -6124,6 +6124,54 @@
+                 json_response(self, exc.status, {"ok": False, "error": str(exc), "message": str(exc)})
+             except Exception as exc:
+                 json_response(self, 500, {"ok": False, "error": str(exc), "message": str(exc)})
++            return
++        if parsed.path == "/api/license/identity/observe":
++            # 唯一改动点：ai-media-library 的 v3 机器身份观测。
++            #
++            # 分两段，界线是"是否已确认归属"：
++            #   归属判定阶段 —— 任何失败都返回 404。app_name 只能从请求体里读，
++            #     所以必须先 read_json；它自带 65536 字节上限，正文过大会抛异常。
++            #     此处不得降级为 200：对一个本不属于该应用的路径返回 200，
++            #     等于确认了该路径存在。归属不明也按 404 处理。
++            #   已确认归属阶段 —— 只有确认是 ai-media-library 之后，
++            #     后续任何异常才吞掉并返回 200 空响应，保证不影响本应用自身的请求。
++            #
++            # app_name 在此用字面量比较，不依赖新模块是否可导入，
++            # 这样即使新模块缺失或损坏，其他应用拿到的仍是干净的 404。
++            try:
++                _aiml_data = read_json(self)
++                _aiml_app = str((_aiml_data or {}).get("app_name") or "").strip()
++            except Exception:
++                _aiml_data = None
++                _aiml_app = ""
++            if _aiml_app != "ai-media-library":
++                json_response(self, 404, {"ok": False, "error": "unknown endpoint"})
++                return
++            try:
++                from ai_media_license_identity import (
++                    handle_identity_observe as _aiml_handle_identity_observe,
++                )
++                _aiml_credential_verified = False
++                _aiml_activation_id = None
++                try:
++                    _aiml_row = _device_auth(self.headers)
++                    _aiml_credential_verified = True
++                    _aiml_activation_id = _aiml_row["id"] if "id" in _aiml_row.keys() else None
++                except Exception:
++                    # 无凭证或凭证无效都只是"未验证"，不改变既有校验逻辑。
++                    _aiml_credential_verified = False
++                _aiml_status, _aiml_body = _aiml_handle_identity_observe(
++                    _aiml_data,
++                    DB_PATH,
++                    credential_verified=_aiml_credential_verified,
++                    activation_id=_aiml_activation_id,
++                )
++                json_response(self, _aiml_status, _aiml_body)
++            except Exception:
++                try:
++                    json_response(self, 200, {"ok": True})
++                except Exception:
++                    pass
+             return
+         if parsed.path == "/api/license/device/unbind":
+             try:

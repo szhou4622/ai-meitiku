@@ -1,0 +1,31 @@
+__pycache__/
+*.pyc
+/.venv/
+/.ruff_cache/
+/.pytest_cache/
+/.coverage
+/htmlcov/
+/node_modules/
+/apps/*/node_modules/
+/apps/*/dist/
+/apps/*/coverage/
+/apps/*/.coverage
+/apps/webui/.env
+/apps/*/*.tsbuildinfo
+# 旧工作区残留可能包含失效的 pnpm 链接，迁移完成前保持忽略。
+/webui/node_modules/
+/.idea/
+/.run/
+/volume/
+/.env
+!/.github/
+/build/
+/dist/
+/output/
+/tmp/
+/.pnpm-store
+ux-walkthrough
+
+
+# 走查截图仅用于本地核对，不进仓库。
+/docs/assets/ux-walkthrough/

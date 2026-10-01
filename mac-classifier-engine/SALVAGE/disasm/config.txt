@@ -1,0 +1,1114 @@
+module: xiaoguan_classifier.config
+bytecode: src/xiaoguan_classifier/config.pyc
+sha256: 2205b530f7796bd623d03ca795f857e49bc4a741fe3e69e67a479519534910bf
+python: 3.12.14
+source_filename: xiaoguan_classifier\config.py
+
+  0           0 RESUME                   0
+
+  1           2 SETUP_ANNOTATIONS
+              4 LOAD_CONST               0 (0)
+              6 LOAD_CONST               1 (('annotations',))
+              8 IMPORT_NAME              0 (__future__)
+             10 IMPORT_FROM              1 (annotations)
+             12 STORE_NAME               1 (annotations)
+             14 POP_TOP
+
+  3          16 LOAD_CONST               0 (0)
+             18 LOAD_CONST               2 (None)
+             20 IMPORT_NAME              2 (json)
+             22 STORE_NAME               2 (json)
+
+  4          24 LOAD_CONST               0 (0)
+             26 LOAD_CONST               2 (None)
+             28 IMPORT_NAME              3 (os)
+             30 STORE_NAME               3 (os)
+
+  5          32 LOAD_CONST               0 (0)
+             34 LOAD_CONST               2 (None)
+             36 IMPORT_NAME              4 (sys)
+             38 STORE_NAME               4 (sys)
+
+  6          40 LOAD_CONST               0 (0)
+             42 LOAD_CONST               3 (('asdict', 'dataclass'))
+             44 IMPORT_NAME              5 (dataclasses)
+             46 IMPORT_FROM              6 (asdict)
+             48 STORE_NAME               6 (asdict)
+             50 IMPORT_FROM              7 (dataclass)
+             52 STORE_NAME               7 (dataclass)
+             54 POP_TOP
+
+  7          56 LOAD_CONST               0 (0)
+             58 LOAD_CONST               4 (('Path',))
+             60 IMPORT_NAME              8 (pathlib)
+             62 IMPORT_FROM              9 (Path)
+             64 STORE_NAME               9 (Path)
+             66 POP_TOP
+
+ 10          68 LOAD_CONST              46 (('return', 'Path'))
+             70 LOAD_CONST               5 (<code object resolve_app_root at <address>, file "xiaoguan_classifier\config.py", line 10>)
+             72 MAKE_FUNCTION            4 (annotations)
+             74 STORE_NAME              10 (resolve_app_root)
+
+ 21          76 PUSH_NULL
+             78 LOAD_NAME               10 (resolve_app_root)
+             80 CALL                     0
+             88 STORE_NAME              11 (APP_ROOT)
+
+ 22          90 LOAD_NAME               11 (APP_ROOT)
+             92 LOAD_CONST               6 ('config')
+             94 BINARY_OP               11 (/)
+             98 STORE_NAME              12 (CONFIG_DIR)
+
+ 23         100 LOAD_NAME               12 (CONFIG_DIR)
+            102 LOAD_CONST               7 ('settings.json')
+            104 BINARY_OP               11 (/)
+            108 STORE_NAME              13 (SETTINGS_PATH)
+
+ 24         110 LOAD_NAME               11 (APP_ROOT)
+            112 LOAD_CONST               8 ('.env.local')
+            114 BINARY_OP               11 (/)
+            118 STORE_NAME              14 (ENV_PATH)
+
+ 27         120 LOAD_NAME                7 (dataclass)
+
+ 28         122 PUSH_NULL
+            124 LOAD_BUILD_CLASS
+            126 LOAD_CONST               9 (<code object ProviderConfig at <address>, file "xiaoguan_classifier\config.py", line 27>)
+            128 MAKE_FUNCTION            0
+            130 LOAD_CONST              10 ('ProviderConfig')
+            132 CALL                     2
+
+ 27         140 CALL                     0
+
+ 28         148 STORE_NAME              15 (ProviderConfig)
+
+ 46         150 PUSH_NULL
+            152 LOAD_NAME               15 (ProviderConfig)
+            154 LOAD_CONST              11 ('volcengine')
+            156 LOAD_CONST              12 ('https://ark.cn-beijing.volces.com/api/v3')
+            158 LOAD_CONST              13 ('')
+            160 LOAD_CONST              14 ('ARK_API_KEY')
+            162 LOAD_CONST              15 (4)
+            164 LOAD_CONST              16 (8)
+            166 CALL                     6
+
+ 47         174 PUSH_NULL
+            176 LOAD_NAME               15 (ProviderConfig)
+            178 LOAD_CONST              17 ('volcengine')
+            180 LOAD_CONST              18 ('https://ark.cn-beijing.volces.com/api/v3')
+            182 LOAD_CONST              19 ('')
+            184 LOAD_CONST              20 ('ARK_API_KEY')
+            186 LOAD_CONST              15 (4)
+            188 LOAD_CONST              16 (8)
+            190 CALL                     6
+
+ 48         198 PUSH_NULL
+            200 LOAD_NAME               15 (ProviderConfig)
+            202 LOAD_CONST              21 ('volcengine')
+            204 LOAD_CONST              22 ('https://ark.cn-beijing.volces.com/api/v3')
+            206 LOAD_CONST              23 ('')
+            208 LOAD_CONST              24 ('ARK_API_KEY')
+            210 LOAD_CONST              25 (3)
+            212 LOAD_CONST              16 (8)
+            214 CALL                     6
+
+ 49         222 PUSH_NULL
+            224 LOAD_NAME               15 (ProviderConfig)
+            226 LOAD_CONST              26 ('volcengine')
+            228 LOAD_CONST              27 ('https://ark.cn-beijing.volces.com/api/v3')
+            230 LOAD_CONST              28 ('')
+            232 LOAD_CONST              29 ('ARK_API_KEY')
+            234 LOAD_CONST              15 (4)
+            236 LOAD_CONST              16 (8)
+            238 CALL                     6
+
+ 45         246 LOAD_CONST              30 (('volcengine', 'volcengine', 'volcengine', 'volcengine'))
+            248 BUILD_CONST_KEY_MAP      4
+            250 STORE_NAME              16 (PROVIDER_DEFAULTS)
+            252 LOAD_CONST              31 ('dict[str, ProviderConfig]')
+            254 LOAD_NAME               17 (__annotations__)
+            256 LOAD_CONST              32 ('PROVIDER_DEFAULTS')
+            258 STORE_SUBSCR
+
+ 53         262 LOAD_CONST              47 (('provider', 'str', 'return', 'ProviderConfig'))
+            264 LOAD_CONST              33 (<code object get_provider_defaults at <address>, file "xiaoguan_classifier\config.py", line 53>)
+            266 MAKE_FUNCTION            4 (annotations)
+            268 STORE_NAME              18 (get_provider_defaults)
+
+ 57         270 LOAD_CONST              48 ((True,))
+            272 LOAD_CONST              49 (('value', 'object', 'default', 'bool', 'return', 'bool'))
+            274 LOAD_CONST              34 (<code object _safe_bool at <address>, file "xiaoguan_classifier\config.py", line 57>)
+            276 MAKE_FUNCTION            5 (defaults, annotations)
+            278 STORE_NAME              19 (_safe_bool)
+
+ 65         280 LOAD_CONST              50 (('value', 'object', 'return', 'str'))
+            282 LOAD_CONST              35 (<code object _safe_mode at <address>, file "xiaoguan_classifier\config.py", line 65>)
+            284 MAKE_FUNCTION            4 (annotations)
+            286 STORE_NAME              20 (_safe_mode)
+
+ 72         288 LOAD_CONST              51 (('return', 'ProviderConfig'))
+            290 LOAD_CONST              36 (<code object load_settings at <address>, file "xiaoguan_classifier\config.py", line 72>)
+            292 MAKE_FUNCTION            4 (annotations)
+            294 STORE_NAME              21 (load_settings)
+
+ 93         296 LOAD_CONST              51 (('return', 'ProviderConfig'))
+            298 LOAD_CONST              37 (<code object load_text_settings at <address>, file "xiaoguan_classifier\config.py", line 93>)
+            300 MAKE_FUNCTION            4 (annotations)
+            302 STORE_NAME              22 (load_text_settings)
+
+111         304 LOAD_CONST              52 (('return', 'dict[str, object]'))
+            306 LOAD_CONST              38 (<code object _settings_payload at <address>, file "xiaoguan_classifier\config.py", line 111>)
+            308 MAKE_FUNCTION            4 (annotations)
+            310 STORE_NAME              23 (_settings_payload)
+
+123         312 LOAD_CONST              53 ((None,))
+            314 LOAD_CONST              54 (('config', 'ProviderConfig', 'api_key', 'str | None', 'return', 'None'))
+            316 LOAD_CONST              39 (<code object save_settings at <address>, file "xiaoguan_classifier\config.py", line 123>)
+            318 MAKE_FUNCTION            5 (defaults, annotations)
+            320 STORE_NAME              24 (save_settings)
+
+132         322 LOAD_CONST              53 ((None,))
+            324 LOAD_CONST              54 (('config', 'ProviderConfig', 'api_key', 'str | None', 'return', 'None'))
+            326 LOAD_CONST              40 (<code object save_text_settings at <address>, file "xiaoguan_classifier\config.py", line 132>)
+            328 MAKE_FUNCTION            5 (defaults, annotations)
+            330 STORE_NAME              25 (save_text_settings)
+
+141         332 LOAD_CONST              53 ((None,))
+            334 LOAD_CONST              55 (('path', 'Path | None', 'return', 'dict[str, str]'))
+            336 LOAD_CONST              41 (<code object parse_env_file at <address>, file "xiaoguan_classifier\config.py", line 141>)
+            338 MAKE_FUNCTION            5 (defaults, annotations)
+            340 STORE_NAME              26 (parse_env_file)
+
+155         342 LOAD_CONST              56 (('config', 'ProviderConfig', 'return', 'str'))
+            344 LOAD_CONST              42 (<code object load_api_key at <address>, file "xiaoguan_classifier\config.py", line 155>)
+            346 MAKE_FUNCTION            4 (annotations)
+            348 STORE_NAME              27 (load_api_key)
+
+162         350 LOAD_CONST              57 (('env_name', 'str', 'api_key', 'str', 'return', 'None'))
+            352 LOAD_CONST              43 (<code object save_api_key at <address>, file "xiaoguan_classifier\config.py", line 162>)
+            354 MAKE_FUNCTION            4 (annotations)
+            356 STORE_NAME              28 (save_api_key)
+
+172         358 LOAD_CONST              58 (('return', 'bool'))
+            360 LOAD_CONST              44 (<code object has_usable_api_config at <address>, file "xiaoguan_classifier\config.py", line 172>)
+            362 MAKE_FUNCTION            4 (annotations)
+            364 STORE_NAME              29 (has_usable_api_config)
+
+177         366 LOAD_CONST              58 (('return', 'bool'))
+            368 LOAD_CONST              45 (<code object has_usable_text_config at <address>, file "xiaoguan_classifier\config.py", line 177>)
+            370 MAKE_FUNCTION            4 (annotations)
+            372 STORE_NAME              30 (has_usable_text_config)
+            374 RETURN_CONST             2 (None)
+
+Disassembly of <code object resolve_app_root at <address>, file "xiaoguan_classifier\config.py", line 10>:
+ 10           0 RESUME                   0
+
+ 11           2 LOAD_GLOBAL              1 (NULL + getattr)
+             12 LOAD_GLOBAL              2 (sys)
+             22 LOAD_CONST               1 ('frozen')
+             24 LOAD_CONST               2 (False)
+             26 CALL                     3
+             34 POP_JUMP_IF_FALSE      193 (to 422)
+
+ 12          36 LOAD_GLOBAL              5 (NULL + Path)
+             46 LOAD_GLOBAL              2 (sys)
+             56 LOAD_ATTR                6 (executable)
+             76 CALL                     1
+             84 LOAD_ATTR                9 (NULL|self + resolve)
+            104 CALL                     0
+            112 STORE_FAST               0 (exe)
+
+ 13         114 LOAD_FAST                0 (exe)
+            116 LOAD_ATTR               10 (parent)
+            136 LOAD_ATTR               10 (parent)
+            156 LOAD_ATTR               12 (name)
+            176 LOAD_ATTR               15 (NULL|self + lower)
+            196 CALL                     0
+            204 LOAD_CONST               3 ('bin')
+            206 COMPARE_OP              40 (==)
+            210 POP_JUMP_IF_FALSE       32 (to 276)
+
+ 14         212 LOAD_FAST                0 (exe)
+            214 LOAD_ATTR               10 (parent)
+            234 LOAD_ATTR               10 (parent)
+            254 LOAD_ATTR               10 (parent)
+            274 RETURN_VALUE
+
+ 15     >>  276 LOAD_FAST                0 (exe)
+            278 LOAD_ATTR               10 (parent)
+            298 LOAD_ATTR               12 (name)
+            318 LOAD_ATTR               15 (NULL|self + lower)
+            338 CALL                     0
+            346 LOAD_CONST               3 ('bin')
+            348 COMPARE_OP              40 (==)
+            352 POP_JUMP_IF_FALSE       22 (to 398)
+
+ 16         354 LOAD_FAST                0 (exe)
+            356 LOAD_ATTR               10 (parent)
+            376 LOAD_ATTR               10 (parent)
+            396 RETURN_VALUE
+
+ 17     >>  398 LOAD_FAST                0 (exe)
+            400 LOAD_ATTR               10 (parent)
+            420 RETURN_VALUE
+
+ 18     >>  422 LOAD_GLOBAL              5 (NULL + Path)
+            432 LOAD_GLOBAL             16 (__file__)
+            442 CALL                     1
+            450 LOAD_ATTR                9 (NULL|self + resolve)
+            470 CALL                     0
+            478 LOAD_ATTR               18 (parents)
+            498 LOAD_CONST               4 (2)
+            500 BINARY_SUBSCR
+            504 RETURN_VALUE
+
+Disassembly of <code object ProviderConfig at <address>, file "xiaoguan_classifier\config.py", line 27>:
+ 27           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('ProviderConfig')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 29          12 LOAD_CONST               1 ('volcengine')
+             14 STORE_NAME               3 (provider)
+             16 LOAD_CONST               2 ('str')
+             18 LOAD_NAME                4 (__annotations__)
+             20 LOAD_CONST               3 ('provider')
+             22 STORE_SUBSCR
+
+ 30          26 LOAD_CONST               4 ('https://ark.cn-beijing.volces.com/api/v3')
+             28 STORE_NAME               5 (base_url)
+             30 LOAD_CONST               2 ('str')
+             32 LOAD_NAME                4 (__annotations__)
+             34 LOAD_CONST               5 ('base_url')
+             36 STORE_SUBSCR
+
+ 31          40 LOAD_CONST               6 ('')
+             42 STORE_NAME               6 (model)
+             44 LOAD_CONST               2 ('str')
+             46 LOAD_NAME                4 (__annotations__)
+             48 LOAD_CONST               7 ('model')
+             50 STORE_SUBSCR
+
+ 32          54 LOAD_CONST               8 ('ARK_API_KEY')
+             56 STORE_NAME               7 (api_key_env)
+             58 LOAD_CONST               2 ('str')
+             60 LOAD_NAME                4 (__annotations__)
+             62 LOAD_CONST               9 ('api_key_env')
+             64 STORE_SUBSCR
+
+ 33          68 LOAD_CONST              10 (4)
+             70 STORE_NAME               8 (max_workers)
+             72 LOAD_CONST              11 ('int')
+             74 LOAD_NAME                4 (__annotations__)
+             76 LOAD_CONST              12 ('max_workers')
+             78 STORE_SUBSCR
+
+ 34          82 LOAD_CONST              13 (8)
+             84 STORE_NAME               9 (frame_count)
+             86 LOAD_CONST              11 ('int')
+             88 LOAD_NAME                4 (__annotations__)
+             90 LOAD_CONST              14 ('frame_count')
+             92 STORE_SUBSCR
+
+ 35          96 LOAD_CONST              15 ('balanced')
+             98 STORE_NAME              10 (classification_mode)
+            100 LOAD_CONST               2 ('str')
+            102 LOAD_NAME                4 (__annotations__)
+            104 LOAD_CONST              16 ('classification_mode')
+            106 STORE_SUBSCR
+
+ 36         110 LOAD_CONST              17 (True)
+            112 STORE_NAME              11 (smart_frames)
+            114 LOAD_CONST              18 ('bool')
+            116 LOAD_NAME                4 (__annotations__)
+            118 LOAD_CONST              19 ('smart_frames')
+            120 STORE_SUBSCR
+
+ 37         124 LOAD_CONST              20 (False)
+            126 STORE_NAME              12 (auto_retry)
+            128 LOAD_CONST              18 ('bool')
+            130 LOAD_NAME                4 (__annotations__)
+            132 LOAD_CONST              21 ('auto_retry')
+            134 STORE_SUBSCR
+
+ 38         138 LOAD_CONST              22 (500)
+            140 STORE_NAME              13 (max_tokens)
+            142 LOAD_CONST              11 ('int')
+            144 LOAD_NAME                4 (__annotations__)
+            146 LOAD_CONST              23 ('max_tokens')
+            148 STORE_SUBSCR
+
+ 40         152 LOAD_NAME               14 (property)
+
+ 41         154 LOAD_CONST              26 (('return', 'str'))
+            156 LOAD_CONST              24 (<code object chat_completions_url at <address>, file "xiaoguan_classifier\config.py", line 40>)
+            158 MAKE_FUNCTION            4 (annotations)
+
+ 40         160 CALL                     0
+
+ 41         168 STORE_NAME              15 (chat_completions_url)
+            170 RETURN_CONST            25 (None)
+
+Disassembly of <code object chat_completions_url at <address>, file "xiaoguan_classifier\config.py", line 40>:
+ 40           0 RESUME                   0
+
+ 42           2 LOAD_FAST                0 (self)
+              4 LOAD_ATTR                0 (base_url)
+             24 LOAD_ATTR                3 (NULL|self + rstrip)
+             44 LOAD_CONST               1 ('/')
+             46 CALL                     1
+             54 LOAD_CONST               2 ('/chat/completions')
+             56 BINARY_OP                0 (+)
+             60 RETURN_VALUE
+
+Disassembly of <code object get_provider_defaults at <address>, file "xiaoguan_classifier\config.py", line 53>:
+ 53           0 RESUME                   0
+
+ 54           2 LOAD_GLOBAL              0 (PROVIDER_DEFAULTS)
+             12 LOAD_ATTR                3 (NULL|self + get)
+             32 LOAD_FAST                0 (provider)
+             34 LOAD_GLOBAL              0 (PROVIDER_DEFAULTS)
+             44 LOAD_CONST               1 ('volcengine')
+             46 BINARY_SUBSCR
+             50 CALL                     2
+             58 RETURN_VALUE
+
+Disassembly of <code object _safe_bool at <address>, file "xiaoguan_classifier\config.py", line 57>:
+ 57           0 RESUME                   0
+
+ 58           2 LOAD_GLOBAL              1 (NULL + isinstance)
+             12 LOAD_FAST                0 (value)
+             14 LOAD_GLOBAL              2 (bool)
+             24 CALL                     2
+             32 POP_JUMP_IF_FALSE        2 (to 38)
+
+ 59          34 LOAD_FAST                0 (value)
+             36 RETURN_VALUE
+
+ 60     >>   38 LOAD_FAST                0 (value)
+             40 POP_JUMP_IF_NOT_NONE     2 (to 46)
+
+ 61          42 LOAD_FAST                1 (default)
+             44 RETURN_VALUE
+
+ 62     >>   46 LOAD_GLOBAL              5 (NULL + str)
+             56 LOAD_FAST                0 (value)
+             58 CALL                     1
+             66 LOAD_ATTR                7 (NULL|self + strip)
+             86 CALL                     0
+             94 LOAD_ATTR                9 (NULL|self + lower)
+            114 CALL                     0
+            122 LOAD_CONST               1 (frozenset({'0', '关闭', 'no', 'false', '否'}))
+            124 CONTAINS_OP              1
+            126 RETURN_VALUE
+
+Disassembly of <code object _safe_mode at <address>, file "xiaoguan_classifier\config.py", line 65>:
+ 65           0 RESUME                   0
+
+ 66           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (value)
+             14 COPY                     1
+             16 POP_JUMP_IF_TRUE         2 (to 22)
+             18 POP_TOP
+             20 LOAD_CONST               1 ('balanced')
+        >>   22 CALL                     1
+             30 LOAD_ATTR                3 (NULL|self + strip)
+             50 CALL                     0
+             58 STORE_FAST               1 (mode)
+
+ 67          60 LOAD_FAST                1 (mode)
+             62 LOAD_CONST               2 (frozenset({'refine', 'balanced', 'fast'}))
+             64 CONTAINS_OP              1
+             66 POP_JUMP_IF_FALSE        1 (to 70)
+
+ 68          68 RETURN_CONST             1 ('balanced')
+
+ 69     >>   70 LOAD_FAST                1 (mode)
+             72 RETURN_VALUE
+
+Disassembly of <code object load_settings at <address>, file "xiaoguan_classifier\config.py", line 72>:
+ 72           0 RESUME                   0
+
+ 73           2 LOAD_GLOBAL              0 (SETTINGS_PATH)
+             12 LOAD_ATTR                3 (NULL|self + exists)
+             32 CALL                     0
+             40 POP_JUMP_IF_TRUE        11 (to 64)
+
+ 74          42 LOAD_GLOBAL              5 (NULL + get_provider_defaults)
+             52 LOAD_CONST               1 ('volcengine')
+             54 CALL                     1
+             62 RETURN_VALUE
+
+ 75     >>   64 LOAD_GLOBAL              7 (NULL + json)
+             74 LOAD_ATTR                8 (loads)
+             94 LOAD_GLOBAL              0 (SETTINGS_PATH)
+            104 LOAD_ATTR               11 (NULL|self + read_text)
+            124 LOAD_CONST               2 ('utf-8')
+            126 KW_NAMES                 3 (('encoding',))
+            128 CALL                     1
+            136 CALL                     1
+            144 STORE_FAST               0 (data)
+
+ 76         146 LOAD_GLOBAL             13 (NULL + isinstance)
+            156 LOAD_FAST                0 (data)
+            158 LOAD_ATTR               15 (NULL|self + get)
+            178 LOAD_CONST               4 ('vision_model')
+            180 CALL                     1
+            188 LOAD_GLOBAL             16 (dict)
+            198 CALL                     2
+            206 POP_JUMP_IF_FALSE        5 (to 218)
+
+ 77         208 LOAD_FAST                0 (data)
+            210 LOAD_CONST               4 ('vision_model')
+            212 BINARY_SUBSCR
+            216 STORE_FAST               0 (data)
+
+ 78     >>  218 LOAD_GLOBAL              5 (NULL + get_provider_defaults)
+            228 LOAD_GLOBAL             19 (NULL + str)
+            238 LOAD_FAST                0 (data)
+            240 LOAD_ATTR               15 (NULL|self + get)
+            260 LOAD_CONST               5 ('provider')
+            262 CALL                     1
+            270 COPY                     1
+            272 POP_JUMP_IF_TRUE         2 (to 278)
+            274 POP_TOP
+            276 LOAD_CONST               1 ('volcengine')
+        >>  278 CALL                     1
+            286 CALL                     1
+            294 STORE_FAST               1 (defaults)
+
+ 79         296 LOAD_GLOBAL             21 (NULL + ProviderConfig)
+
+ 80         306 LOAD_GLOBAL             19 (NULL + str)
+            316 LOAD_FAST                0 (data)
+            318 LOAD_ATTR               15 (NULL|self + get)
+            338 LOAD_CONST               5 ('provider')
+            340 CALL                     1
+            348 COPY                     1
+            350 POP_JUMP_IF_TRUE        12 (to 376)
+            352 POP_TOP
+            354 LOAD_FAST                1 (defaults)
+            356 LOAD_ATTR               22 (provider)
+        >>  376 CALL                     1
+
+ 81         384 LOAD_GLOBAL             19 (NULL + str)
+            394 LOAD_FAST                0 (data)
+            396 LOAD_ATTR               15 (NULL|self + get)
+            416 LOAD_CONST               6 ('base_url')
+            418 CALL                     1
+            426 COPY                     1
+            428 POP_JUMP_IF_TRUE        12 (to 454)
+            430 POP_TOP
+            432 LOAD_FAST                1 (defaults)
+            434 LOAD_ATTR               24 (base_url)
+        >>  454 CALL                     1
+
+ 82         462 LOAD_GLOBAL             19 (NULL + str)
+            472 LOAD_FAST                0 (data)
+            474 LOAD_ATTR               15 (NULL|self + get)
+            494 LOAD_CONST               7 ('model')
+            496 CALL                     1
+            504 COPY                     1
+            506 POP_JUMP_IF_TRUE        12 (to 532)
+            508 POP_TOP
+            510 LOAD_FAST                1 (defaults)
+            512 LOAD_ATTR               26 (model)
+        >>  532 CALL                     1
+
+ 83         540 LOAD_GLOBAL             19 (NULL + str)
+            550 LOAD_FAST                0 (data)
+            552 LOAD_ATTR               15 (NULL|self + get)
+            572 LOAD_CONST               8 ('api_key_env')
+            574 CALL                     1
+            582 COPY                     1
+            584 POP_JUMP_IF_TRUE        12 (to 610)
+            586 POP_TOP
+            588 LOAD_FAST                1 (defaults)
+            590 LOAD_ATTR               28 (api_key_env)
+        >>  610 CALL                     1
+
+ 84         618 LOAD_GLOBAL             31 (NULL + max)
+            628 LOAD_CONST               9 (1)
+            630 LOAD_GLOBAL             33 (NULL + min)
+            640 LOAD_CONST              10 (12)
+            642 LOAD_GLOBAL             35 (NULL + int)
+            652 LOAD_FAST                0 (data)
+            654 LOAD_ATTR               15 (NULL|self + get)
+            674 LOAD_CONST              11 ('max_workers')
+            676 CALL                     1
+            684 COPY                     1
+            686 POP_JUMP_IF_TRUE        12 (to 712)
+            688 POP_TOP
+            690 LOAD_FAST                1 (defaults)
+            692 LOAD_ATTR               36 (max_workers)
+        >>  712 CALL                     1
+            720 CALL                     2
+            728 CALL                     2
+
+ 85         736 LOAD_GLOBAL             31 (NULL + max)
+            746 LOAD_CONST              12 (3)
+            748 LOAD_GLOBAL             33 (NULL + min)
+            758 LOAD_CONST              10 (12)
+            760 LOAD_GLOBAL             35 (NULL + int)
+            770 LOAD_FAST                0 (data)
+            772 LOAD_ATTR               15 (NULL|self + get)
+            792 LOAD_CONST              13 ('frame_count')
+            794 CALL                     1
+            802 COPY                     1
+            804 POP_JUMP_IF_TRUE        12 (to 830)
+            806 POP_TOP
+            808 LOAD_FAST                1 (defaults)
+            810 LOAD_ATTR               38 (frame_count)
+        >>  830 CALL                     1
+            838 CALL                     2
+            846 CALL                     2
+
+ 86         854 LOAD_GLOBAL             41 (NULL + _safe_mode)
+            864 LOAD_FAST                0 (data)
+            866 LOAD_ATTR               15 (NULL|self + get)
+            886 LOAD_CONST              14 ('classification_mode')
+            888 CALL                     1
+            896 COPY                     1
+            898 POP_JUMP_IF_TRUE        17 (to 934)
+            900 POP_TOP
+            902 LOAD_FAST                0 (data)
+            904 LOAD_ATTR               15 (NULL|self + get)
+            924 LOAD_CONST              15 ('mode')
+            926 CALL                     1
+        >>  934 CALL                     1
+
+ 87         942 LOAD_GLOBAL             43 (NULL + _safe_bool)
+            952 LOAD_FAST                0 (data)
+            954 LOAD_ATTR               15 (NULL|self + get)
+            974 LOAD_CONST              16 ('smart_frames')
+            976 CALL                     1
+            984 LOAD_CONST              17 (True)
+            986 CALL                     2
+
+ 88         994 LOAD_GLOBAL             43 (NULL + _safe_bool)
+           1004 LOAD_FAST                0 (data)
+           1006 LOAD_ATTR               15 (NULL|self + get)
+           1026 LOAD_CONST              18 ('auto_retry')
+           1028 CALL                     1
+           1036 LOAD_CONST              19 (False)
+           1038 CALL                     2
+
+ 89        1046 LOAD_GLOBAL             31 (NULL + max)
+           1056 LOAD_CONST              20 (128)
+           1058 LOAD_GLOBAL             33 (NULL + min)
+           1068 LOAD_CONST              21 (1600)
+           1070 LOAD_GLOBAL             35 (NULL + int)
+           1080 LOAD_FAST                0 (data)
+           1082 LOAD_ATTR               15 (NULL|self + get)
+           1102 LOAD_CONST              22 ('max_tokens')
+           1104 CALL                     1
+           1112 COPY                     1
+           1114 POP_JUMP_IF_TRUE        12 (to 1140)
+           1116 POP_TOP
+           1118 LOAD_FAST                1 (defaults)
+           1120 LOAD_ATTR               44 (max_tokens)
+        >> 1140 CALL                     1
+           1148 CALL                     2
+           1156 CALL                     2
+
+ 79        1164 KW_NAMES                23 (('provider', 'base_url', 'model', 'api_key_env', 'max_workers', 'frame_count', 'classification_mode', 'smart_frames', 'auto_retry', 'max_tokens'))
+           1166 CALL                    10
+           1174 RETURN_VALUE
+
+Disassembly of <code object load_text_settings at <address>, file "xiaoguan_classifier\config.py", line 93>:
+ 93           0 RESUME                   0
+
+ 94           2 LOAD_GLOBAL              0 (SETTINGS_PATH)
+             12 LOAD_ATTR                3 (NULL|self + exists)
+             32 CALL                     0
+             40 POP_JUMP_IF_TRUE        10 (to 62)
+
+ 95          42 LOAD_GLOBAL              5 (NULL + load_settings)
+             52 CALL                     0
+             60 RETURN_VALUE
+
+ 96     >>   62 LOAD_GLOBAL              7 (NULL + json)
+             72 LOAD_ATTR                8 (loads)
+             92 LOAD_GLOBAL              0 (SETTINGS_PATH)
+            102 LOAD_ATTR               11 (NULL|self + read_text)
+            122 LOAD_CONST               1 ('utf-8')
+            124 KW_NAMES                 2 (('encoding',))
+            126 CALL                     1
+            134 CALL                     1
+            142 STORE_FAST               0 (data)
+
+ 97         144 LOAD_GLOBAL             13 (NULL + isinstance)
+            154 LOAD_FAST                0 (data)
+            156 LOAD_ATTR               15 (NULL|self + get)
+            176 LOAD_CONST               3 ('text_model')
+            178 CALL                     1
+            186 LOAD_GLOBAL             16 (dict)
+            196 CALL                     2
+            204 POP_JUMP_IF_TRUE        10 (to 226)
+
+ 98         206 LOAD_GLOBAL              5 (NULL + load_settings)
+            216 CALL                     0
+            224 RETURN_VALUE
+
+ 99     >>  226 LOAD_FAST                0 (data)
+            228 LOAD_CONST               3 ('text_model')
+            230 BINARY_SUBSCR
+            234 STORE_FAST               1 (text_data)
+
+100         236 LOAD_GLOBAL             19 (NULL + get_provider_defaults)
+            246 LOAD_GLOBAL             21 (NULL + str)
+            256 LOAD_FAST                1 (text_data)
+            258 LOAD_ATTR               15 (NULL|self + get)
+            278 LOAD_CONST               4 ('provider')
+            280 CALL                     1
+            288 COPY                     1
+            290 POP_JUMP_IF_TRUE         2 (to 296)
+            292 POP_TOP
+            294 LOAD_CONST               5 ('volcengine')
+        >>  296 CALL                     1
+            304 CALL                     1
+            312 STORE_FAST               2 (defaults)
+
+101         314 LOAD_GLOBAL             23 (NULL + ProviderConfig)
+
+102         324 LOAD_GLOBAL             21 (NULL + str)
+            334 LOAD_FAST                1 (text_data)
+            336 LOAD_ATTR               15 (NULL|self + get)
+            356 LOAD_CONST               4 ('provider')
+            358 CALL                     1
+            366 COPY                     1
+            368 POP_JUMP_IF_TRUE        12 (to 394)
+            370 POP_TOP
+            372 LOAD_FAST                2 (defaults)
+            374 LOAD_ATTR               24 (provider)
+        >>  394 CALL                     1
+
+103         402 LOAD_GLOBAL             21 (NULL + str)
+            412 LOAD_FAST                1 (text_data)
+            414 LOAD_ATTR               15 (NULL|self + get)
+            434 LOAD_CONST               6 ('base_url')
+            436 CALL                     1
+            444 COPY                     1
+            446 POP_JUMP_IF_TRUE        12 (to 472)
+            448 POP_TOP
+            450 LOAD_FAST                2 (defaults)
+            452 LOAD_ATTR               26 (base_url)
+        >>  472 CALL                     1
+
+104         480 LOAD_GLOBAL             21 (NULL + str)
+            490 LOAD_FAST                1 (text_data)
+            492 LOAD_ATTR               15 (NULL|self + get)
+            512 LOAD_CONST               7 ('model')
+            514 CALL                     1
+            522 COPY                     1
+            524 POP_JUMP_IF_TRUE        12 (to 550)
+            526 POP_TOP
+            528 LOAD_FAST                2 (defaults)
+            530 LOAD_ATTR               28 (model)
+        >>  550 CALL                     1
+
+105         558 LOAD_GLOBAL             21 (NULL + str)
+            568 LOAD_FAST                1 (text_data)
+            570 LOAD_ATTR               15 (NULL|self + get)
+            590 LOAD_CONST               8 ('api_key_env')
+            592 CALL                     1
+            600 COPY                     1
+            602 POP_JUMP_IF_TRUE        12 (to 628)
+            604 POP_TOP
+            606 LOAD_FAST                2 (defaults)
+            608 LOAD_ATTR               30 (api_key_env)
+        >>  628 CALL                     1
+
+106         636 LOAD_CONST               9 (1)
+
+107         638 LOAD_CONST              10 (3)
+
+101         640 KW_NAMES                11 (('provider', 'base_url', 'model', 'api_key_env', 'max_workers', 'frame_count'))
+            642 CALL                     6
+            650 RETURN_VALUE
+
+Disassembly of <code object _settings_payload at <address>, file "xiaoguan_classifier\config.py", line 111>:
+111           0 RESUME                   0
+
+112           2 LOAD_GLOBAL              0 (SETTINGS_PATH)
+             12 LOAD_ATTR                3 (NULL|self + exists)
+             32 CALL                     0
+             40 POP_JUMP_IF_TRUE         2 (to 46)
+
+113          42 BUILD_MAP                0
+             44 RETURN_VALUE
+
+114     >>   46 NOP
+
+115          48 LOAD_GLOBAL              5 (NULL + json)
+             58 LOAD_ATTR                6 (loads)
+             78 LOAD_GLOBAL              0 (SETTINGS_PATH)
+             88 LOAD_ATTR                9 (NULL|self + read_text)
+            108 LOAD_CONST               1 ('utf-8')
+            110 KW_NAMES                 2 (('encoding',))
+            112 CALL                     1
+            120 CALL                     1
+            128 STORE_FAST               0 (data)
+
+118         130 LOAD_GLOBAL             13 (NULL + isinstance)
+            140 LOAD_FAST                0 (data)
+            142 LOAD_GLOBAL             14 (dict)
+            152 CALL                     2
+            160 POP_JUMP_IF_TRUE         2 (to 166)
+
+119         162 BUILD_MAP                0
+            164 RETURN_VALUE
+
+120     >>  166 LOAD_FAST                0 (data)
+            168 RETURN_VALUE
+        >>  170 PUSH_EXC_INFO
+
+116         172 LOAD_GLOBAL              4 (json)
+            182 LOAD_ATTR               10 (JSONDecodeError)
+            202 CHECK_EXC_MATCH
+            204 POP_JUMP_IF_FALSE        5 (to 216)
+            206 POP_TOP
+
+117         208 BUILD_MAP                0
+            210 SWAP                     2
+            212 POP_EXCEPT
+            214 RETURN_VALUE
+
+116     >>  216 RERAISE                  0
+        >>  218 COPY                     3
+            220 POP_EXCEPT
+            222 RERAISE                  1
+ExceptionTable:
+  48 to 128 -> 170 [0]
+  170 to 210 -> 218 [1] lasti
+  216 to 216 -> 218 [1] lasti
+
+Disassembly of <code object save_settings at <address>, file "xiaoguan_classifier\config.py", line 123>:
+123           0 RESUME                   0
+
+124           2 LOAD_GLOBAL              0 (CONFIG_DIR)
+             12 LOAD_ATTR                3 (NULL|self + mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+125          48 LOAD_GLOBAL              5 (NULL + _settings_payload)
+             58 CALL                     0
+             66 STORE_FAST               2 (data)
+
+126          68 LOAD_GLOBAL              7 (NULL + asdict)
+             78 LOAD_FAST                0 (config)
+             80 CALL                     1
+             88 LOAD_FAST                2 (data)
+             90 LOAD_CONST               3 ('vision_model')
+             92 STORE_SUBSCR
+
+127          96 LOAD_GLOBAL              8 (SETTINGS_PATH)
+            106 LOAD_ATTR               11 (NULL|self + write_text)
+            126 LOAD_GLOBAL             13 (NULL + json)
+            136 LOAD_ATTR               14 (dumps)
+            156 LOAD_FAST                2 (data)
+            158 LOAD_CONST               4 (False)
+            160 LOAD_CONST               5 (2)
+            162 KW_NAMES                 6 (('ensure_ascii', 'indent'))
+            164 CALL                     3
+            172 LOAD_CONST               7 ('utf-8')
+            174 KW_NAMES                 8 (('encoding',))
+            176 CALL                     2
+            184 POP_TOP
+
+128         186 LOAD_FAST                1 (api_key)
+            188 POP_JUMP_IF_NONE        23 (to 236)
+
+129         190 LOAD_GLOBAL             17 (NULL + save_api_key)
+            200 LOAD_FAST                0 (config)
+            202 LOAD_ATTR               18 (api_key_env)
+            222 LOAD_FAST                1 (api_key)
+            224 CALL                     2
+            232 POP_TOP
+            234 RETURN_CONST             0 (None)
+
+128     >>  236 RETURN_CONST             0 (None)
+
+Disassembly of <code object save_text_settings at <address>, file "xiaoguan_classifier\config.py", line 132>:
+132           0 RESUME                   0
+
+133           2 LOAD_GLOBAL              0 (CONFIG_DIR)
+             12 LOAD_ATTR                3 (NULL|self + mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+134          48 LOAD_GLOBAL              5 (NULL + _settings_payload)
+             58 CALL                     0
+             66 STORE_FAST               2 (data)
+
+135          68 LOAD_GLOBAL              7 (NULL + asdict)
+             78 LOAD_FAST                0 (config)
+             80 CALL                     1
+             88 LOAD_FAST                2 (data)
+             90 LOAD_CONST               3 ('text_model')
+             92 STORE_SUBSCR
+
+136          96 LOAD_GLOBAL              8 (SETTINGS_PATH)
+            106 LOAD_ATTR               11 (NULL|self + write_text)
+            126 LOAD_GLOBAL             13 (NULL + json)
+            136 LOAD_ATTR               14 (dumps)
+            156 LOAD_FAST                2 (data)
+            158 LOAD_CONST               4 (False)
+            160 LOAD_CONST               5 (2)
+            162 KW_NAMES                 6 (('ensure_ascii', 'indent'))
+            164 CALL                     3
+            172 LOAD_CONST               7 ('utf-8')
+            174 KW_NAMES                 8 (('encoding',))
+            176 CALL                     2
+            184 POP_TOP
+
+137         186 LOAD_FAST                1 (api_key)
+            188 POP_JUMP_IF_NONE        23 (to 236)
+
+138         190 LOAD_GLOBAL             17 (NULL + save_api_key)
+            200 LOAD_FAST                0 (config)
+            202 LOAD_ATTR               18 (api_key_env)
+            222 LOAD_FAST                1 (api_key)
+            224 CALL                     2
+            232 POP_TOP
+            234 RETURN_CONST             0 (None)
+
+137     >>  236 RETURN_CONST             0 (None)
+
+Disassembly of <code object parse_env_file at <address>, file "xiaoguan_classifier\config.py", line 141>:
+141           0 RESUME                   0
+
+142           2 LOAD_FAST                0 (path)
+              4 COPY                     1
+              6 POP_JUMP_IF_TRUE         6 (to 20)
+              8 POP_TOP
+             10 LOAD_GLOBAL              0 (ENV_PATH)
+        >>   20 STORE_FAST               0 (path)
+
+143          22 BUILD_MAP                0
+             24 STORE_FAST               1 (values)
+
+144          26 LOAD_FAST                0 (path)
+             28 LOAD_ATTR                3 (NULL|self + exists)
+             48 CALL                     0
+             56 POP_JUMP_IF_TRUE         2 (to 62)
+
+145          58 LOAD_FAST                1 (values)
+             60 RETURN_VALUE
+
+146     >>   62 LOAD_FAST                0 (path)
+             64 LOAD_ATTR                5 (NULL|self + read_text)
+             84 LOAD_CONST               1 ('utf-8')
+             86 KW_NAMES                 2 (('encoding',))
+             88 CALL                     1
+             96 LOAD_ATTR                7 (NULL|self + splitlines)
+            116 CALL                     0
+            124 GET_ITER
+        >>  126 FOR_ITER               126 (to 382)
+            130 STORE_FAST               2 (line)
+
+147         132 LOAD_FAST                2 (line)
+            134 LOAD_ATTR                9 (NULL|self + strip)
+            154 CALL                     0
+            162 STORE_FAST               3 (stripped)
+
+148         164 LOAD_FAST                3 (stripped)
+            166 POP_JUMP_IF_FALSE       21 (to 210)
+            168 LOAD_FAST                3 (stripped)
+            170 LOAD_ATTR               11 (NULL|self + startswith)
+            190 LOAD_CONST               3 ('#')
+            192 CALL                     1
+            200 POP_JUMP_IF_TRUE         4 (to 210)
+            202 LOAD_CONST               4 ('=')
+            204 LOAD_FAST                3 (stripped)
+            206 CONTAINS_OP              1
+            208 POP_JUMP_IF_FALSE        1 (to 212)
+
+149     >>  210 JUMP_BACKWARD           43 (to 126)
+
+150     >>  212 LOAD_FAST                3 (stripped)
+            214 LOAD_ATTR               13 (NULL|self + split)
+            234 LOAD_CONST               4 ('=')
+            236 LOAD_CONST               5 (1)
+            238 CALL                     2
+            246 UNPACK_SEQUENCE          2
+            250 STORE_FAST               4 (key)
+            252 STORE_FAST               5 (value)
+
+151         254 LOAD_FAST                5 (value)
+            256 LOAD_ATTR                9 (NULL|self + strip)
+            276 CALL                     0
+            284 LOAD_ATTR                9 (NULL|self + strip)
+            304 LOAD_CONST               6 ('"')
+            306 CALL                     1
+            314 LOAD_ATTR                9 (NULL|self + strip)
+            334 LOAD_CONST               7 ("'")
+            336 CALL                     1
+            344 LOAD_FAST                1 (values)
+            346 LOAD_FAST                4 (key)
+            348 LOAD_ATTR                9 (NULL|self + strip)
+            368 CALL                     0
+            376 STORE_SUBSCR
+            380 JUMP_BACKWARD          128 (to 126)
+
+146     >>  382 END_FOR
+
+152         384 LOAD_FAST                1 (values)
+            386 RETURN_VALUE
+
+Disassembly of <code object load_api_key at <address>, file "xiaoguan_classifier\config.py", line 155>:
+155           0 RESUME                   0
+
+156           2 LOAD_GLOBAL              0 (os)
+             12 LOAD_ATTR                2 (environ)
+             32 LOAD_ATTR                5 (NULL|self + get)
+             52 LOAD_FAST                0 (config)
+             54 LOAD_ATTR                6 (api_key_env)
+             74 CALL                     1
+             82 STORE_FAST               1 (env_value)
+
+157          84 LOAD_FAST                1 (env_value)
+             86 POP_JUMP_IF_FALSE        2 (to 92)
+
+158          88 LOAD_FAST                1 (env_value)
+             90 RETURN_VALUE
+
+159     >>   92 LOAD_GLOBAL              9 (NULL + parse_env_file)
+            102 CALL                     0
+            110 LOAD_ATTR                5 (NULL|self + get)
+            130 LOAD_FAST                0 (config)
+            132 LOAD_ATTR                6 (api_key_env)
+            152 LOAD_CONST               1 ('')
+            154 CALL                     2
+            162 RETURN_VALUE
+
+Disassembly of <code object save_api_key at <address>, file "xiaoguan_classifier\config.py", line 162>:
+162           0 RESUME                   0
+
+163           2 LOAD_FAST                0 (env_name)
+              4 LOAD_ATTR                1 (NULL|self + strip)
+             24 CALL                     0
+             32 STORE_FAST               0 (env_name)
+
+164          34 LOAD_FAST                0 (env_name)
+             36 POP_JUMP_IF_TRUE        11 (to 60)
+
+165          38 LOAD_GLOBAL              3 (NULL + ValueError)
+             48 LOAD_CONST               1 ('API Key 环境变量名不能为空')
+             50 CALL                     1
+             58 RAISE_VARARGS            1
+
+166     >>   60 LOAD_GLOBAL              5 (NULL + parse_env_file)
+             70 CALL                     0
+             78 STORE_FAST               2 (existing)
+
+167          80 LOAD_FAST                1 (api_key)
+             82 LOAD_ATTR                1 (NULL|self + strip)
+            102 CALL                     0
+            110 LOAD_FAST                2 (existing)
+            112 LOAD_FAST                0 (env_name)
+            114 STORE_SUBSCR
+
+168         118 LOAD_FAST                2 (existing)
+            120 LOAD_ATTR                7 (NULL|self + items)
+            140 CALL                     0
+            148 GET_ITER
+            150 LOAD_FAST_AND_CLEAR      3 (key)
+            152 LOAD_FAST_AND_CLEAR      4 (value)
+            154 SWAP                     3
+            156 BUILD_LIST               0
+            158 SWAP                     2
+        >>  160 FOR_ITER                12 (to 188)
+            164 UNPACK_SEQUENCE          2
+            168 STORE_FAST               3 (key)
+            170 STORE_FAST               4 (value)
+            172 LOAD_FAST                3 (key)
+            174 FORMAT_VALUE             0
+            176 LOAD_CONST               2 ('=')
+            178 LOAD_FAST                4 (value)
+            180 FORMAT_VALUE             0
+            182 BUILD_STRING             3
+            184 LIST_APPEND              2
+            186 JUMP_BACKWARD           14 (to 160)
+        >>  188 END_FOR
+            190 STORE_FAST               5 (lines)
+            192 STORE_FAST               3 (key)
+            194 STORE_FAST               4 (value)
+
+169         196 LOAD_GLOBAL              8 (ENV_PATH)
+            206 LOAD_ATTR               11 (NULL|self + write_text)
+            226 LOAD_CONST               3 ('\n')
+            228 LOAD_ATTR               13 (NULL|self + join)
+            248 LOAD_FAST                5 (lines)
+            250 CALL                     1
+            258 LOAD_CONST               3 ('\n')
+            260 BINARY_OP                0 (+)
+            264 LOAD_CONST               4 ('utf-8')
+            266 KW_NAMES                 5 (('encoding',))
+            268 CALL                     2
+            276 POP_TOP
+            278 RETURN_CONST             0 (None)
+        >>  280 SWAP                     2
+            282 POP_TOP
+
+168         284 SWAP                     3
+            286 STORE_FAST               4 (value)
+            288 STORE_FAST               3 (key)
+            290 RERAISE                  0
+ExceptionTable:
+  156 to 188 -> 280 [3]
+
+Disassembly of <code object has_usable_api_config at <address>, file "xiaoguan_classifier\config.py", line 172>:
+172           0 RESUME                   0
+
+173           2 LOAD_GLOBAL              1 (NULL + load_settings)
+             12 CALL                     0
+             20 STORE_FAST               0 (config)
+
+174          22 LOAD_GLOBAL              3 (NULL + bool)
+             32 LOAD_FAST                0 (config)
+             34 LOAD_ATTR                4 (model)
+             54 LOAD_ATTR                7 (NULL|self + strip)
+             74 CALL                     0
+             82 COPY                     1
+             84 POP_JUMP_IF_FALSE       25 (to 136)
+             86 POP_TOP
+             88 LOAD_GLOBAL              9 (NULL + load_api_key)
+             98 LOAD_FAST                0 (config)
+            100 CALL                     1
+            108 LOAD_ATTR                7 (NULL|self + strip)
+            128 CALL                     0
+        >>  136 CALL                     1
+            144 RETURN_VALUE
+
+Disassembly of <code object has_usable_text_config at <address>, file "xiaoguan_classifier\config.py", line 177>:
+177           0 RESUME                   0
+
+178           2 LOAD_GLOBAL              1 (NULL + load_text_settings)
+             12 CALL                     0
+             20 STORE_FAST               0 (config)
+
+179          22 LOAD_GLOBAL              3 (NULL + bool)
+             32 LOAD_FAST                0 (config)
+             34 LOAD_ATTR                4 (model)
+             54 LOAD_ATTR                7 (NULL|self + strip)
+             74 CALL                     0
+             82 COPY                     1
+             84 POP_JUMP_IF_FALSE       25 (to 136)
+             86 POP_TOP
+             88 LOAD_GLOBAL              9 (NULL + load_api_key)
+             98 LOAD_FAST                0 (config)
+            100 CALL                     1
+            108 LOAD_ATTR                7 (NULL|self + strip)
+            128 CALL                     0
+        >>  136 CALL                     1
+            144 RETURN_VALUE

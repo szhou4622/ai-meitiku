@@ -1,0 +1,11 @@
+module: xiaoguan_classifier.__init__
+bytecode: src/xiaoguan_classifier/__init__.pyc
+sha256: 4a11901cac144a5cffe815e98e890b3dca3c3e0caa8f644e1fc5a6102a3e703e
+python: 3.12.14
+source_filename: xiaoguan_classifier\__init__.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 ('0.1.0')
+              4 STORE_NAME               0 (__version__)
+              6 RETURN_CONST             1 (None)

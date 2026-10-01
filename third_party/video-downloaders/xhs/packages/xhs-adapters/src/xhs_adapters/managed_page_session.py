@@ -1,0 +1,276 @@
+"""通过本机 CDP 建立短生命周期的 Playwright 页面会话。"""
+
+from collections.abc import Callable, Sequence
+from contextlib import suppress
+from typing import Any, Protocol, cast
+
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    async_playwright,
+)
+from playwright.async_api import (
+    Error as PlaywrightError,
+)
+from xhs_core.domain import ManagedBrowserError
+
+from .chromium_process import CDP_HOST
+
+CDP_CONNECT_TIMEOUT_MILLISECONDS = 10_000
+_XHS_COOKIE_DOMAINS = ("xiaohongshu.com", ".xiaohongshu.com")
+_PUBLISH_BUTTON_NAMES = {"发布", "定时发布"}
+_SPACE_KEY = {
+    "key": " ",
+    "code": "Space",
+    "windowsVirtualKeyCode": 32,
+    "nativeVirtualKeyCode": 32,
+}
+
+
+class ManagedPage(Protocol):
+    """受管任务执行器依赖的最小页面接口。"""
+
+    @property
+    def url(self) -> str:
+        """返回当前页面地址。
+
+        Returns:
+            仅用于进程内导航判定且不应写入日志的地址。
+        """
+        ...
+
+    async def goto(
+        self,
+        url: str,
+        **options: Any,
+    ) -> Any:
+        """导航到受信任地址。
+
+        Args:
+            url: 已验证的小红书页面地址。
+            **options: Playwright 页面就绪阶段和等待上限。
+
+        Returns:
+            Playwright 导航响应；调用方不读取其中的敏感信息。
+        """
+        ...
+
+    async def evaluate(self, expression: str, arg: Any = None) -> Any:
+        """在页面主世界执行适配器调用。
+
+        Args:
+            expression: 固定的适配器调用表达式。
+            arg: 已验证的结构化任务。
+
+        Returns:
+            可序列化的页面执行结果。
+        """
+        ...
+
+    async def click(self, selector: str, **options: Any) -> None:
+        """通过浏览器级输入点击页面控件。
+
+        Args:
+            selector: 页面适配器预检并由执行器复核的固定选择器。
+            **options: Playwright 严格匹配和等待上限。
+        """
+        ...
+
+    async def close(self) -> None:
+        """关闭当前任务新建的页面。"""
+        ...
+
+    async def bring_to_front(self) -> None:
+        """把需要用户扫码或处理验证的页面置于前台。"""
+        ...
+
+
+class ManagedPageSession(Protocol):
+    """受管任务执行器依赖的 CDP 会话接口。"""
+
+    async def connect(self, port: int) -> None:
+        """连接固定回环地址上的 Chromium。
+
+        Args:
+            port: Chromium 自行分配的 CDP 端口。
+        """
+        ...
+
+    async def pages(self) -> Sequence[ManagedPage]:
+        """列出专用浏览器默认上下文中的页面。
+
+        Returns:
+            当前仍然打开的页面。
+        """
+        ...
+
+    async def new_page(self) -> ManagedPage:
+        """创建任务页面。
+
+        Returns:
+            默认持久化上下文中的新页面。
+        """
+        ...
+
+    async def activate_focused_publish_button(self, page: ManagedPage) -> None:
+        """通过 CDP 语义节点激活当前已聚焦的真实发布按钮。
+
+        Args:
+            page: 当前受管创作页面。
+        """
+        ...
+
+    async def delete_xhs_cookies(self) -> None:
+        """仅清理小红书顶级域的 Cookie，且不读取 Cookie 值。"""
+        ...
+
+    async def close(self) -> None:
+        """断开自动化连接，但不终止受管 Chromium。"""
+        ...
+
+
+class PlaywrightCdpSession:
+    """连接现有 Chromium 默认上下文的 Playwright 会话。"""
+
+    def __init__(self) -> None:
+        """初始化尚未连接的会话。"""
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
+
+    async def connect(self, port: int) -> None:
+        """连接固定回环 CDP 并取得持久化默认上下文。
+
+        Args:
+            port: Chromium 自行分配的 CDP 端口。
+
+        Raises:
+            ManagedBrowserError: CDP 不可连接或缺少默认上下文。
+        """
+        if self._context:
+            return
+        self._playwright = await async_playwright().start()
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(
+                f"http://{CDP_HOST}:{port}",
+                timeout=CDP_CONNECT_TIMEOUT_MILLISECONDS,
+                is_local=True,
+            )
+        except PlaywrightError as error:
+            await self.close()
+            raise ManagedBrowserError("无法连接受管浏览器自动化端点") from error
+        if not self._browser.contexts:
+            await self.close()
+            raise ManagedBrowserError("受管浏览器没有可用的持久化页面上下文")
+        self._context = self._browser.contexts[0]
+
+    async def pages(self) -> Sequence[Page]:
+        """列出默认上下文中的现有页面。
+
+        Returns:
+            当前页面快照。
+
+        Raises:
+            ManagedBrowserError: 会话尚未连接。
+        """
+        if not self._context:
+            raise ManagedBrowserError("受管浏览器自动化会话尚未连接")
+        return tuple(self._context.pages)
+
+    async def new_page(self) -> Page:
+        """在默认持久化上下文中创建页面。
+
+        Returns:
+            新页面。
+
+        Raises:
+            ManagedBrowserError: 会话尚未连接。
+        """
+        if not self._context:
+            raise ManagedBrowserError("受管浏览器自动化会话尚未连接")
+        return await self._context.new_page()
+
+    async def activate_focused_publish_button(self, page: ManagedPage) -> None:
+        """通过 CDP 语义节点激活当前已聚焦的真实发布按钮。
+
+        Args:
+            page: 页面适配器已将真实按钮聚焦的创作页面。
+
+        Raises:
+            ManagedBrowserError: 会话不可用、按钮不唯一或 CDP 输入失败。
+        """
+        if not self._context:
+            raise ManagedBrowserError("受管浏览器自动化会话尚未连接")
+        cdp = await self._context.new_cdp_session(cast(Page, page))
+        try:
+            tree = await cdp.send("Accessibility.getFullAXTree", {"depth": -1})
+            matches = [
+                node
+                for node in tree.get("nodes", [])
+                if _is_focused_publish_button(node)
+            ]
+            if len(matches) != 1:
+                raise ManagedBrowserError("无法唯一确认已聚焦的真实发布按钮")
+            backend_node_id = matches[0]["backendDOMNodeId"]
+            await cdp.send("DOM.focus", {"backendNodeId": backend_node_id})
+            await cdp.send(
+                "Input.dispatchKeyEvent",
+                {"type": "keyDown", **_SPACE_KEY},
+            )
+            await cdp.send(
+                "Input.dispatchKeyEvent",
+                {"type": "keyUp", **_SPACE_KEY},
+            )
+        except ManagedBrowserError:
+            raise
+        except PlaywrightError as error:
+            raise ManagedBrowserError("受管浏览器发布按钮激活失败") from error
+        finally:
+            with suppress(PlaywrightError):
+                await cdp.detach()
+
+    async def delete_xhs_cookies(self) -> None:
+        """仅清理精确匹配小红书顶级域的 Cookie。
+
+        清理直接使用 BrowserContext 的域过滤能力，不读取或返回 Cookie。
+
+        Raises:
+            ManagedBrowserError: 会话尚未连接。
+        """
+        if not self._context:
+            raise ManagedBrowserError("受管浏览器自动化会话尚未连接")
+        for domain in _XHS_COOKIE_DOMAINS:
+            await self._context.clear_cookies(domain=domain)
+
+    async def close(self) -> None:
+        """停止 Playwright 驱动并仅断开 CDP 连接。"""
+        playwright = self._playwright
+        self._context = None
+        self._browser = None
+        self._playwright = None
+        if playwright:
+            # Chromium 生命周期由 ChromiumController 持有; 不能发送 Browser.close。
+            await playwright.stop()
+
+
+ManagedPageSessionFactory = Callable[[], ManagedPageSession]
+
+
+def _is_focused_publish_button(node: dict[str, Any]) -> bool:
+    name = node.get("name", {}).get("value")
+    role = node.get("role", {}).get("value")
+    backend_node_id = node.get("backendDOMNodeId")
+    focused = any(
+        item.get("name") == "focused" and item.get("value", {}).get("value") is True
+        for item in node.get("properties", [])
+    )
+    return (
+        role == "button"
+        and name in _PUBLISH_BUTTON_NAMES
+        and isinstance(backend_node_id, int)
+        and not isinstance(backend_node_id, bool)
+        and backend_node_id > 0
+        and focused
+    )

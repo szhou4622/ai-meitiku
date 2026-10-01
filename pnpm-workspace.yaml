@@ -1,0 +1,18 @@
+allowBuilds:
+  '@alicloud/openapi-core': set this to true or false
+  electron-winstaller: set this to true or false
+  esbuild: set this to true or false
+  onnxruntime-node: set this to true or false
+  protobufjs: set this to true or false
+  sharp: set this to true or false
+  tesseract.js: set this to true or false
+  unrs-resolver: set this to true or false
+  workerd: set this to true or false
+supportedArchitectures:
+  os:
+    - current
+    - darwin
+  cpu:
+    - current
+    - arm64
+    - x64

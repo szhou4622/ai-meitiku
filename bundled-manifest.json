@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-16",
+  "hash_algorithm": "sha256",
+  "tree_hash_format": "sha256 of sorted UTF-8 lines: <file_sha256><two spaces><posix_relative_path><newline>; .env and .env.local are excluded",
+  "ignored_bundles": [
+    {
+      "name": "bundled-classifier",
+      "version": "private-snapshot-2026-09-16",
+      "source_url": null,
+      "sha256": "18a67b03211ee72615eeaaba6e6cd451b8f04d21f577b830876d951a1fcd9e00",
+      "sha256_kind": "tree",
+      "file_count": 3987,
+      "size_bytes": 421906678,
+      "extract_path": "bundled-classifier/",
+      "restore": "private-backup-or-platform-rebuild",
+      "notes": "The hash excludes bundled-classifier/.env. Never place the API key in the backup manifest or Git."
+    },
+    {
+      "name": "bundled-downloaders",
+      "version": "yt-dlp-2026.08.19+xhs-downloader-3.0.0",
+      "source_url": "https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19",
+      "additional_source_url": "https://github.com/Andy-SoulShell/xhs-downloader/tree/cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "sha256": "ec630e1a7c19890d50c52c3906fc3b665064a14bcf9999a6086584da8ac4630e",
+      "sha256_kind": "tree",
+      "file_count": 4567,
+      "size_bytes": 603359745,
+      "extract_path": "bundled-downloaders/",
+      "restore": "public-fetch-plus-private-backup-or-platform-rebuild"
+    },
+    {
+      "name": "bundled-tools",
+      "version": "ffmpeg-7.1-macos+ffmpeg-N-92722-gf22fcd4483-windows",
+      "source_url": "https://pypi.org/project/imageio-ffmpeg/0.6.0/",
+      "sha256": "bafb732c5128c0b25f960c2384067a3e3a442d96a8bfa042c700fbe9e72bb913",
+      "sha256_kind": "tree",
+      "file_count": 3,
+      "size_bytes": 189819168,
+      "extract_path": "bundled-tools/",
+      "restore": "public-fetch-for-macos-private-backup-for-windows"
+    }
+  ],
+  "runtimes": [
+    {
+      "name": "classifier-engine-macos-arm64",
+      "version": "private-snapshot-2026-09-16",
+      "source_url": null,
+      "sha256": "8306954636c012350e642cab8c7016e78e68b69049e07102638b43750c137e03",
+      "sha256_kind": "file",
+      "extract_path": "bundled-classifier/bin/darwin-arm64/素材分类引擎",
+      "automatic": false
+    },
+    {
+      "name": "classifier-engine-macos-x64",
+      "version": "private-snapshot-2026-09-16-python-3.12",
+      "source_url": null,
+      "sha256": "d061be8c8f9e1e3da5d277c582db44d0ab995713418123079813bf51a59112e1",
+      "sha256_kind": "tree",
+      "extract_path": "bundled-classifier/bin/darwin-x64/",
+      "automatic": false
+    },
+    {
+      "name": "classifier-engine-windows-x64",
+      "version": "private-snapshot-2026-09-16",
+      "source_url": null,
+      "sha256": "7accb944e4db7f0926c01bedc6f5c5ca797d61ecf8fbfe09fa29b7580c9a9f28",
+      "sha256_kind": "file",
+      "extract_path": "bundled-classifier/素材分类引擎.exe",
+      "automatic": false
+    },
+    {
+      "name": "xhs-downloader-macos-arm64",
+      "version": "3.0.0+cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "source_url": "https://github.com/Andy-SoulShell/xhs-downloader/tree/cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "sha256": "65ea0c9b3133407eba486d7db6f3f9d28aa0bafc99ccaf44aa73de7961657822",
+      "sha256_kind": "file",
+      "extract_path": "bundled-downloaders/darwin-arm64/xhs-downloader",
+      "automatic": false
+    },
+    {
+      "name": "xhs-downloader-macos-x64",
+      "version": "3.0.0+cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "source_url": "https://github.com/Andy-SoulShell/xhs-downloader/tree/cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "sha256": "97658aa08e40843185ab44db5367dac18416a247afa14f58bcb2bedd5a40c7a7",
+      "sha256_kind": "file",
+      "extract_path": "bundled-downloaders/darwin-x64/xhs-downloader",
+      "automatic": false
+    },
+    {
+      "name": "xhs-downloader-windows-x64-runtime",
+      "version": "3.0.0+cc2bb34036acb12f5a722c95af7bad53ec696d03+python-3.12",
+      "source_url": "https://github.com/Andy-SoulShell/xhs-downloader/tree/cc2bb34036acb12f5a722c95af7bad53ec696d03",
+      "sha256": "e269657b2e7f86efaae6307fbd98ae0ea3d8b38404166e8779fc199a341e1cf6",
+      "sha256_kind": "tree",
+      "extract_path": "bundled-downloaders/win32-x64/xhs-runtime/",
+      "automatic": false
+    },
+    {
+      "name": "yt-dlp-macos-universal",
+      "version": "2026.08.19",
+      "source_url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos",
+      "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+      "sha256_kind": "file",
+      "extract_paths": [
+        "bundled-downloaders/darwin-arm64/yt-dlp",
+        "bundled-downloaders/darwin-x64/yt-dlp",
+        "bundled-downloaders/darwin-universal/yt-dlp"
+      ],
+      "automatic": true,
+      "archive_type": "file"
+    },
+    {
+      "name": "yt-dlp-windows-x64",
+      "version": "2026.08.19",
+      "source_url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+      "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+      "sha256_kind": "file",
+      "extract_path": "bundled-downloaders/win32-x64/yt-dlp.exe",
+      "automatic": true,
+      "archive_type": "file"
+    },
+    {
+      "name": "ffmpeg-macos-arm64",
+      "version": "7.1+imageio-ffmpeg-0.6.0",
+      "source_url": "https://files.pythonhosted.org/packages/40/5c/f3d8a657d362cc93b81aab8feda487317da5b5d31c0e1fdfd5e986e55d17/imageio_ffmpeg-0.6.0-py3-none-macosx_11_0_arm64.whl",
+      "download_sha256": "b1ae3173414b5fc5f538a726c4e48ea97edc0d2cdc11f103afee655c463fa742",
+      "sha256": "6d175a4743ca50256e89a8cdd731100f9cee33bd79aeea46894d209410dc6617",
+      "sha256_kind": "file",
+      "extract_path": "bundled-tools/darwin-arm64/ffmpeg",
+      "automatic": true,
+      "archive_type": "wheel-member",
+      "archive_member": "imageio_ffmpeg/binaries/ffmpeg-macos-aarch64-v7.1"
+    },
+    {
+      "name": "ffmpeg-macos-x64",
+      "version": "7.1+imageio-ffmpeg-0.6.0",
+      "source_url": "https://files.pythonhosted.org/packages/da/58/87ef68ac83f4c7690961bce288fd8e382bc5f1513860fc7f90a9c1c1c6bf/imageio_ffmpeg-0.6.0-py3-none-macosx_10_9_intel.macosx_10_9_x86_64.whl",
+      "download_sha256": "9d2baaf867088508d4a3458e61eeb30e945c4ad8016025545f66c4b5aaef0a61",
+      "sha256": "4a4a968b98859588e98500ae25973d80a5ca5eed0724222b9f76360dcb72a001",
+      "sha256_kind": "file",
+      "extract_path": "bundled-tools/darwin-x64/ffmpeg",
+      "automatic": true,
+      "archive_type": "wheel-member",
+      "archive_member": "imageio_ffmpeg/binaries/ffmpeg-macos-x86_64-v7.1"
+    },
+    {
+      "name": "ffmpeg-windows-x64",
+      "version": "N-92722-gf22fcd4483",
+      "source_url": null,
+      "sha256": "c8abc49e7be62dde8e12972af373959e0076a7b8dc8040eb45978e0608f8781e",
+      "sha256_kind": "file",
+      "extract_path": "bundled-tools/win32-x64/ffmpeg.exe",
+      "automatic": false,
+      "notes": "The exact historical binary source is not documented; restore it from the private backup instead of silently substituting another build."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# Pure-Python packages copied into the embedded Windows 3.12 runtime.
+# Keep these versions aligned with third_party/video-downloaders/xhs/requirements.txt.
+click==8.4.2
+colorama==0.4.6
+win32-setctime==1.2.0

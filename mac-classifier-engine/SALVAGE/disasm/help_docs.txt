@@ -1,0 +1,40 @@
+module: xiaoguan_classifier.help_docs
+bytecode: src/xiaoguan_classifier/help_docs.pyc
+sha256: 2e4838e8d4ee76212eed524353325d7c15e7fc57b9d751810d773abc9a265ed3
+python: 3.12.14
+source_filename: xiaoguan_classifier\help_docs.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  4          14 LOAD_CONST               2 ('https://ecnyp4mrafm2.feishu.cn/docx/JTaEdJQ0goraL2xTx8ScFGNYnKb')
+             16 STORE_NAME               2 (CLASSIFICATION_DOC_URL)
+
+  5          18 LOAD_CONST               3 ('https://fkm8bkhhkj.feishu.cn/wiki/V6Ycw1dwDiMwLak4lAtc1mu7nmf?from=from_copylink')
+             20 STORE_NAME               3 (PRODUCT_GUIDE_DOC_URL)
+
+  6          22 LOAD_NAME                2 (CLASSIFICATION_DOC_URL)
+             24 STORE_NAME               4 (FEISHU_DOC_URL)
+
+  9          26 LOAD_CONST               6 (('return', 'dict[str, str]'))
+             28 LOAD_CONST               4 (<code object help_links at <address>, file "xiaoguan_classifier\help_docs.py", line 9>)
+             30 MAKE_FUNCTION            4 (annotations)
+             32 STORE_NAME               5 (help_links)
+             34 RETURN_CONST             5 (None)
+
+Disassembly of <code object help_links at <address>, file "xiaoguan_classifier\help_docs.py", line 9>:
+  9           0 RESUME                   0
+
+ 11           2 LOAD_GLOBAL              0 (CLASSIFICATION_DOC_URL)
+
+ 12          12 LOAD_GLOBAL              2 (PRODUCT_GUIDE_DOC_URL)
+
+ 10          22 LOAD_CONST               1 (('classification', 'product_guide'))
+             24 BUILD_CONST_KEY_MAP      2
+             26 RETURN_VALUE

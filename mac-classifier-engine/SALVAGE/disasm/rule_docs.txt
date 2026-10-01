@@ -1,0 +1,350 @@
+module: xiaoguan_classifier.rule_docs
+bytecode: src/xiaoguan_classifier/rule_docs.pyc
+sha256: e2b098b60c51750993b1f2403b21f8b901c7b2852046f05cee93a21b82dd2f61
+python: 3.12.14
+source_filename: xiaoguan_classifier\rule_docs.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (html)
+             20 STORE_NAME               2 (html)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (re)
+             28 STORE_NAME               3 (re)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               3 (('Path',))
+             34 IMPORT_NAME              4 (pathlib)
+             36 IMPORT_FROM              5 (Path)
+             38 STORE_NAME               5 (Path)
+             40 POP_TOP
+
+  7          42 LOAD_CONST               4 (1)
+             44 LOAD_CONST               5 (('CONFIG_DIR',))
+             46 IMPORT_NAME              6 (config)
+             48 IMPORT_FROM              7 (CONFIG_DIR)
+             50 STORE_NAME               7 (CONFIG_DIR)
+             52 POP_TOP
+
+  8          54 LOAD_CONST               4 (1)
+             56 LOAD_CONST               6 (('ClassificationTemplate',))
+             58 IMPORT_NAME              8 (templates)
+             60 IMPORT_FROM              9 (ClassificationTemplate)
+             62 STORE_NAME               9 (ClassificationTemplate)
+             64 POP_TOP
+
+ 11          66 LOAD_NAME                7 (CONFIG_DIR)
+             68 LOAD_CONST               7 ('rule_docs')
+             70 BINARY_OP               11 (/)
+             74 STORE_NAME              10 (RULE_DOC_DIR)
+
+ 14          76 LOAD_CONST              12 (('value', 'str', 'return', 'str'))
+             78 LOAD_CONST               8 (<code object _safe_filename at <address>, file "xiaoguan_classifier\rule_docs.py", line 14>)
+             80 MAKE_FUNCTION            4 (annotations)
+             82 STORE_NAME              11 (_safe_filename)
+
+ 20          84 LOAD_CONST              13 (('text', 'str', 'return', 'str'))
+             86 LOAD_CONST               9 (<code object _paragraphs at <address>, file "xiaoguan_classifier\rule_docs.py", line 20>)
+             88 MAKE_FUNCTION            4 (annotations)
+             90 STORE_NAME              12 (_paragraphs)
+
+ 27          92 LOAD_CONST              14 (('template', 'ClassificationTemplate', 'return', 'str'))
+             94 LOAD_CONST              10 (<code object _taxonomy_table at <address>, file "xiaoguan_classifier\rule_docs.py", line 27>)
+             96 MAKE_FUNCTION            4 (annotations)
+             98 STORE_NAME              13 (_taxonomy_table)
+
+ 40         100 LOAD_CONST              15 (('template', 'ClassificationTemplate', 'return', 'Path'))
+            102 LOAD_CONST              11 (<code object build_template_rule_doc at <address>, file "xiaoguan_classifier\rule_docs.py", line 40>)
+            104 MAKE_FUNCTION            4 (annotations)
+            106 STORE_NAME              14 (build_template_rule_doc)
+            108 RETURN_CONST             2 (None)
+
+Disassembly of <code object _safe_filename at <address>, file "xiaoguan_classifier\rule_docs.py", line 14>:
+ 14           0 RESUME                   0
+
+ 15           2 LOAD_GLOBAL              1 (NULL + re)
+             12 LOAD_ATTR                2 (sub)
+             32 LOAD_CONST               1 ('[\\\\/:*?"<>|]+')
+             34 LOAD_CONST               2 ('_')
+             36 LOAD_FAST                0 (value)
+             38 LOAD_ATTR                5 (NULL|self + strip)
+             58 CALL                     0
+             66 CALL                     3
+             74 STORE_FAST               1 (cleaned)
+
+ 16          76 LOAD_GLOBAL              1 (NULL + re)
+             86 LOAD_ATTR                2 (sub)
+            106 LOAD_CONST               3 ('\\s+')
+            108 LOAD_CONST               2 ('_')
+            110 LOAD_FAST                1 (cleaned)
+            112 CALL                     3
+            120 STORE_FAST               1 (cleaned)
+
+ 17         122 LOAD_FAST                1 (cleaned)
+            124 LOAD_CONST               0 (None)
+            126 LOAD_CONST               4 (80)
+            128 BINARY_SLICE
+            130 COPY                     1
+            132 POP_JUMP_IF_TRUE         2 (to 138)
+            134 POP_TOP
+            136 LOAD_CONST               5 ('分类方案')
+        >>  138 RETURN_VALUE
+
+Disassembly of <code object _paragraphs at <address>, file "xiaoguan_classifier\rule_docs.py", line 20>:
+ 20           0 RESUME                   0
+
+ 21           2 LOAD_FAST                0 (text)
+              4 LOAD_ATTR                1 (NULL|self + splitlines)
+             24 CALL                     0
+             32 GET_ITER
+             34 LOAD_FAST_AND_CLEAR      1 (line)
+             36 SWAP                     2
+             38 BUILD_LIST               0
+             40 SWAP                     2
+        >>   42 FOR_ITER                35 (to 116)
+             46 STORE_FAST               1 (line)
+             48 LOAD_FAST                1 (line)
+             50 LOAD_ATTR                3 (NULL|self + strip)
+             70 CALL                     0
+             78 POP_JUMP_IF_TRUE         1 (to 82)
+             80 JUMP_BACKWARD           20 (to 42)
+        >>   82 LOAD_FAST                1 (line)
+             84 LOAD_ATTR                3 (NULL|self + strip)
+            104 CALL                     0
+            112 LIST_APPEND              2
+            114 JUMP_BACKWARD           37 (to 42)
+        >>  116 END_FOR
+            118 STORE_FAST               2 (lines)
+            120 STORE_FAST               1 (line)
+
+ 22         122 LOAD_FAST                2 (lines)
+            124 POP_JUMP_IF_TRUE         1 (to 128)
+
+ 23         126 RETURN_CONST             1 ('<p class="muted">当前方案还没有填写分类规则 / 边界说明。建议在“编辑方案”里补充判断顺序和容易混淆的边界。</p>')
+
+ 24     >>  128 LOAD_CONST               2 ('\n')
+            130 LOAD_ATTR                5 (NULL|self + join)
+            150 LOAD_CONST               3 (<code object <genexpr> at <address>, file "xiaoguan_classifier\rule_docs.py", line 24>)
+            152 MAKE_FUNCTION            0
+            154 LOAD_FAST                2 (lines)
+            156 GET_ITER
+            158 CALL                     0
+            166 CALL                     1
+            174 RETURN_VALUE
+        >>  176 SWAP                     2
+            178 POP_TOP
+
+ 21         180 SWAP                     2
+            182 STORE_FAST               1 (line)
+            184 RERAISE                  0
+ExceptionTable:
+  38 to 78 -> 176 [2]
+  82 to 116 -> 176 [2]
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\rule_docs.py", line 24>:
+ 24           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                29 (to 70)
+             12 STORE_FAST               1 (line)
+             14 LOAD_CONST               0 ('<p>')
+             16 LOAD_GLOBAL              1 (NULL + html)
+             26 LOAD_ATTR                2 (escape)
+             46 LOAD_FAST                1 (line)
+             48 CALL                     1
+             56 FORMAT_VALUE             0
+             58 LOAD_CONST               1 ('</p>')
+             60 BUILD_STRING             3
+             62 YIELD_VALUE              1
+             64 RESUME                   1
+             66 POP_TOP
+             68 JUMP_BACKWARD           31 (to 8)
+        >>   70 END_FOR
+             72 RETURN_CONST             2 (None)
+        >>   74 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             76 RERAISE                  1
+ExceptionTable:
+  4 to 72 -> 74 [0] lasti
+
+Disassembly of <code object _taxonomy_table at <address>, file "xiaoguan_classifier\rule_docs.py", line 27>:
+ 27           0 RESUME                   0
+
+ 28           2 BUILD_LIST               0
+              4 STORE_FAST               1 (rows)
+
+ 29           6 LOAD_FAST                0 (template)
+              8 LOAD_ATTR                0 (taxonomy)
+             28 LOAD_ATTR                3 (NULL|self + items)
+             48 CALL                     0
+             56 GET_ITER
+        >>   58 FOR_ITER                88 (to 238)
+             62 UNPACK_SEQUENCE          2
+             66 STORE_FAST               2 (category)
+             68 STORE_FAST               3 (subcategories)
+
+ 30          70 LOAD_FAST                3 (subcategories)
+             72 POP_JUMP_IF_FALSE       17 (to 108)
+             74 LOAD_CONST               1 ('、')
+             76 LOAD_ATTR                5 (NULL|self + join)
+             96 LOAD_FAST                3 (subcategories)
+             98 CALL                     1
+            106 JUMP_FORWARD             1 (to 110)
+        >>  108 LOAD_CONST               2 ('默认')
+        >>  110 STORE_FAST               4 (sub_text)
+
+ 31         112 LOAD_FAST                1 (rows)
+            114 LOAD_ATTR                7 (NULL|self + append)
+
+ 32         134 LOAD_CONST               3 ('<tr><td class="category">')
+
+ 33         136 LOAD_GLOBAL              9 (NULL + html)
+            146 LOAD_ATTR               10 (escape)
+            166 LOAD_FAST                2 (category)
+            168 CALL                     1
+            176 FORMAT_VALUE             0
+            178 LOAD_CONST               4 ('</td><td>')
+
+ 34         180 LOAD_GLOBAL              9 (NULL + html)
+            190 LOAD_ATTR               10 (escape)
+            210 LOAD_FAST                4 (sub_text)
+            212 CALL                     1
+            220 FORMAT_VALUE             0
+            222 LOAD_CONST               5 ('</td></tr>')
+
+ 32         224 BUILD_STRING             5
+
+ 31         226 CALL                     1
+            234 POP_TOP
+            236 JUMP_BACKWARD           90 (to 58)
+
+ 29     >>  238 END_FOR
+
+ 37         240 LOAD_CONST               6 ('\n')
+            242 LOAD_ATTR                5 (NULL|self + join)
+            262 LOAD_FAST                1 (rows)
+            264 CALL                     1
+            272 RETURN_VALUE
+
+Disassembly of <code object build_template_rule_doc at <address>, file "xiaoguan_classifier\rule_docs.py", line 40>:
+ 40           0 RESUME                   0
+
+ 41           2 LOAD_GLOBAL              0 (RULE_DOC_DIR)
+             12 LOAD_ATTR                3 (NULL|self + mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+ 42          48 LOAD_GLOBAL              5 (NULL + _safe_filename)
+             58 LOAD_FAST                0 (template)
+             60 LOAD_ATTR                6 (name)
+             80 CALL                     1
+             88 FORMAT_VALUE             0
+             90 LOAD_CONST               3 ('_')
+             92 LOAD_GLOBAL              5 (NULL + _safe_filename)
+            102 LOAD_FAST                0 (template)
+            104 LOAD_ATTR                8 (product_name)
+            124 CALL                     1
+            132 FORMAT_VALUE             0
+            134 LOAD_CONST               4 ('_分类规则.html')
+            136 BUILD_STRING             4
+            138 STORE_FAST               1 (filename)
+
+ 43         140 LOAD_GLOBAL              0 (RULE_DOC_DIR)
+            150 LOAD_FAST                1 (filename)
+            152 BINARY_OP               11 (/)
+            156 STORE_FAST               2 (path)
+
+ 44         158 LOAD_CONST               5 ('<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>')
+
+ 49         160 LOAD_GLOBAL             11 (NULL + html)
+            170 LOAD_ATTR               12 (escape)
+            190 LOAD_FAST                0 (template)
+            192 LOAD_ATTR                6 (name)
+            212 CALL                     1
+            220 FORMAT_VALUE             0
+            222 LOAD_CONST               6 (' - 分类规则</title>\n  <style>\n    body {\n      margin: 0;\n      background: #f4f6fa;\n      color: #172033;\n      font-family: "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;\n      line-height: 1.7;\n    }\n    main {\n      max-width: 980px;\n      margin: 0 auto;\n      padding: 34px 28px 52px;\n    }\n    .hero, section {\n      background: #fff;\n      border: 1px solid #d8dde8;\n      padding: 24px;\n      margin-bottom: 16px;\n    }\n    h1 {\n      margin: 0 0 8px;\n      font-size: 28px;\n      line-height: 1.3;\n    }\n    h2 {\n      margin: 0 0 14px;\n      font-size: 19px;\n    }\n    p {\n      margin: 7px 0;\n    }\n    .muted {\n      color: #6b7280;\n    }\n    .pill {\n      display: inline-block;\n      margin: 6px 8px 0 0;\n      padding: 4px 10px;\n      background: #eef3f9;\n      border: 1px solid #d8dde8;\n      color: #334155;\n      font-size: 13px;\n    }\n    table {\n      width: 100%;\n      border-collapse: collapse;\n      table-layout: fixed;\n      background: #fff;\n    }\n    th, td {\n      border: 1px solid #d8dde8;\n      padding: 10px 12px;\n      text-align: left;\n      vertical-align: top;\n      word-break: break-word;\n    }\n    th {\n      background: #eef3f9;\n      font-weight: 700;\n    }\n    .category {\n      width: 220px;\n      font-weight: 700;\n    }\n    .rule-box {\n      background: #fbfcff;\n      border: 1px solid #d8dde8;\n      padding: 14px 16px;\n    }\n    code {\n      background: #eef3f9;\n      padding: 2px 5px;\n    }\n  </style>\n</head>\n<body>\n  <main>\n    <div class="hero">\n      <h1>')
+
+128         224 LOAD_GLOBAL             11 (NULL + html)
+            234 LOAD_ATTR               12 (escape)
+            254 LOAD_FAST                0 (template)
+            256 LOAD_ATTR                6 (name)
+            276 CALL                     1
+            284 FORMAT_VALUE             0
+            286 LOAD_CONST               7 ('</h1>\n      <p class="muted">这是由素材分类工作台根据当前分类方案自动生成的本地规则文档。</p>\n      <span class="pill">产品/项目：')
+
+130         288 LOAD_GLOBAL             11 (NULL + html)
+            298 LOAD_ATTR               12 (escape)
+            318 LOAD_FAST                0 (template)
+            320 LOAD_ATTR                8 (product_name)
+            340 CALL                     1
+            348 FORMAT_VALUE             0
+            350 LOAD_CONST               8 ('</span>\n      <span class="pill">方案 ID：')
+
+131         352 LOAD_GLOBAL             11 (NULL + html)
+            362 LOAD_ATTR               12 (escape)
+            382 LOAD_FAST                0 (template)
+            384 LOAD_ATTR               14 (template_id)
+            404 CALL                     1
+            412 FORMAT_VALUE             0
+            414 LOAD_CONST               9 ('</span>\n      <span class="pill">更新时间：')
+
+132         416 LOAD_GLOBAL             11 (NULL + html)
+            426 LOAD_ATTR               12 (escape)
+            446 LOAD_FAST                0 (template)
+            448 LOAD_ATTR               16 (updated_at)
+            468 COPY                     1
+            470 POP_JUMP_IF_TRUE         2 (to 476)
+            472 POP_TOP
+            474 LOAD_CONST              10 ('未记录')
+        >>  476 CALL                     1
+            484 FORMAT_VALUE             0
+            486 LOAD_CONST              11 ('</span>\n    </div>\n\n    <section>\n      <h2>命名规则</h2>\n      <p><code>')
+
+137         488 LOAD_GLOBAL             11 (NULL + html)
+            498 LOAD_ATTR               12 (escape)
+            518 LOAD_FAST                0 (template)
+            520 LOAD_ATTR               18 (naming_rule)
+            540 CALL                     1
+            548 FORMAT_VALUE             0
+            550 LOAD_CONST              12 ('</code></p>\n      <p class="muted">默认理解：产品名_二级分类_具体画面_景别_素材拍摄日期_序号。实际文件名会根据识别到的二级分类、具体画面、素材日期和序号自动生成。</p>\n      <p class="muted">素材拍摄日期优先读取视频元数据或图片 EXIF；读不到时识别文件名里的 YYYYMMDD 日期，例如 20230818_XIN0628.MP4 会命名为 230818；这些都读不到时才用文件修改日期兜底，并在分类清单里记录日期来源。</p>\n    </section>\n\n    <section>\n      <h2>分类结构</h2>\n      <table>\n        <thead>\n          <tr><th>一级分类</th><th>二级分类</th></tr>\n        </thead>\n        <tbody>\n          ')
+
+149         552 LOAD_GLOBAL             21 (NULL + _taxonomy_table)
+            562 LOAD_FAST                0 (template)
+            564 CALL                     1
+            572 FORMAT_VALUE             0
+            574 LOAD_CONST              13 ('\n        </tbody>\n      </table>\n    </section>\n\n    <section>\n      <h2>分类规则 / 边界说明</h2>\n      <div class="rule-box">\n        ')
+
+157         576 LOAD_GLOBAL             23 (NULL + _paragraphs)
+            586 LOAD_FAST                0 (template)
+            588 LOAD_ATTR               24 (rules)
+            608 CALL                     1
+            616 FORMAT_VALUE             0
+            618 LOAD_CONST              14 ('\n      </div>\n    </section>\n\n    <section>\n      <h2>使用提醒</h2>\n      <ul>\n        <li>如果分类结果不准，优先回到“编辑方案”补充边界说明，而不是只改类目名称。</li>\n        <li>一级分类建议稳定，不要因为单个素材临时增加太多大类。</li>\n        <li>二级分类尽量描述镜头用途和画面构建，不要只堆商品参数。</li>\n        <li>不确定、低置信度、画面主体不清的素材建议进入待筛。</li>\n      </ul>\n    </section>\n  </main>\n</body>\n</html>\n')
+
+ 44         620 BUILD_STRING            17
+            622 STORE_FAST               3 (content)
+
+174         624 LOAD_FAST                2 (path)
+            626 LOAD_ATTR               27 (NULL|self + write_text)
+            646 LOAD_FAST                3 (content)
+            648 LOAD_CONST              15 ('utf-8')
+            650 KW_NAMES                16 (('encoding',))
+            652 CALL                     2
+            660 POP_TOP
+
+175         662 LOAD_FAST                2 (path)
+            664 RETURN_VALUE

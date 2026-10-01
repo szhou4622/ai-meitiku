@@ -1,0 +1,222 @@
+{
+  "name": "ai-media-library",
+  "version": "1.1.17",
+  "packageManager": "pnpm@11.19.0",
+  "private": true,
+  "description": "本地优先的 AI 媒体库",
+  "author": "梅小倩",
+  "main": "electron/main.mjs",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "start": "vinext start",
+    "desktop": "npm run build && node scripts/launch-electron-preview.mjs",
+    "desktop:isolated": "npm run build && node scripts/launch-electron-preview.mjs --isolated",
+    "runtime:verify": "node scripts/verify-electron-runtime-imports.mjs",
+    "local-model:prepare": "node scripts/prepare-local-visual-model.mjs",
+    "xhs:sync:win": "node scripts/sync-windows-xhs-source.mjs",
+    "desktop:win": "npm run runtime:verify && npm run xhs:sync:win && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs win32-x64 && npm run build && electron-builder --win nsis --x64",
+    "desktop:win:dir": "npm run runtime:verify && npm run xhs:sync:win && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs win32-x64 && npm run build && electron-builder --win dir --x64",
+    "downloaders:setup": "zsh scripts/setup-video-downloaders.sh",
+    "downloaders:vendor:win-xhs": "node scripts/vendor-windows-xhs-runtime.mjs",
+    "downloaders:verify": "node scripts/verify-video-downloader-assets.mjs all",
+    "desktop:icon": "zsh scripts/build-macos-icon.sh",
+    "desktop:pack": "npm run runtime:verify && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs darwin-arm64 && npm run desktop:icon && npm run build && electron-builder --mac dir --arm64",
+    "desktop:dmg": "zsh scripts/build-macos-notarized.sh arm64",
+    "desktop:dmg:arm64": "zsh scripts/build-macos-notarized.sh arm64",
+    "desktop:dmg:x64": "zsh scripts/build-macos-notarized.sh x64",
+    "desktop:dmg:universal": "zsh scripts/build-macos-notarized.sh universal",
+    "desktop:dmg:all": "zsh scripts/build-macos-notarized.sh all",
+    "desktop:dmg:notarized": "zsh scripts/build-macos-notarized.sh all",
+    "desktop:dmg:check": "zsh scripts/build-macos-notarized.sh check",
+    "desktop:dmg:arm64:unsigned": "npm run runtime:verify && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs darwin-arm64 && electron-builder --mac dmg --arm64 --publish never",
+    "desktop:dmg:x64:unsigned": "npm run runtime:verify && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs darwin-x64 && electron-builder --mac dmg --x64 --publish never",
+    "desktop:dmg:universal:unsigned": "npm run runtime:verify && npm run local-model:prepare && node scripts/verify-video-downloader-assets.mjs darwin-universal && electron-builder --mac dmg --universal --publish never",
+    "diagnostic:preview": "electron electron/device-diagnostic-main.mjs",
+    "diagnostic:prepare": "node scripts/license-diagnostic-app/prepare-app.mjs",
+    "diagnostic:admin": "node scripts/license-diagnostic-app/admin.mjs",
+    "diagnostic:win": "npm run diagnostic:prepare && electron-builder --config scripts/license-diagnostic-app/electron-builder.json --win nsis --x64 --publish never",
+    "diagnostic:mac:arm64": "npm run diagnostic:prepare && electron-builder --config scripts/license-diagnostic-app/electron-builder.json --mac dmg --arm64 --publish never",
+    "diagnostic:mac:x64": "npm run diagnostic:prepare && electron-builder --config scripts/license-diagnostic-app/electron-builder.json --mac dmg --x64 --publish never",
+    "diagnostic:mac:notarized": "zsh scripts/license-diagnostic-app/build-macos-notarized.sh all",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "db:generate": "drizzle-kit generate"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "4.20260515.1",
+    "@huggingface/transformers": "^3.8.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.11",
+    "lucide-react": "^1.28.0",
+    "next": "^16.2.11",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-server-dom-webpack": "19.2.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vinext": "^0.0.50",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "overrides": {
+    "postcss": "8.5.23",
+    "sharp": "0.35.0"
+  },
+  "type": "module",
+  "dependencies": {
+    "@alicloud/openapi-client": "0.4.15",
+    "@alicloud/sts20150401": "1.2.0",
+    "@alicloud/tea-util": "1.4.11",
+    "@alicloud/videoenhan20200320": "4.0.0",
+    "officeparser": "7.5.1",
+    "semver": "^7.7.4"
+  },
+  "build": {
+    "appId": "com.meixiaoqian.ai-media-library",
+    "productName": "AI媒体库",
+    "artifactName": "AI媒体库-${version}-${os}-${arch}-安装程序.${ext}",
+    "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "files": [
+      "electron/**/*",
+      "electron/contact-service.mjs",
+      "app/viral-display-columns.mjs",
+      "THIRD_PARTY_NOTICES.md",
+      "third_party/video-downloaders/**/*",
+      "build/icon.png",
+      "dist/client/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "minimumSystemVersion": "11.0",
+      "x64ArchFiles": "Contents/Resources/{classifier/bin/{**/*,**/.*/*},bin/**/*,downloaders/**/*,models/**/*}",
+      "hardenedRuntime": true,
+      "signIgnore": [
+        "\\.pak$",
+        "Contents/Resources/classifier/.+\\.(?:a|apache|bsd|build|c|cfg|csv|def|enc|f|f90|gif|gz|h|html|ini|js|json|license|md|npy|npz|pc|pem|pickle|png|pxd|py|pyc|pyf|pyi|pyx|rst|tcl|tm|txt|typed|xml)$"
+      ],
+      "extraResources": [
+        {
+          "from": "bundled-classifier",
+          "to": "classifier",
+          "filter": [
+            "**/*",
+            "!bin/**/*",
+            "!素材分类引擎.exe"
+          ]
+        },
+        {
+          "from": "bundled-classifier/bin/darwin-${arch}",
+          "to": "classifier/bin/darwin-${arch}",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-tools/darwin-${arch}",
+          "to": "bin/darwin-${arch}",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-downloaders/darwin-${arch}",
+          "to": "downloaders",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-models",
+          "to": "models",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
+      "target": [
+        "dir",
+        "dmg"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "bundled-classifier",
+          "to": "classifier",
+          "filter": [
+            "**/*",
+            "!bin/**/*"
+          ]
+        },
+        {
+          "from": "bundled-classifier/bin/win32-x64",
+          "to": "classifier/bin/win32-x64",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-downloaders/win32-x64",
+          "to": "downloaders",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-tools/win32-x64",
+          "to": "bin/win32-x64",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "bundled-models",
+          "to": "models",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI媒体库"
+    }
+  }
+}

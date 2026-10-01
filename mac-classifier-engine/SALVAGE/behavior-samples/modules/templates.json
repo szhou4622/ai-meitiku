@@ -1,0 +1,431 @@
+{
+  "module": "xiaoguan_classifier.templates",
+  "bytecode_sha256": "38950d7389b9025c82a03a42ab883b0f95ba51d5a0b6e45b7f9a38c787d27677",
+  "observed_in_classification_run": true,
+  "sample_count": 12,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "<module>",
+      "calls": 7,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "ClassificationTemplate",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "__create_fn__",
+      "calls": 6,
+      "input": {
+        "__dataclass_type_template_id__": "str",
+        "__dataclass_type_name__": "str",
+        "__dataclass_type_product_name__": "str",
+        "__dataclass_type_taxonomy__": "dict[str, list[str]]",
+        "__dataclass_type_rules__": "str",
+        "__dataclass_type_naming_rule__": "str",
+        "__dataclass_type_updated_at__": "str",
+        "__dataclass_HAS_DEFAULT_FACTORY__": {
+          "type": "_HAS_DEFAULT_FACTORY_CLASS",
+          "fields": {}
+        },
+        "__dataclass_builtins_object__": {
+          "type": "type",
+          "fields": "<builtins.mappingproxy>"
+        },
+        "__dataclass_dflt_rules__": "",
+        "__dataclass_dflt_naming_rule__": "产品名_二级分类_具体画面_景别_素材拍摄日期_序号",
+        "__dataclass_dflt_updated_at__": "",
+        "__dataclass_return_type__": null
+      },
+      "output": {
+        "type": "function",
+        "fields": {}
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "get_active_template",
+      "calls": 1,
+      "input": {},
+      "output": {
+        "type": "ClassificationTemplate",
+        "fields": {
+          "template_id": "custom-1787753524437",
+          "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+          "product_name": "宠物零食兔血冻干「拿铁小方」",
+          "taxonomy": {
+            "01_产品本体展示": "<list>",
+            "02_食用场景应用": "<list>",
+            "03_适口性与宠物互动": "<list>",
+            "04_核心卖点展示": "<list>",
+            "05_合规信息展示": "<list>",
+            "06_促销活动素材": "<list>",
+            "07_品牌与生产信息": "<list>"
+          },
+          "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+          "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+          "updated_at": "2026-09-12T07:15:56.180Z"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "get_active_template_id",
+      "calls": 1,
+      "input": {},
+      "output": "custom-1787753524437"
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "ensure_default_template",
+      "calls": 2,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "builtin_templates",
+      "calls": 2,
+      "input": {},
+      "output": {
+        "type": "list",
+        "length": 4,
+        "items": [
+          {
+            "type": "ClassificationTemplate",
+            "fields": {
+              "template_id": "<str>",
+              "name": "<str>",
+              "product_name": "<str>",
+              "taxonomy": "<dict>",
+              "rules": "<str>",
+              "naming_rule": "<str>",
+              "updated_at": "<str>"
+            }
+          },
+          {
+            "type": "ClassificationTemplate",
+            "fields": {
+              "template_id": "<str>",
+              "name": "<str>",
+              "product_name": "<str>",
+              "taxonomy": "<dict>",
+              "rules": "<str>",
+              "naming_rule": "<str>",
+              "updated_at": "<str>"
+            }
+          },
+          {
+            "type": "ClassificationTemplate",
+            "fields": {
+              "template_id": "<str>",
+              "name": "<str>",
+              "product_name": "<str>",
+              "taxonomy": "<dict>",
+              "rules": "<str>",
+              "naming_rule": "<str>",
+              "updated_at": "<str>"
+            }
+          },
+          {
+            "type": "ClassificationTemplate",
+            "fields": {
+              "template_id": "<str>",
+              "name": "<str>",
+              "product_name": "<str>",
+              "taxonomy": "<dict>",
+              "rules": "<str>",
+              "naming_rule": "<str>",
+              "updated_at": "<str>"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "_now_text",
+      "calls": 8,
+      "input": {},
+      "output": "2026-09-16 16:04:35"
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "__create_fn__.<locals>.__init__",
+      "calls": 9,
+      "input": {
+        "self": {
+          "type": "ClassificationTemplate",
+          "fields": {}
+        },
+        "template_id": "xiaoguan-default",
+        "name": "浓萃乌龙默认方案",
+        "product_name": "浓萃乌龙",
+        "taxonomy": {
+          "00_待筛素材": {
+            "type": "list",
+            "length": 1,
+            "items": [
+              "画面不明确或低相关"
+            ]
+          },
+          "01_痛点镜头": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "上课备考犯困",
+              "办公开会犯困",
+              "午后工作犯困",
+              "加班熬夜犯困",
+              "通勤路上犯困",
+              "开车出行犯困"
+            ]
+          },
+          "02_产品镜头": {
+            "type": "list",
+            "length": 10,
+            "items": [
+              "瓶身展示",
+              "整箱展示",
+              "产品组合",
+              "包装信息",
+              "配料表",
+              "营养成分",
+              "活动机制",
+              "产品空镜",
+              "冰爽清冽",
+              "液体质感"
+            ]
+          },
+          "03_使用镜头": {
+            "type": "list",
+            "length": 7,
+            "items": [
+              "上课备考",
+              "办公开会",
+              "午后工位",
+              "加班续航",
+              "通勤外带",
+              "开车出行",
+              "冰饮畅饮"
+            ]
+          },
+          "04_卖点镜头": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "提神醒脑",
+              "配料干净低负担",
+              "好喝体验"
+            ]
+          },
+          "05_对比镜头": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "喝前喝后",
+              "对比普通咖啡",
+              "对比含糖饮料",
+              "对比能量饮料",
+              "对比普通茶饮",
+              "成分负担对比"
+            ]
+          },
+          "06_真人口播": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "痛点口播",
+              "卖点口播",
+              "场景口播",
+              "测评口播",
+              "活动口播",
+              "主播讲解"
+            ]
+          },
+          "07_品牌背书": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "小罐茶品牌",
+              "现代中国茶",
+              "工厂矩阵",
+              "门店销量",
+              "专利技术",
+              "茶饮研发"
+            ]
+          },
+          "08_达人素材": {
+            "type": "list",
+            "length": 2,
+            "items": [
+              "达人原片",
+              "达人口播"
+            ]
+          },
+          "10_AI生成": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "脑雾清醒特效",
+              "茶咖融合视觉",
+              "咖啡因示意",
+              "液体漩涡",
+              "场景补充",
+              "转场动效"
+            ]
+          }
+        },
+        "rules": "核心判断顺序：产品画面 > 明确痛点动作 > 明确使用动作 > 达人/真人口播 > 卖点反应 > 待筛。\n源文件只作为来源线索，最终按画面主价值分类。\n产品镜头/配料表、营养成分是资料型证据；卖点镜头/配料干净低负担必须把参数转化成购买理由。\n达人素材文件夹只是来源线索，纯产品、冰杯、茶汤、倒饮、配料表等按画面主价值归类。\n低置信度、主体不清、动作不完整、合规风险不明确的素材进入待筛。",
+        "naming_rule": "产品名_二级分类_具体画面_景别_素材拍摄日期_序号",
+        "updated_at": "2026-09-16 16:04:35"
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "template_path",
+      "calls": 9,
+      "input": {
+        "template_id": "xiaoguan-default"
+      },
+      "output": "<runtime>/config/templates/xiaoguan-default.json"
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "load_template",
+      "calls": 1,
+      "input": {
+        "template_id": "custom-1787753524437"
+      },
+      "output": {
+        "type": "ClassificationTemplate",
+        "fields": {
+          "template_id": "custom-1787753524437",
+          "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+          "product_name": "宠物零食兔血冻干「拿铁小方」",
+          "taxonomy": {
+            "01_产品本体展示": "<list>",
+            "02_食用场景应用": "<list>",
+            "03_适口性与宠物互动": "<list>",
+            "04_核心卖点展示": "<list>",
+            "05_合规信息展示": "<list>",
+            "06_促销活动素材": "<list>",
+            "07_品牌与生产信息": "<list>"
+          },
+          "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+          "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+          "updated_at": "2026-09-12T07:15:56.180Z"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.templates",
+      "function": "template_from_dict",
+      "calls": 1,
+      "input": {
+        "data": {
+          "template_id": "custom-1787753524437",
+          "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+          "product_name": "宠物零食兔血冻干「拿铁小方」",
+          "taxonomy": {
+            "01_产品本体展示": {
+              "type": "list",
+              "length": 3,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "02_食用场景应用": {
+              "type": "list",
+              "length": 4,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "03_适口性与宠物互动": {
+              "type": "list",
+              "length": 3,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "04_核心卖点展示": {
+              "type": "list",
+              "length": 4,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "05_合规信息展示": {
+              "type": "list",
+              "length": 3,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "06_促销活动素材": {
+              "type": "list",
+              "length": 3,
+              "items": [
+                "<str>",
+                "<str>",
+                "<str>"
+              ]
+            },
+            "07_品牌与生产信息": {
+              "type": "list",
+              "length": 2,
+              "items": [
+                "<str>",
+                "<str>"
+              ]
+            }
+          },
+          "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+          "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+          "updated_at": "2026-09-12T07:15:56.180Z"
+        }
+      },
+      "output": {
+        "type": "ClassificationTemplate",
+        "fields": {
+          "template_id": "custom-1787753524437",
+          "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+          "product_name": "宠物零食兔血冻干「拿铁小方」",
+          "taxonomy": {
+            "01_产品本体展示": "<list>",
+            "02_食用场景应用": "<list>",
+            "03_适口性与宠物互动": "<list>",
+            "04_核心卖点展示": "<list>",
+            "05_合规信息展示": "<list>",
+            "06_促销活动素材": "<list>",
+            "07_品牌与生产信息": "<list>"
+          },
+          "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+          "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+          "updated_at": "2026-09-12T07:15:56.180Z"
+        }
+      }
+    }
+  ],
+  "note": ""
+}

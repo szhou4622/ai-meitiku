@@ -1,0 +1,1027 @@
+module: xiaoguan_classifier.templates
+bytecode: src/xiaoguan_classifier/templates.pyc
+sha256: 38950d7389b9025c82a03a42ab883b0f95ba51d5a0b6e45b7f9a38c787d27677
+python: 3.12.14
+source_filename: xiaoguan_classifier\templates.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (json)
+             20 STORE_NAME               2 (json)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (uuid)
+             28 STORE_NAME               3 (uuid)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               3 (('asdict', 'dataclass'))
+             34 IMPORT_NAME              4 (dataclasses)
+             36 IMPORT_FROM              5 (asdict)
+             38 STORE_NAME               5 (asdict)
+             40 IMPORT_FROM              6 (dataclass)
+             42 STORE_NAME               6 (dataclass)
+             44 POP_TOP
+
+  6          46 LOAD_CONST               0 (0)
+             48 LOAD_CONST               4 (('datetime',))
+             50 IMPORT_NAME              7 (datetime)
+             52 IMPORT_FROM              7 (datetime)
+             54 STORE_NAME               7 (datetime)
+             56 POP_TOP
+
+  7          58 LOAD_CONST               0 (0)
+             60 LOAD_CONST               5 (('Path',))
+             62 IMPORT_NAME              8 (pathlib)
+             64 IMPORT_FROM              9 (Path)
+             66 STORE_NAME               9 (Path)
+             68 POP_TOP
+
+  8          70 LOAD_CONST               0 (0)
+             72 LOAD_CONST               6 (('Any',))
+             74 IMPORT_NAME             10 (typing)
+             76 IMPORT_FROM             11 (Any)
+             78 STORE_NAME              11 (Any)
+             80 POP_TOP
+
+ 10          82 LOAD_CONST               7 (1)
+             84 LOAD_CONST               8 (('CONFIG_DIR',))
+             86 IMPORT_NAME             12 (config)
+             88 IMPORT_FROM             13 (CONFIG_DIR)
+             90 STORE_NAME              13 (CONFIG_DIR)
+             92 POP_TOP
+
+ 11          94 LOAD_CONST               7 (1)
+             96 LOAD_CONST               9 (('PRODUCT_NAME', 'TAXONOMY'))
+             98 IMPORT_NAME             14 (taxonomy)
+            100 IMPORT_FROM             15 (PRODUCT_NAME)
+            102 STORE_NAME              15 (PRODUCT_NAME)
+            104 IMPORT_FROM             16 (TAXONOMY)
+            106 STORE_NAME              16 (TAXONOMY)
+            108 POP_TOP
+
+ 14         110 LOAD_CONST              10 ('xiaoguan-default')
+            112 STORE_NAME              17 (DEFAULT_TEMPLATE_ID)
+
+ 15         114 LOAD_NAME               13 (CONFIG_DIR)
+            116 LOAD_CONST              11 ('templates')
+            118 BINARY_OP               11 (/)
+            122 STORE_NAME              18 (TEMPLATE_DIR)
+
+ 16         124 LOAD_NAME               13 (CONFIG_DIR)
+            126 LOAD_CONST              12 ('active_template.json')
+            128 BINARY_OP               11 (/)
+            132 STORE_NAME              19 (ACTIVE_TEMPLATE_PATH)
+
+ 19         134 PUSH_NULL
+            136 LOAD_NAME                6 (dataclass)
+            138 LOAD_CONST              13 (True)
+            140 KW_NAMES                14 (('frozen',))
+            142 CALL                     1
+
+ 20         150 PUSH_NULL
+            152 LOAD_BUILD_CLASS
+            154 LOAD_CONST              15 (<code object ClassificationTemplate at <address>, file "xiaoguan_classifier\templates.py", line 19>)
+            156 MAKE_FUNCTION            0
+            158 LOAD_CONST              16 ('ClassificationTemplate')
+            160 CALL                     2
+
+ 19         168 CALL                     0
+
+ 20         176 STORE_NAME              20 (ClassificationTemplate)
+
+ 30         178 LOAD_CONST              30 (('return', 'str'))
+            180 LOAD_CONST              17 (<code object _now_text at <address>, file "xiaoguan_classifier\templates.py", line 30>)
+            182 MAKE_FUNCTION            4 (annotations)
+            184 STORE_NAME              21 (_now_text)
+
+ 34         186 LOAD_CONST              31 (('return', 'ClassificationTemplate'))
+            188 LOAD_CONST              18 (<code object default_template at <address>, file "xiaoguan_classifier\templates.py", line 34>)
+            190 MAKE_FUNCTION            4 (annotations)
+            192 STORE_NAME              22 (default_template)
+
+ 38         194 LOAD_CONST              32 (('return', 'list[ClassificationTemplate]'))
+            196 LOAD_CONST              19 (<code object builtin_templates at <address>, file "xiaoguan_classifier\templates.py", line 38>)
+            198 MAKE_FUNCTION            4 (annotations)
+            200 STORE_NAME              23 (builtin_templates)
+
+159         202 LOAD_CONST              33 (('template_id', 'str', 'return', 'Path'))
+            204 LOAD_CONST              20 (<code object template_path at <address>, file "xiaoguan_classifier\templates.py", line 159>)
+            206 MAKE_FUNCTION            4 (annotations)
+            208 STORE_NAME              24 (template_path)
+
+163         210 LOAD_CONST              34 (('return', 'None'))
+            212 LOAD_CONST              21 (<code object ensure_default_template at <address>, file "xiaoguan_classifier\templates.py", line 163>)
+            214 MAKE_FUNCTION            4 (annotations)
+            216 STORE_NAME              25 (ensure_default_template)
+
+173         218 LOAD_CONST              35 (('data', 'dict[str, Any]', 'return', 'ClassificationTemplate'))
+            220 LOAD_CONST              22 (<code object template_from_dict at <address>, file "xiaoguan_classifier\templates.py", line 173>)
+            222 MAKE_FUNCTION            4 (annotations)
+            224 STORE_NAME              26 (template_from_dict)
+
+194         226 LOAD_CONST              36 (('template_id', 'str', 'return', 'ClassificationTemplate'))
+            228 LOAD_CONST              23 (<code object load_template at <address>, file "xiaoguan_classifier\templates.py", line 194>)
+            230 MAKE_FUNCTION            4 (annotations)
+            232 STORE_NAME              27 (load_template)
+
+202         234 LOAD_CONST              37 (('template', 'ClassificationTemplate', 'return', 'None'))
+            236 LOAD_CONST              24 (<code object save_template at <address>, file "xiaoguan_classifier\templates.py", line 202>)
+            238 MAKE_FUNCTION            4 (annotations)
+            240 STORE_NAME              28 (save_template)
+
+209         242 LOAD_CONST              32 (('return', 'list[ClassificationTemplate]'))
+            244 LOAD_CONST              25 (<code object list_templates at <address>, file "xiaoguan_classifier\templates.py", line 209>)
+            246 MAKE_FUNCTION            4 (annotations)
+            248 STORE_NAME              29 (list_templates)
+
+222         250 LOAD_CONST              30 (('return', 'str'))
+            252 LOAD_CONST              26 (<code object get_active_template_id at <address>, file "xiaoguan_classifier\templates.py", line 222>)
+            254 MAKE_FUNCTION            4 (annotations)
+            256 STORE_NAME              30 (get_active_template_id)
+
+231         258 LOAD_CONST              38 (('template_id', 'str', 'return', 'None'))
+            260 LOAD_CONST              27 (<code object set_active_template_id at <address>, file "xiaoguan_classifier\templates.py", line 231>)
+            262 MAKE_FUNCTION            4 (annotations)
+            264 STORE_NAME              31 (set_active_template_id)
+
+236         266 LOAD_CONST              31 (('return', 'ClassificationTemplate'))
+            268 LOAD_CONST              28 (<code object get_active_template at <address>, file "xiaoguan_classifier\templates.py", line 236>)
+            270 MAKE_FUNCTION            4 (annotations)
+            272 STORE_NAME              32 (get_active_template)
+
+240         274 LOAD_CONST              39 (('template', 'ClassificationTemplate', 'name', 'str', 'product_name', 'str', 'return', 'ClassificationTemplate'))
+            276 LOAD_CONST              29 (<code object clone_template at <address>, file "xiaoguan_classifier\templates.py", line 240>)
+            278 MAKE_FUNCTION            4 (annotations)
+            280 STORE_NAME              33 (clone_template)
+            282 RETURN_CONST             2 (None)
+
+Disassembly of <code object ClassificationTemplate at <address>, file "xiaoguan_classifier\templates.py", line 19>:
+ 19           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('ClassificationTemplate')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 21          12 LOAD_CONST               1 ('str')
+             14 LOAD_NAME                3 (__annotations__)
+             16 LOAD_CONST               2 ('template_id')
+             18 STORE_SUBSCR
+
+ 22          22 LOAD_CONST               1 ('str')
+             24 LOAD_NAME                3 (__annotations__)
+             26 LOAD_CONST               3 ('name')
+             28 STORE_SUBSCR
+
+ 23          32 LOAD_CONST               1 ('str')
+             34 LOAD_NAME                3 (__annotations__)
+             36 LOAD_CONST               4 ('product_name')
+             38 STORE_SUBSCR
+
+ 24          42 LOAD_CONST               5 ('dict[str, list[str]]')
+             44 LOAD_NAME                3 (__annotations__)
+             46 LOAD_CONST               6 ('taxonomy')
+             48 STORE_SUBSCR
+
+ 25          52 LOAD_CONST               7 ('')
+             54 STORE_NAME               4 (rules)
+             56 LOAD_CONST               1 ('str')
+             58 LOAD_NAME                3 (__annotations__)
+             60 LOAD_CONST               8 ('rules')
+             62 STORE_SUBSCR
+
+ 26          66 LOAD_CONST               9 ('产品名_二级分类_具体画面_景别_素材拍摄日期_序号')
+             68 STORE_NAME               5 (naming_rule)
+             70 LOAD_CONST               1 ('str')
+             72 LOAD_NAME                3 (__annotations__)
+             74 LOAD_CONST              10 ('naming_rule')
+             76 STORE_SUBSCR
+
+ 27          80 LOAD_CONST               7 ('')
+             82 STORE_NAME               6 (updated_at)
+             84 LOAD_CONST               1 ('str')
+             86 LOAD_NAME                3 (__annotations__)
+             88 LOAD_CONST              11 ('updated_at')
+             90 STORE_SUBSCR
+             94 RETURN_CONST            12 (None)
+
+Disassembly of <code object _now_text at <address>, file "xiaoguan_classifier\templates.py", line 30>:
+ 30           0 RESUME                   0
+
+ 31           2 LOAD_GLOBAL              1 (NULL + datetime)
+             12 LOAD_ATTR                2 (now)
+             32 CALL                     0
+             40 LOAD_ATTR                5 (NULL|self + strftime)
+             60 LOAD_CONST               1 ('%Y-%m-%d %H:%M:%S')
+             62 CALL                     1
+             70 RETURN_VALUE
+
+Disassembly of <code object default_template at <address>, file "xiaoguan_classifier\templates.py", line 34>:
+ 34           0 RESUME                   0
+
+ 35           2 LOAD_GLOBAL              1 (NULL + builtin_templates)
+             12 CALL                     0
+             20 LOAD_CONST               1 (0)
+             22 BINARY_SUBSCR
+             26 RETURN_VALUE
+
+Disassembly of <code object builtin_templates at <address>, file "xiaoguan_classifier\templates.py", line 38>:
+ 38           0 RESUME                   0
+
+ 40           2 LOAD_GLOBAL              1 (NULL + ClassificationTemplate)
+
+ 41          12 LOAD_GLOBAL              2 (DEFAULT_TEMPLATE_ID)
+
+ 42          22 LOAD_CONST               1 ('浓萃乌龙默认方案')
+
+ 43          24 LOAD_GLOBAL              4 (PRODUCT_NAME)
+
+ 44          34 LOAD_GLOBAL              7 (NULL + TAXONOMY)
+             44 LOAD_ATTR                8 (items)
+             64 CALL                     0
+             72 GET_ITER
+             74 LOAD_FAST_AND_CLEAR      0 (key)
+             76 LOAD_FAST_AND_CLEAR      1 (value)
+             78 SWAP                     3
+             80 BUILD_MAP                0
+             82 SWAP                     2
+        >>   84 FOR_ITER                17 (to 122)
+             88 UNPACK_SEQUENCE          2
+             92 STORE_FAST               0 (key)
+             94 STORE_FAST               1 (value)
+             96 LOAD_FAST                0 (key)
+             98 LOAD_GLOBAL             11 (NULL + list)
+            108 LOAD_FAST                1 (value)
+            110 CALL                     1
+            118 MAP_ADD                  2
+            120 JUMP_BACKWARD           19 (to 84)
+        >>  122 END_FOR
+            124 SWAP                     3
+            126 STORE_FAST               1 (value)
+            128 STORE_FAST               0 (key)
+
+ 46         130 LOAD_CONST               2 ('核心判断顺序：产品画面 > 明确痛点动作 > 明确使用动作 > 达人/真人口播 > 卖点反应 > 待筛。\n源文件只作为来源线索，最终按画面主价值分类。\n产品镜头/配料表、营养成分是资料型证据；卖点镜头/配料干净低负担必须把参数转化成购买理由。\n达人素材文件夹只是来源线索，纯产品、冰杯、茶汤、倒饮、配料表等按画面主价值归类。\n低置信度、主体不清、动作不完整、合规风险不明确的素材进入待筛。')
+
+ 52         132 LOAD_GLOBAL             13 (NULL + _now_text)
+            142 CALL                     0
+
+ 40         150 KW_NAMES                 3 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'updated_at'))
+            152 CALL                     6
+
+ 54         160 LOAD_GLOBAL              1 (NULL + ClassificationTemplate)
+
+ 55         170 LOAD_CONST               4 ('huanding-default')
+
+ 56         172 LOAD_CONST               5 ('环鼎水暖毯-素材分类')
+
+ 57         174 LOAD_CONST               6 ('环鼎')
+
+ 59         176 LOAD_CONST               7 ('画面不明确或低相关')
+            178 BUILD_LIST               1
+
+ 60         180 BUILD_LIST               0
+            182 LOAD_CONST               8 (('电热毯漏电风险', '电磁辐射焦虑', '空调干燥上火', '取暖器制热不均', '老人误操作安全', '孕妇敏感群体担忧', '婴幼儿使用顾虑', '夜间噪音干扰'))
+            184 LIST_EXTEND              1
+
+ 70         186 BUILD_LIST               0
+            188 LOAD_CONST               9 (('主机外观', '毯体展示', '整箱展示', '包装信息', '配件展示', '活动机制'))
+            190 LIST_EXTEND              1
+
+ 71         192 BUILD_LIST               0
+            194 LOAD_CONST              10 (('铺床取暖', '客厅玩耍取暖', '宿舍取暖', '睡前调温', '遥控操作', '旋钮调节', '定时开关', '除螨模式'))
+            196 LIST_EXTEND              1
+
+ 81         198 BUILD_LIST               0
+            200 LOAD_CONST              11 (('水循环制热', '升温速度快', '温润不干燥', '静音运行', '无塑胶异味', '环保安全', '组装简单', '节能省电'))
+            202 LIST_EXTEND              1
+
+ 91         204 BUILD_LIST               0
+            206 LOAD_CONST              12 (('水暖毯vs电热毯', '水暖毯vs空调', '水暖毯vs取暖器', '干燥对比', '噪音对比', '耗电对比'))
+            208 LIST_EXTEND              1
+
+ 92         210 BUILD_LIST               0
+            212 LOAD_CONST              13 (('痛点口播', '卖点口播', '场景口播', '测评口播', '活动口播', '主播讲解'))
+            214 LIST_EXTEND              1
+
+ 93         216 BUILD_LIST               0
+            218 LOAD_CONST              14 (('产地工厂', '质检抽查', '专利技术', '生产线', '用户口碑'))
+            220 LIST_EXTEND              1
+
+ 94         222 LOAD_CONST              15 ('达人原片')
+            224 LOAD_CONST              16 ('达人口播')
+            226 BUILD_LIST               2
+
+ 95         228 BUILD_LIST               0
+            230 LOAD_CONST              17 (('水循环特效', '升温示意', '静音视觉', '除螨示意', '场景补充', '转场动效'))
+            232 LIST_EXTEND              1
+
+ 58         234 LOAD_CONST              18 (('00_待筛素材', '01_痛点镜头', '02_产品镜头', '03_使用镜头', '04_卖点镜头', '05_对比镜头', '06_真人口播', '07_品牌背书', '08_达人素材', '10_AI生成'))
+            236 BUILD_CONST_KEY_MAP     10
+
+ 98         238 LOAD_CONST              19 ('核心判断顺序：产品画面 > 明确痛点动作 > 明确使用动作 > 达人/真人口播 > 卖点反应 > 待筛。\n源文件夹、达人名、文件名只作为来源线索，最终按画面主价值分类。\n低置信度、主体不清、动作不完整、合规风险不明确的素材进入待筛。\n产品镜头中主机、毯体、整箱、包装文字、配件、活动机制等均归入02_产品镜头。\n使用镜头必须有明确的人与产品互动，例如铺床、取暖、遥控、旋钮、定时、除螨等操作或使用状态。\n对比镜头需同时出现对比双方、对比道具，或明显对比效果；只口头提到对比但画面没有对比证据时，按口播或待筛处理。\n卖点镜头可单独展示卖点效果，如温度计、湿度计、噪音计、水循环可视化、升温过程、静音效果、干燥程度等。\n真人口播收自有主播、演员、品牌方讲解；外部达人出镜讲解、试用、测评统一归达人素材/达人口播。\n命名时具体画面必须描述核心视觉元素，景别用全景、中景、近景、特写、俯拍、手持等。')
+
+108         240 LOAD_GLOBAL             13 (NULL + _now_text)
+            250 CALL                     0
+
+ 54         258 KW_NAMES                 3 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'updated_at'))
+            260 CALL                     6
+
+110         268 LOAD_GLOBAL              1 (NULL + ClassificationTemplate)
+
+111         278 LOAD_CONST              20 ('shihu-default')
+
+112         280 LOAD_CONST              21 ('石斛原浆默认方案')
+
+113         282 LOAD_CONST              22 ('石斛原浆')
+
+115         284 BUILD_LIST               0
+            286 LOAD_CONST              23 (('口气体味', '肠胃不适', '干燥上火', '排便问题', '睡眠状态'))
+            288 LIST_EXTEND              1
+
+116         290 BUILD_LIST               0
+            292 LOAD_CONST              24 (('礼盒展示', '单包展示', '包装信息', '原浆展示', '陈列空镜', '活动机制'))
+            294 LIST_EXTEND              1
+
+117         296 BUILD_LIST               0
+            298 LOAD_CONST              25 (('种植基地', '原料处理', '生产工艺', '工厂环境', '检测背书', '仓储发货'))
+            300 LIST_EXTEND              1
+
+118         302 BUILD_LIST               0
+            304 LOAD_CONST              26 (('居家使用', '办公使用', '外出携带', '长辈使用', '送礼场景', '饮用动作'))
+            306 LIST_EXTEND              1
+
+119         308 BUILD_LIST               0
+            310 LOAD_CONST              27 (('双糖含量', '无蔗糖', '配料干净', '开袋即食', '好吸收', '活性稳定', '便携方便'))
+            312 LIST_EXTEND              1
+
+120         314 BUILD_LIST               0
+            316 LOAD_CONST              28 (('口气反馈', '体味反馈', '肠胃状态', '干燥状态', '长辈反馈', '坚持反馈'))
+            318 LIST_EXTEND              1
+
+121         320 BUILD_LIST               0
+            322 LOAD_CONST              29 (('形态对比', '喝法对比', '原料对比', '含量对比', '包装对比', '价格规格对比'))
+            324 LIST_EXTEND              1
+
+122         326 BUILD_LIST               0
+            328 LOAD_CONST              30 (('前3秒钩子', '强视觉画面', '高转化画面', '已验证画面', '封面画面'))
+            330 LIST_EXTEND              1
+
+123         332 BUILD_LIST               0
+            334 LOAD_CONST              31 (('达人原片', '达人使用镜头', '达人推荐镜头', '达人介绍镜头'))
+            336 LIST_EXTEND              1
+
+124         338 LOAD_CONST              32 ('暂时空着')
+            340 BUILD_LIST               1
+
+125         342 BUILD_LIST               0
+            344 LOAD_CONST              33 (('原理图', '痛点夸张', '营养数字', '场景补充', '转场动效'))
+            346 LIST_EXTEND              1
+
+114         348 LOAD_CONST              34 (('01_痛点', '02_产品', '03_溯源', '04_使用', '05_卖点', '06_效果', '07_对比', '08_关键', '09_达人', '10_IP', '11_AI生成'))
+            350 BUILD_CONST_KEY_MAP     11
+
+128         352 LOAD_CONST              35 ('一级先判断痛点、产品、溯源、使用、卖点、效果、对比、关键、达人、IP、AI生成。\n空镜全部归产品；网络素材不单独列大类，按内容融入对应分类。\n涂手、抹开、纸巾按压/擦拭、不粘测试等吸收证明镜头，归卖点/好吸收，不归使用/饮用动作。\n素材命名统一用产品名_二级分类_具体画面_景别_素材拍摄日期_序号，不使用一级分类或达人名作为第二段。低质、模糊或法规风险素材进待筛或剔除。')
+
+133         354 LOAD_GLOBAL             13 (NULL + _now_text)
+            364 CALL                     0
+
+110         372 KW_NAMES                 3 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'updated_at'))
+            374 CALL                     6
+
+135         382 LOAD_GLOBAL              1 (NULL + ClassificationTemplate)
+
+136         392 LOAD_CONST              36 ('egg-cake-default')
+
+137         394 LOAD_CONST              37 ('鸡蛋糕默认方案')
+
+138         396 LOAD_CONST              38 ('鸡蛋糕')
+
+140         398 BUILD_LIST               0
+            400 LOAD_CONST              39 (('早餐赶时间', '早餐没胃口', '孩子不爱吃', '普通点心太干噎', '零食不顶饿', '配料不放心', '下午容易饿'))
+            402 LIST_EXTEND              1
+
+141         404 BUILD_LIST               0
+            406 LOAD_CONST              40 (('商品全貌', '包装展示', '单枚展示', '掰开组织', '产品信息', '陈列空镜', '活动机制'))
+            408 LIST_EXTEND              1
+
+142         410 BUILD_LIST               0
+            412 LOAD_CONST              41 (('早餐搭配', '办公室加餐', '孩子加餐', '全家分享', '长辈点心', '外出携带', '送礼拜访'))
+            414 LIST_EXTEND              1
+
+143         416 BUILD_LIST               0
+            418 LOAD_CONST              42 (('配料干净', '润不干噎', '原料讲究', '早餐省心', '加餐顶饿'))
+            420 LIST_EXTEND              1
+
+144         422 BUILD_LIST               0
+            424 LOAD_CONST              43 (('前3秒钩子', '强视觉画面', '强情绪画面', '高转化画面', '已验证画面', '封面画面', '促单利益点'))
+            426 LIST_EXTEND              1
+
+145         428 BUILD_LIST               0
+            430 LOAD_CONST              44 (('达人原片', '达人开箱', '达人试吃', '达人推荐', '达人场景', '达人口播'))
+            432 LIST_EXTEND              1
+
+146         434 BUILD_LIST               0
+            436 LOAD_CONST              45 (('痛点夸张', '场景补充', '原料可视化', '转场动效', '微距质感'))
+            438 LIST_EXTEND              1
+
+139         440 LOAD_CONST              46 (('01_痛点', '02_产品', '03_使用', '04_卖点', '05_关键', '06_达人', '07_AI生成'))
+            442 BUILD_CONST_KEY_MAP      7
+
+149         444 LOAD_CONST              47 ('鸡蛋糕镜头库服务画面构建，不是商品参数库；分类要回答这个素材帮剪辑表达什么购买理由。\n不设对比大类，对比画面按最终证明的结论归到产品、卖点或关键。\n55%鸡蛋液、黄天鹅鸡蛋、巴旦木片、芝士粉等参数写进具体画面，分类落到原料讲究等买点。\n鸡蛋糕组织展示统一用掰开；素材文件名第二段统一写二级类目，不写一级类目或达人名。')
+
+154         446 LOAD_GLOBAL             13 (NULL + _now_text)
+            456 CALL                     0
+
+135         464 KW_NAMES                 3 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'updated_at'))
+            466 CALL                     6
+
+ 39         474 BUILD_LIST               4
+            476 RETURN_VALUE
+        >>  478 SWAP                     2
+            480 POP_TOP
+
+ 44         482 SWAP                     3
+            484 STORE_FAST               1 (value)
+            486 STORE_FAST               0 (key)
+            488 RERAISE                  0
+ExceptionTable:
+  80 to 122 -> 478 [8]
+
+Disassembly of <code object template_path at <address>, file "xiaoguan_classifier\templates.py", line 159>:
+159           0 RESUME                   0
+
+160           2 LOAD_GLOBAL              0 (TEMPLATE_DIR)
+             12 LOAD_FAST                0 (template_id)
+             14 FORMAT_VALUE             0
+             16 LOAD_CONST               1 ('.json')
+             18 BUILD_STRING             2
+             20 BINARY_OP               11 (/)
+             24 RETURN_VALUE
+
+Disassembly of <code object ensure_default_template at <address>, file "xiaoguan_classifier\templates.py", line 163>:
+163           0 RESUME                   0
+
+164           2 LOAD_GLOBAL              0 (TEMPLATE_DIR)
+             12 LOAD_ATTR                3 (NULL|self + mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+165          48 LOAD_GLOBAL              5 (NULL + builtin_templates)
+             58 CALL                     0
+             66 GET_ITER
+        >>   68 FOR_ITER                51 (to 174)
+             72 STORE_FAST               0 (template)
+
+166          74 LOAD_GLOBAL              7 (NULL + template_path)
+             84 LOAD_FAST                0 (template)
+             86 LOAD_ATTR                8 (template_id)
+            106 CALL                     1
+            114 STORE_FAST               1 (path)
+
+167         116 LOAD_FAST                1 (path)
+            118 LOAD_ATTR               11 (NULL|self + exists)
+            138 CALL                     0
+            146 POP_JUMP_IF_FALSE        1 (to 150)
+            148 JUMP_BACKWARD           41 (to 68)
+
+168     >>  150 LOAD_GLOBAL             13 (NULL + save_template)
+            160 LOAD_FAST                0 (template)
+            162 CALL                     1
+            170 POP_TOP
+            172 JUMP_BACKWARD           53 (to 68)
+
+165     >>  174 END_FOR
+
+169         176 LOAD_GLOBAL             14 (ACTIVE_TEMPLATE_PATH)
+            186 LOAD_ATTR               11 (NULL|self + exists)
+            206 CALL                     0
+            214 POP_JUMP_IF_TRUE        16 (to 248)
+
+170         216 LOAD_GLOBAL             17 (NULL + set_active_template_id)
+            226 LOAD_GLOBAL             18 (DEFAULT_TEMPLATE_ID)
+            236 CALL                     1
+            244 POP_TOP
+            246 RETURN_CONST             0 (None)
+
+169     >>  248 RETURN_CONST             0 (None)
+
+Disassembly of <code object template_from_dict at <address>, file "xiaoguan_classifier\templates.py", line 173>:
+173           0 RESUME                   0
+
+174           2 LOAD_FAST                0 (data)
+              4 LOAD_ATTR                1 (NULL|self + get)
+             24 LOAD_CONST               1 ('taxonomy')
+             26 CALL                     1
+             34 COPY                     1
+             36 POP_JUMP_IF_TRUE         2 (to 42)
+             38 POP_TOP
+             40 BUILD_MAP                0
+        >>   42 STORE_FAST               1 (taxonomy_raw)
+
+175          44 BUILD_MAP                0
+             46 STORE_FAST               2 (taxonomy)
+
+176          48 LOAD_GLOBAL              3 (NULL + isinstance)
+             58 LOAD_FAST                1 (taxonomy_raw)
+             60 LOAD_GLOBAL              4 (dict)
+             70 CALL                     2
+             78 POP_JUMP_IF_FALSE      104 (to 288)
+
+177          80 LOAD_FAST                1 (taxonomy_raw)
+             82 LOAD_ATTR                7 (NULL|self + items)
+            102 CALL                     0
+            110 GET_ITER
+        >>  112 FOR_ITER                85 (to 286)
+            116 UNPACK_SEQUENCE          2
+            120 STORE_FAST               3 (category)
+            122 STORE_FAST               4 (subcategories)
+
+178         124 LOAD_GLOBAL              3 (NULL + isinstance)
+            134 LOAD_FAST                4 (subcategories)
+            136 LOAD_GLOBAL              8 (list)
+            146 CALL                     2
+            154 POP_JUMP_IF_TRUE         1 (to 158)
+            156 JUMP_BACKWARD           23 (to 112)
+
+179     >>  158 LOAD_FAST                4 (subcategories)
+            160 GET_ITER
+            162 LOAD_FAST_AND_CLEAR      5 (item)
+            164 SWAP                     2
+            166 BUILD_LIST               0
+            168 SWAP                     2
+        >>  170 FOR_ITER                39 (to 252)
+            174 STORE_FAST               5 (item)
+            176 LOAD_GLOBAL             11 (NULL + str)
+            186 LOAD_FAST                5 (item)
+            188 CALL                     1
+            196 LOAD_ATTR               13 (NULL|self + strip)
+            216 CALL                     0
+            224 POP_JUMP_IF_TRUE         1 (to 228)
+            226 JUMP_BACKWARD           29 (to 170)
+        >>  228 LOAD_GLOBAL             11 (NULL + str)
+            238 LOAD_FAST                5 (item)
+            240 CALL                     1
+            248 LIST_APPEND              2
+            250 JUMP_BACKWARD           41 (to 170)
+        >>  252 END_FOR
+            254 SWAP                     2
+            256 STORE_FAST               5 (item)
+            258 LOAD_FAST                2 (taxonomy)
+            260 LOAD_GLOBAL             11 (NULL + str)
+            270 LOAD_FAST                3 (category)
+            272 CALL                     1
+            280 STORE_SUBSCR
+            284 JUMP_BACKWARD           87 (to 112)
+
+177     >>  286 END_FOR
+
+180     >>  288 LOAD_FAST                2 (taxonomy)
+            290 POP_JUMP_IF_TRUE        48 (to 388)
+
+181         292 LOAD_GLOBAL             15 (NULL + TAXONOMY)
+            302 LOAD_ATTR                6 (items)
+            322 CALL                     0
+            330 GET_ITER
+            332 LOAD_FAST_AND_CLEAR      6 (key)
+            334 LOAD_FAST_AND_CLEAR      7 (value)
+            336 SWAP                     3
+            338 BUILD_MAP                0
+            340 SWAP                     2
+        >>  342 FOR_ITER                17 (to 380)
+            346 UNPACK_SEQUENCE          2
+            350 STORE_FAST               6 (key)
+            352 STORE_FAST               7 (value)
+            354 LOAD_FAST                6 (key)
+            356 LOAD_GLOBAL              9 (NULL + list)
+            366 LOAD_FAST                7 (value)
+            368 CALL                     1
+            376 MAP_ADD                  2
+            378 JUMP_BACKWARD           19 (to 342)
+        >>  380 END_FOR
+            382 STORE_FAST               2 (taxonomy)
+            384 STORE_FAST               6 (key)
+            386 STORE_FAST               7 (value)
+
+183     >>  388 LOAD_GLOBAL             17 (NULL + ClassificationTemplate)
+
+184         398 LOAD_GLOBAL             11 (NULL + str)
+            408 LOAD_FAST                0 (data)
+            410 LOAD_ATTR                1 (NULL|self + get)
+            430 LOAD_CONST               2 ('template_id')
+            432 CALL                     1
+            440 COPY                     1
+            442 POP_JUMP_IF_TRUE        36 (to 516)
+            444 POP_TOP
+            446 LOAD_CONST               3 ('tpl-')
+            448 LOAD_GLOBAL             19 (NULL + uuid)
+            458 LOAD_ATTR               20 (uuid4)
+            478 CALL                     0
+            486 LOAD_ATTR               22 (hex)
+            506 LOAD_CONST               0 (None)
+            508 LOAD_CONST               4 (10)
+            510 BINARY_SLICE
+            512 FORMAT_VALUE             0
+            514 BUILD_STRING             2
+        >>  516 CALL                     1
+
+185         524 LOAD_GLOBAL             11 (NULL + str)
+            534 LOAD_FAST                0 (data)
+            536 LOAD_ATTR                1 (NULL|self + get)
+            556 LOAD_CONST               5 ('name')
+            558 CALL                     1
+            566 COPY                     1
+            568 POP_JUMP_IF_TRUE         2 (to 574)
+            570 POP_TOP
+            572 LOAD_CONST               6 ('未命名分类方案')
+        >>  574 CALL                     1
+
+186         582 LOAD_GLOBAL             11 (NULL + str)
+            592 LOAD_FAST                0 (data)
+            594 LOAD_ATTR                1 (NULL|self + get)
+            614 LOAD_CONST               7 ('product_name')
+            616 CALL                     1
+            624 COPY                     1
+            626 POP_JUMP_IF_TRUE         6 (to 640)
+            628 POP_TOP
+            630 LOAD_GLOBAL             24 (PRODUCT_NAME)
+        >>  640 CALL                     1
+
+187         648 LOAD_FAST                2 (taxonomy)
+
+188         650 LOAD_GLOBAL             11 (NULL + str)
+            660 LOAD_FAST                0 (data)
+            662 LOAD_ATTR                1 (NULL|self + get)
+            682 LOAD_CONST               8 ('rules')
+            684 CALL                     1
+            692 COPY                     1
+            694 POP_JUMP_IF_TRUE         2 (to 700)
+            696 POP_TOP
+            698 LOAD_CONST               9 ('')
+        >>  700 CALL                     1
+
+189         708 LOAD_GLOBAL             11 (NULL + str)
+            718 LOAD_FAST                0 (data)
+            720 LOAD_ATTR                1 (NULL|self + get)
+            740 LOAD_CONST              10 ('naming_rule')
+            742 CALL                     1
+            750 COPY                     1
+            752 POP_JUMP_IF_TRUE         2 (to 758)
+            754 POP_TOP
+            756 LOAD_CONST              11 ('产品名_二级分类_具体画面_景别_素材拍摄日期_序号')
+        >>  758 CALL                     1
+
+190         766 LOAD_GLOBAL             11 (NULL + str)
+            776 LOAD_FAST                0 (data)
+            778 LOAD_ATTR                1 (NULL|self + get)
+            798 LOAD_CONST              12 ('updated_at')
+            800 CALL                     1
+            808 COPY                     1
+            810 POP_JUMP_IF_TRUE        10 (to 832)
+            812 POP_TOP
+            814 LOAD_GLOBAL             27 (NULL + _now_text)
+            824 CALL                     0
+        >>  832 CALL                     1
+
+183         840 KW_NAMES                13 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'naming_rule', 'updated_at'))
+            842 CALL                     7
+            850 RETURN_VALUE
+        >>  852 SWAP                     2
+            854 POP_TOP
+
+179         856 SWAP                     2
+            858 STORE_FAST               5 (item)
+            860 RERAISE                  0
+        >>  862 SWAP                     2
+            864 POP_TOP
+
+181         866 SWAP                     3
+            868 STORE_FAST               7 (value)
+            870 STORE_FAST               6 (key)
+            872 RERAISE                  0
+ExceptionTable:
+  166 to 224 -> 852 [3]
+  228 to 252 -> 852 [3]
+  338 to 380 -> 862 [3]
+
+Disassembly of <code object load_template at <address>, file "xiaoguan_classifier\templates.py", line 194>:
+194           0 RESUME                   0
+
+195           2 LOAD_GLOBAL              1 (NULL + ensure_default_template)
+             12 CALL                     0
+             20 POP_TOP
+
+196          22 LOAD_GLOBAL              3 (NULL + template_path)
+             32 LOAD_FAST                0 (template_id)
+             34 CALL                     1
+             42 STORE_FAST               1 (path)
+
+197          44 LOAD_FAST                1 (path)
+             46 LOAD_ATTR                5 (NULL|self + exists)
+             66 CALL                     0
+             74 POP_JUMP_IF_TRUE        10 (to 96)
+
+198          76 LOAD_GLOBAL              7 (NULL + default_template)
+             86 CALL                     0
+             94 RETURN_VALUE
+
+199     >>   96 LOAD_GLOBAL              9 (NULL + template_from_dict)
+            106 LOAD_GLOBAL             11 (NULL + json)
+            116 LOAD_ATTR               12 (loads)
+            136 LOAD_FAST                1 (path)
+            138 LOAD_ATTR               15 (NULL|self + read_text)
+            158 LOAD_CONST               1 ('utf-8')
+            160 KW_NAMES                 2 (('encoding',))
+            162 CALL                     1
+            170 CALL                     1
+            178 CALL                     1
+            186 RETURN_VALUE
+
+Disassembly of <code object save_template at <address>, file "xiaoguan_classifier\templates.py", line 202>:
+202           0 RESUME                   0
+
+203           2 LOAD_GLOBAL              0 (TEMPLATE_DIR)
+             12 LOAD_ATTR                3 (NULL|self + mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+204          48 LOAD_GLOBAL              5 (NULL + asdict)
+             58 LOAD_FAST                0 (template)
+             60 CALL                     1
+             68 STORE_FAST               1 (payload)
+
+205          70 LOAD_GLOBAL              7 (NULL + _now_text)
+             80 CALL                     0
+             88 LOAD_FAST                1 (payload)
+             90 LOAD_CONST               3 ('updated_at')
+             92 STORE_SUBSCR
+
+206          96 LOAD_GLOBAL              9 (NULL + template_path)
+            106 LOAD_FAST                0 (template)
+            108 LOAD_ATTR               10 (template_id)
+            128 CALL                     1
+            136 LOAD_ATTR               13 (NULL|self + write_text)
+            156 LOAD_GLOBAL             15 (NULL + json)
+            166 LOAD_ATTR               16 (dumps)
+            186 LOAD_FAST                1 (payload)
+            188 LOAD_CONST               4 (False)
+            190 LOAD_CONST               5 (2)
+            192 KW_NAMES                 6 (('ensure_ascii', 'indent'))
+            194 CALL                     3
+            202 LOAD_CONST               7 ('utf-8')
+            204 KW_NAMES                 8 (('encoding',))
+            206 CALL                     2
+            214 POP_TOP
+            216 RETURN_CONST             0 (None)
+
+Disassembly of <code object list_templates at <address>, file "xiaoguan_classifier\templates.py", line 209>:
+209           0 RESUME                   0
+
+210           2 LOAD_GLOBAL              1 (NULL + ensure_default_template)
+             12 CALL                     0
+             20 POP_TOP
+
+211          22 BUILD_LIST               0
+             24 STORE_FAST               0 (templates)
+
+212          26 LOAD_GLOBAL              3 (NULL + sorted)
+             36 LOAD_GLOBAL              4 (TEMPLATE_DIR)
+             46 LOAD_ATTR                7 (NULL|self + glob)
+             66 LOAD_CONST               1 ('*.json')
+             68 CALL                     1
+             76 LOAD_CONST               2 (<code object <lambda> at <address>, file "xiaoguan_classifier\templates.py", line 212>)
+             78 MAKE_FUNCTION            0
+             80 KW_NAMES                 3 (('key',))
+             82 CALL                     2
+             90 GET_ITER
+        >>   92 FOR_ITER                64 (to 224)
+             96 STORE_FAST               1 (path)
+
+213          98 NOP
+
+214         100 LOAD_FAST                0 (templates)
+            102 LOAD_ATTR                9 (NULL|self + append)
+            122 LOAD_GLOBAL             11 (NULL + template_from_dict)
+            132 LOAD_GLOBAL             13 (NULL + json)
+            142 LOAD_ATTR               14 (loads)
+            162 LOAD_FAST                1 (path)
+            164 LOAD_ATTR               17 (NULL|self + read_text)
+            184 LOAD_CONST               4 ('utf-8')
+            186 KW_NAMES                 5 (('encoding',))
+            188 CALL                     1
+            196 CALL                     1
+            204 CALL                     1
+            212 CALL                     1
+            220 POP_TOP
+            222 JUMP_BACKWARD           66 (to 92)
+
+212     >>  224 END_FOR
+
+217         226 LOAD_FAST                0 (templates)
+            228 POP_JUMP_IF_TRUE        25 (to 280)
+
+218         230 LOAD_FAST                0 (templates)
+            232 LOAD_ATTR                9 (NULL|self + append)
+            252 LOAD_GLOBAL             21 (NULL + default_template)
+            262 CALL                     0
+            270 CALL                     1
+            278 POP_TOP
+
+219     >>  280 LOAD_FAST                0 (templates)
+            282 RETURN_VALUE
+        >>  284 PUSH_EXC_INFO
+
+215         286 LOAD_GLOBAL             18 (Exception)
+            296 CHECK_EXC_MATCH
+            298 POP_JUMP_IF_FALSE        3 (to 306)
+            300 POP_TOP
+
+216         302 POP_EXCEPT
+            304 JUMP_BACKWARD          107 (to 92)
+
+215     >>  306 RERAISE                  0
+        >>  308 COPY                     3
+            310 POP_EXCEPT
+            312 RERAISE                  1
+ExceptionTable:
+  100 to 220 -> 284 [1]
+  284 to 300 -> 308 [2] lasti
+  306 to 306 -> 308 [2] lasti
+
+Disassembly of <code object <lambda> at <address>, file "xiaoguan_classifier\templates.py", line 212>:
+212           0 RESUME                   0
+              2 LOAD_FAST                0 (item)
+              4 LOAD_ATTR                0 (name)
+             24 LOAD_ATTR                3 (NULL|self + lower)
+             44 CALL                     0
+             52 RETURN_VALUE
+
+Disassembly of <code object get_active_template_id at <address>, file "xiaoguan_classifier\templates.py", line 222>:
+222           0 RESUME                   0
+
+223           2 LOAD_GLOBAL              1 (NULL + ensure_default_template)
+             12 CALL                     0
+             20 POP_TOP
+
+224          22 NOP
+
+225          24 LOAD_GLOBAL              3 (NULL + json)
+             34 LOAD_ATTR                4 (loads)
+             54 LOAD_GLOBAL              6 (ACTIVE_TEMPLATE_PATH)
+             64 LOAD_ATTR                9 (NULL|self + read_text)
+             84 LOAD_CONST               1 ('utf-8')
+             86 KW_NAMES                 2 (('encoding',))
+             88 CALL                     1
+             96 CALL                     1
+            104 STORE_FAST               0 (data)
+
+226         106 LOAD_GLOBAL             11 (NULL + str)
+            116 LOAD_FAST                0 (data)
+            118 LOAD_ATTR               13 (NULL|self + get)
+            138 LOAD_CONST               3 ('template_id')
+            140 CALL                     1
+            148 COPY                     1
+            150 POP_JUMP_IF_TRUE         6 (to 164)
+            152 POP_TOP
+            154 LOAD_GLOBAL             14 (DEFAULT_TEMPLATE_ID)
+        >>  164 CALL                     1
+            172 RETURN_VALUE
+        >>  174 PUSH_EXC_INFO
+
+227         176 LOAD_GLOBAL             16 (Exception)
+            186 CHECK_EXC_MATCH
+            188 POP_JUMP_IF_FALSE        9 (to 208)
+            190 POP_TOP
+
+228         192 LOAD_GLOBAL             14 (DEFAULT_TEMPLATE_ID)
+            202 SWAP                     2
+            204 POP_EXCEPT
+            206 RETURN_VALUE
+
+227     >>  208 RERAISE                  0
+        >>  210 COPY                     3
+            212 POP_EXCEPT
+            214 RERAISE                  1
+ExceptionTable:
+  24 to 170 -> 174 [0]
+  174 to 202 -> 210 [1] lasti
+  208 to 208 -> 210 [1] lasti
+
+Disassembly of <code object set_active_template_id at <address>, file "xiaoguan_classifier\templates.py", line 231>:
+231           0 RESUME                   0
+
+232           2 LOAD_GLOBAL              1 (NULL + CONFIG_DIR)
+             12 LOAD_ATTR                2 (mkdir)
+             32 LOAD_CONST               1 (True)
+             34 LOAD_CONST               1 (True)
+             36 KW_NAMES                 2 (('parents', 'exist_ok'))
+             38 CALL                     2
+             46 POP_TOP
+
+233          48 LOAD_GLOBAL              4 (ACTIVE_TEMPLATE_PATH)
+             58 LOAD_ATTR                7 (NULL|self + write_text)
+             78 LOAD_GLOBAL              9 (NULL + json)
+             88 LOAD_ATTR               10 (dumps)
+            108 LOAD_CONST               3 ('template_id')
+            110 LOAD_FAST                0 (template_id)
+            112 BUILD_MAP                1
+            114 LOAD_CONST               4 (False)
+            116 LOAD_CONST               5 (2)
+            118 KW_NAMES                 6 (('ensure_ascii', 'indent'))
+            120 CALL                     3
+            128 LOAD_CONST               7 ('utf-8')
+            130 KW_NAMES                 8 (('encoding',))
+            132 CALL                     2
+            140 POP_TOP
+            142 RETURN_CONST             0 (None)
+
+Disassembly of <code object get_active_template at <address>, file "xiaoguan_classifier\templates.py", line 236>:
+236           0 RESUME                   0
+
+237           2 LOAD_GLOBAL              1 (NULL + load_template)
+             12 LOAD_GLOBAL              3 (NULL + get_active_template_id)
+             22 CALL                     0
+             30 CALL                     1
+             38 RETURN_VALUE
+
+Disassembly of <code object clone_template at <address>, file "xiaoguan_classifier\templates.py", line 240>:
+240           0 RESUME                   0
+
+241           2 LOAD_GLOBAL              1 (NULL + ClassificationTemplate)
+
+242          12 LOAD_CONST               1 ('tpl-')
+             14 LOAD_GLOBAL              3 (NULL + uuid)
+             24 LOAD_ATTR                4 (uuid4)
+             44 CALL                     0
+             52 LOAD_ATTR                6 (hex)
+             72 LOAD_CONST               0 (None)
+             74 LOAD_CONST               2 (10)
+             76 BINARY_SLICE
+             78 FORMAT_VALUE             0
+             80 BUILD_STRING             2
+
+243          82 LOAD_FAST                1 (name)
+
+244          84 LOAD_FAST                2 (product_name)
+
+245          86 LOAD_FAST                0 (template)
+             88 LOAD_ATTR                8 (taxonomy)
+            108 LOAD_ATTR               11 (NULL|self + items)
+            128 CALL                     0
+            136 GET_ITER
+            138 LOAD_FAST_AND_CLEAR      3 (key)
+            140 LOAD_FAST_AND_CLEAR      4 (value)
+            142 SWAP                     3
+            144 BUILD_MAP                0
+            146 SWAP                     2
+        >>  148 FOR_ITER                17 (to 186)
+            152 UNPACK_SEQUENCE          2
+            156 STORE_FAST               3 (key)
+            158 STORE_FAST               4 (value)
+            160 LOAD_FAST                3 (key)
+            162 LOAD_GLOBAL             13 (NULL + list)
+            172 LOAD_FAST                4 (value)
+            174 CALL                     1
+            182 MAP_ADD                  2
+            184 JUMP_BACKWARD           19 (to 148)
+        >>  186 END_FOR
+            188 SWAP                     3
+            190 STORE_FAST               4 (value)
+            192 STORE_FAST               3 (key)
+
+246         194 LOAD_FAST                0 (template)
+            196 LOAD_ATTR               14 (rules)
+
+247         216 LOAD_FAST                0 (template)
+            218 LOAD_ATTR               16 (naming_rule)
+
+248         238 LOAD_GLOBAL             19 (NULL + _now_text)
+            248 CALL                     0
+
+241         256 KW_NAMES                 3 (('template_id', 'name', 'product_name', 'taxonomy', 'rules', 'naming_rule', 'updated_at'))
+            258 CALL                     7
+            266 RETURN_VALUE
+        >>  268 SWAP                     2
+            270 POP_TOP
+
+245         272 SWAP                     3
+            274 STORE_FAST               4 (value)
+            276 STORE_FAST               3 (key)
+            278 RERAISE                  0
+ExceptionTable:
+  144 to 186 -> 268 [8]

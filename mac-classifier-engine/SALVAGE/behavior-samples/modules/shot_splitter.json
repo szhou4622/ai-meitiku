@@ -1,0 +1,8 @@
+{
+  "module": "xiaoguan_classifier.shot_splitter",
+  "bytecode_sha256": "513e744d3244f6b09c392705820bbbabb8b3872bb001098d2e2820569958e2e7",
+  "observed_in_classification_run": false,
+  "sample_count": 0,
+  "samples": [],
+  "note": "This module was not invoked by the classify command; see interface-map.md and disasm for its static contract."
+}

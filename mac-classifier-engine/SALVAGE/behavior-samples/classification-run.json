@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "source": {
+    "name": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+    "size": 514445,
+    "sha256": "670bc3b8b950fda0404aa38c04bdd0d8ed52d8fd986fdad390e6e2725a6917c9"
+  },
+  "request": {
+    "command": "classify",
+    "folder": "<input>",
+    "output_root": "<output>",
+    "progress_path": "<work>/progress.log",
+    "runtime_root": "<runtime>"
+  },
+  "result": {
+    "ok": true,
+    "result": {
+      "count": 1,
+      "todo_count": 1,
+      "copied_count": 1,
+      "skipped_count": 0,
+      "failed_count": 0,
+      "pending_count": 0,
+      "request_count": 1,
+      "request_success_count": 1,
+      "request_failed_count": 0,
+      "request_timeout_count": 0,
+      "prompt_tokens": "<redacted:int>",
+      "completion_tokens": "<redacted:int>",
+      "total_tokens": "<redacted:int>",
+      "manifest": "<output>/outputs/分类清单.csv",
+      "pending": "<output>/outputs/待筛清单.csv",
+      "failed": "<output>/outputs/失败清单.csv",
+      "resume": "<output>/outputs/整理断点记录.jsonl",
+      "log": "<output>/outputs/操作日志.json",
+      "report": "<output>/outputs/整理日志_20260916_160435.md",
+      "undo": "<output>/outputs/清理本次分类副本.bat",
+      "classification_root": "<output>",
+      "duration": "15秒"
+    }
+  },
+  "output_files": [
+    {
+      "path": "01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+      "size": 514445,
+      "sha256": "670bc3b8b950fda0404aa38c04bdd0d8ed52d8fd986fdad390e6e2725a6917c9"
+    },
+    {
+      "path": "outputs/work_20260916_160435/sheets/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01/frames_sheet.jpg",
+      "size": 143988,
+      "sha256": "e2469382920b830511f710776661edbc72a3d1bcff66af2b42afe81d6e9489aa"
+    },
+    {
+      "path": "outputs/分类清单.csv",
+      "size": 1402,
+      "sha256": "145726696eae4192e8af8482ada166ed5b6286f193f3b61611ffecbf60d0251a"
+    },
+    {
+      "path": "outputs/失败清单.csv",
+      "size": 3,
+      "sha256": "f1945cd6c19e56b3c1c78943ef5ec18116907a4ca1efc40a57d48ab1db7adfc5"
+    },
+    {
+      "path": "outputs/待筛清单.csv",
+      "size": 3,
+      "sha256": "f1945cd6c19e56b3c1c78943ef5ec18116907a4ca1efc40a57d48ab1db7adfc5"
+    },
+    {
+      "path": "outputs/操作日志.json",
+      "size": 4471,
+      "sha256": "8404ff6fb2a1e53778307c9eed362896b5ca8ed3d7414458cc7a91af1be60446"
+    },
+    {
+      "path": "outputs/整理断点记录.jsonl",
+      "size": 3856,
+      "sha256": "159ed333003d180cdf2a17a084363121de292b127374ec224d700560bf5dec4e"
+    },
+    {
+      "path": "outputs/整理日志_20260916_160435.md",
+      "size": 1684,
+      "sha256": "b885faea7b02fa073f5ba93db03949899185732e0b4b6e532c91b283a4807ec7"
+    },
+    {
+      "path": "outputs/清理本次分类副本.bat",
+      "size": 684,
+      "sha256": "013877ceaffeb3a5a4f4a5e3422b813651aa0145179e079d1a793150bd43b2d5"
+    }
+  ],
+  "progress": [
+    "找到 1 个素材，本次需要识别 1 个。全量/断点续跑，稳准模式，并发数 4，每条视频抽 8 帧智能拼图。",
+    "[1/1] 已识别 下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4 -> 01_产品本体展示 / 冻干本体外观（形态/颜色/内部结构）",
+    "  已复制到 <output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4，源文件保留不动",
+    "整理完成。",
+    "请求账本：总请求 1，成功 1，失败 0，超时 0，自动重试关闭",
+    "Token 消耗：输入 2478，输出 722，总计 3200",
+    "整理日志：<output>/outputs/整理日志_20260916_160435.md"
+  ],
+  "safety": {
+    "source_copied_to_isolated_temp": true,
+    "original_source_modified": false,
+    "generated_media_committed": false,
+    "secrets_committed": false
+  }
+}

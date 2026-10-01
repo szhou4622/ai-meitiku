@@ -1,0 +1,91 @@
+{
+  "module": "xiaoguan_classifier.media",
+  "bytecode_sha256": "7b798eb4808c139b41d8cc225579bd3be37bbcc071aa8a18ae9ed9a141588401",
+  "observed_in_classification_run": true,
+  "sample_count": 7,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "<module>",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "scan_materials",
+      "calls": 1,
+      "input": {
+        "folder": "<input>"
+      },
+      "output": {
+        "type": "list",
+        "length": 1,
+        "items": [
+          "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "scan_materials.<locals>.<genexpr>",
+      "calls": 2,
+      "input": {
+        ".0": "<builtins.tuple_iterator>"
+      },
+      "output": false
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "scan_materials.<locals>.<lambda>",
+      "calls": 1,
+      "input": {
+        "item": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+      },
+      "output": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "material_shoot_date",
+      "calls": 1,
+      "input": {
+        "path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+      },
+      "output": {
+        "type": "tuple",
+        "length": 3,
+        "items": [
+          "260328",
+          "2026-03-28",
+          "filename_date:original_shoot_date"
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "_video_metadata_date",
+      "calls": 1,
+      "input": {
+        "path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.media",
+      "function": "_filename_date",
+      "calls": 1,
+      "input": {
+        "path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+      },
+      "output": {
+        "type": "tuple",
+        "length": 2,
+        "items": [
+          "2026-03-28",
+          "filename_date:original_shoot_date"
+        ]
+      }
+    }
+  ],
+  "note": ""
+}

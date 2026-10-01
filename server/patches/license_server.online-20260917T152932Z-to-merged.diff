@@ -1,0 +1,525 @@
+--- online license_server.py 0cb447e5
++++ merged license_server.py candidate 98e0c1ea
+@@ -238,11 +238,57 @@
+ 
+ 
+ class DeviceApiError(Exception):
+-    def __init__(self, message, status=400):
++    def __init__(self, message, status=400, code=""):
+         super().__init__(message)
+         self.status = int(status)
++        self.code = str(code or "")
+ 
+ 
++def _scoped_device_error(message, status, app_name, code):
++    """Attach machine-readable codes only for AI媒体库; other apps stay byte-compatible."""
++    return DeviceApiError(
++        message,
++        status,
++        code if str(app_name or "").strip() == "ai-media-library" else "",
++    )
++
++
++class AiMediaTimeConflictError(ValueError):
++    """A rejected time-card attempt; never consumes the submitted code."""
++
++    def __init__(self, error_code, action, message):
++        super().__init__(message)
++        self.error_code = error_code
++        self.action = action
++        self.status = 409
++
++
++def _aiml_auth_matches_primary(authenticated_row, primary, machine_code, supplied_credential=""):
++    if not authenticated_row or not primary:
++        return False
++    return (
++        str(authenticated_row.get("app_name") or "") == "ai-media-library"
++        and str(authenticated_row.get("code_id") or "") == str(primary["code_id"] or "")
++        and str(authenticated_row.get("bound_machine_code") or "").strip().upper() == machine_code
++        and str(primary["bound_machine_code"] or "").strip().upper() == machine_code
++        and str(authenticated_row.get("binding_status") or "") == "active"
++        and str(authenticated_row.get("binding_role") or "") == "primary"
++        and int(authenticated_row.get("credential_version") or 0) == int(primary["credential_version"] or 0)
++        and bool(authenticated_row.get("device_credential_hash"))
++        and hmac.compare_digest(
++            str(authenticated_row.get("device_credential_hash") or ""),
++            str(primary["device_credential_hash"] or ""),
++        )
++        and (
++            not supplied_credential
++            or hmac.compare_digest(
++                _credential_hash(supplied_credential),
++                str(primary["device_credential_hash"] or ""),
++            )
++        )
++    )
++
++
+ def _b64url_encode(data):
+     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+ 
+@@ -1554,6 +1600,12 @@
+         _create_device_transfer_log_table(conn)
+         _create_admin_batch_action_tables(conn)
+         _create_primary_reissue_tables(conn)
++        # Independent target-app tables; the existing activations schema and
++        # its primary uniqueness constraint remain unchanged.
++        from ai_media_canonical_activation import create_schema as _aiml_create_canonical_schema
++        _aiml_create_canonical_schema(conn)
++        from ai_media_device_diagnostic import create_schema as _aiml_create_diagnostic_schema
++        _aiml_create_diagnostic_schema(conn)
+         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+         conn.commit()
+ 
+@@ -2396,13 +2448,14 @@
+     if not authorization.startswith("Bearer "):
+         raise DeviceApiError("缺少设备会话。", 401)
+     identity = _verify_device_session(authorization[7:].strip())
++    identity_app = str(identity.get("app_name") or "")
+     credential = str(
+         headers.get("X-Device-Credential")
+         or headers.get("x-device-credential")
+         or ""
+     ).strip()
+     if not credential:
+-        raise DeviceApiError("缺少 device_credential。", 401)
++        raise _scoped_device_error("缺少 device_credential。", 401, identity_app, "device_credential_missing")
+     with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+         conn.row_factory = sqlite3.Row
+         row = conn.execute(
+@@ -2418,24 +2471,24 @@
+             (str(identity.get("app_name") or ""), str(identity.get("code_id") or "")),
+         ).fetchone()
+     if not row or str(row["binding_status"] or "") != "active":
+-        raise DeviceApiError("授权当前未绑定设备。", 401)
++        raise _scoped_device_error("授权当前未绑定设备。", 401, identity_app, "device_binding_unbound")
+     if code_row and int(code_row[0] or 0):
+-        raise DeviceApiError("这个兑换码已被停用。", 401)
++        raise _scoped_device_error("这个兑换码已被停用。", 401, identity_app, "license_disabled")
+     if str(row["binding_role"] or "primary") != "primary":
+         raise DeviceApiError("合并码不能作为设备主授权。", 401)
+     if str(row["bound_machine_code"] or "").strip().upper() != str(identity.get("machine_code") or "").strip().upper():
+-        raise DeviceApiError("设备绑定已变更。", 401)
++        raise _scoped_device_error("设备绑定已变更。", 401, identity_app, "device_binding_unbound")
+     if int(row["credential_version"] or 0) != int(identity.get("credential_version") or -1):
+-        raise DeviceApiError("设备凭证已撤销。", 401)
++        raise _scoped_device_error("设备凭证已撤销。", 401, identity_app, "device_credential_revoked")
+     expected_hash = str(row["device_credential_hash"] or "")
+     if not expected_hash or not hmac.compare_digest(expected_hash, _credential_hash(credential)):
+-        raise DeviceApiError("设备凭证无效。", 401)
++        raise _scoped_device_error("设备凭证无效。", 401, identity_app, "device_credential_mismatch")
+     try:
+         payload = json.loads(str(row["payload_json"] or "{}"))
+     except json.JSONDecodeError:
+         payload = {}
+     if not allow_expired and _server_is_expired(str(payload.get("expires_at") or "")):
+-        raise DeviceApiError("授权已过期。", 401)
++        raise _scoped_device_error("授权已过期。", 401, identity_app, "license_expired")
+     return dict(row)
+ 
+ 
+@@ -2589,6 +2642,24 @@
+         result["unlimited"] = bool(unlimited)
+         result["entitlement_type"] = "unlimited" if unlimited else "credits"
+     return result
++
++
++def handle_ai_media_identity_baseline(data, headers):
++    """Credential-authenticated, append-only v2 factor baseline for this app."""
++    if str(data.get("app_name") or "").strip() != "ai-media-library":
++        raise DeviceApiError("unknown endpoint", 404)
++    authenticated = _device_auth(headers)
++    if str(authenticated.get("app_name") or "") != "ai-media-library":
++        raise DeviceApiError("unknown endpoint", 404)
++    from ai_media_canonical_activation import enroll_baseline
++    with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
++        conn.execute("BEGIN IMMEDIATE")
++        result = enroll_baseline(conn, data, authenticated, utc_now())
++        if result == "enrolled":
++            conn.commit()
++        else:
++            conn.rollback()
++    return {"ok": result in ("enrolled", "confirmed"), "baseline_state": result}
+ 
+ 
+ 
+@@ -2622,21 +2693,25 @@
+             (app_name, code_id),
+         ).fetchone()
+         if not row or str(row["binding_status"] or "") != "active":
+-            raise DeviceApiError("授权当前未绑定设备。", 401)
++            raise _scoped_device_error("授权当前未绑定设备。", 401, app_name, "device_binding_unbound")
+         if code_row and int(code_row[0] or 0):
+             raise DeviceApiError("这个兑换码已被停用。", 401)
+         if str(row["binding_role"] or "primary") != "primary":
+             raise DeviceApiError("合并码不能作为设备主授权。", 401)
+         if str(row["bound_machine_code"] or "").strip().upper() != machine_code:
+-            raise DeviceApiError("设备绑定已变更。", 401)
++            raise _scoped_device_error("设备绑定已变更。", 401, app_name, "device_binding_unbound")
+         expected_hash = str(row["device_credential_hash"] or "")
+         if not expected_hash or not hmac.compare_digest(expected_hash, _credential_hash(credential)):
+-            raise DeviceApiError("设备凭证无效。", 401)
++            raise _scoped_device_error("设备凭证无效。", 401, app_name, "device_credential_mismatch")
+         try:
+             payload = json.loads(str(row["payload_json"] or "{}"))
+         except json.JSONDecodeError:
+             payload = {}
+-        if _server_is_expired(str(payload.get("expires_at") or "")):
++        entitlement_expired = _server_is_expired(str(payload.get("expires_at") or ""))
++        # AI媒体库的长期设备凭证不应因时间授权到期而失效。这里只为
++        # 已通过 device_credential 校验的原设备刷新短期会话，不授予产品使用权；
++        # /device/status 仍会按到期状态拒绝进入主界面。其他 app 保持原行为。
++        if entitlement_expired and app_name != "ai-media-library":
+             raise DeviceApiError("授权已过期。", 401)
+         is_time_based = _time_entitlement(payload, app_name)
+         account_state = None if is_time_based else _point_account_state(
+@@ -2663,6 +2738,10 @@
+         result.update(_time_status(payload, row["activated_at"]))
+         result["entitlement_type"] = "time"
+         result["unlimited"] = False
++        if app_name == "ai-media-library" and entitlement_expired:
++            result["license_status"] = "expired"
++            result["is_expired"] = True
++            result["message"] = "授权已到期，设备凭证已保留。可使用新的月卡或年卡恢复授权。"
+     else:
+         balance = account_state["balance"] if account_state else 0
+         unlimited = account_state["unlimited"] if account_state else False
+@@ -2985,6 +3064,51 @@
+     received = str(headers.get("X-Admin-Token") or headers.get("x-admin-token") or "").strip()
+     if not received or not hmac.compare_digest(received, LICENSE_ADMIN_API_TOKEN):
+         raise DeviceApiError("管理员接口认证失败。", 403)
++
++
++def handle_ai_media_device_diagnostic_submit(data):
++    from ai_media_device_diagnostic import create_schema, submit_report
++    with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
++        conn.execute("BEGIN IMMEDIATE")
++        create_schema(conn)
++        result = submit_report(conn, data)
++        conn.commit()
++        return result
++
++
++def handle_admin_device_diagnostic_challenge(data, headers):
++    _admin_api_auth(headers)
++    from ai_media_device_diagnostic import create_challenge, create_schema
++    operator = str((data or {}).get("operator") or "").strip()
++    with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
++        conn.execute("BEGIN IMMEDIATE")
++        create_schema(conn)
++        result = create_challenge(conn, operator=operator)
++        conn.commit()
++        return result
++
++
++def handle_admin_device_diagnostic_list(data, headers):
++    _admin_api_auth(headers)
++    from ai_media_device_diagnostic import create_schema, list_reports
++    with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
++        create_schema(conn)
++        return list_reports(
++            conn,
++            state=str((data or {}).get("state") or ""),
++            limit=(data or {}).get("limit", 50),
++        )
++
++
++def handle_admin_device_diagnostic_review(data, headers):
++    _admin_api_auth(headers)
++    from ai_media_device_diagnostic import create_schema, review_report
++    with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
++        conn.execute("BEGIN IMMEDIATE")
++        create_schema(conn)
++        result = review_report(conn, data or {})
++        conn.commit()
++        return result
+ 
+ 
+ def _trusted_proxy_credit_snapshot(app_name, code_id, machine_code):
+@@ -4187,6 +4311,8 @@
+     confirm_merge=False,
+     credential_refresh=False,
+     authenticated_row=None,
++    authentication_error=None,
++    activation_data=None,
+ ):
+     clean_app = normalize_app_name(app_name)
+     if not code:
+@@ -4218,6 +4344,7 @@
+     credential_version = 1
+     transfer_count = 0
+     remaining_credits = None
++    canonical_resolution = None
+ 
+     with DB_LOCK, sqlite3.connect(DB_PATH) as conn:
+         conn.row_factory = sqlite3.Row
+@@ -4268,7 +4395,31 @@
+                 raise ValueError(
+                     "服务器未找到当前主激活码，已拒绝消耗新的兑换码；"
+                     "请先按主激活码编号完成旧授权迁移。"
++                )
++
++        if clean_app == "ai-media-library" and _time_entitlement(public_payload, clean_app):
++            from ai_media_canonical_activation import (
++                creation_enabled as _aiml_canonical_creation_enabled,
++                resolve_activation as _aiml_resolve_canonical_activation,
++            )
++            canonical_resolution = _aiml_resolve_canonical_activation(
++                conn, data=activation_data or {}, code_id=code_id, row=row,
++                target_primary=target_primary, authenticated_row=authenticated_row,
++                supplied_credential=device_credential, credential_hash=_credential_hash,
++                now=now, allow_create=_aiml_canonical_creation_enabled(),
++            )
++            decision = canonical_resolution["kind"]
++            if decision in ("review", "same"):
++                raise AiMediaTimeConflictError(
++                    "existing_time_license" if decision == "same" else "machine_identity_conflict",
++                    "renewal_requires_confirmation" if decision == "same" else "manual_identity_review",
++                    ("本机已有时间授权，第二张时间卡未使用。请在客户端明确确认续期；续期成功前不会消耗新卡或更换设备身份。"
++                     if decision == "same" else
++                     "检测到机器身份冲突或缺少原设备硬件基线，请复制脱敏诊断联系管理员核对。本次未消耗激活码，原授权未改变。"),
+                 )
++            if decision in ("new", "resume"):
++                clean_machine = canonical_resolution["canonical"].upper()
++                target_primary = row if decision == "resume" and str(row["binding_status"] or "") == "active" else None
+ 
+         if target_primary and str(target_primary["code_id"]) != code_id:
+             try:
+@@ -4276,7 +4427,22 @@
+             except json.JSONDecodeError:
+                 target_payload = {}
+             if _time_entitlement(public_payload, clean_app) or _time_entitlement(target_payload, clean_app):
++                if clean_app == "ai-media-library":
++                    if not _aiml_auth_matches_primary(authenticated_row, target_primary, clean_machine, device_credential):
++                        raise AiMediaTimeConflictError(
++                            "machine_identity_conflict",
++                            "manual_identity_review",
++                            "检测到机器身份冲突，请复制脱敏诊断联系管理员核对。本次未消耗激活码，原授权未改变。",
++                        )
++                    raise AiMediaTimeConflictError(
++                        "existing_time_license",
++                        "renewal_requires_confirmation",
++                        "本机已有时间授权，第二张时间卡未使用。请在客户端明确确认续期；续期成功前不会消耗新卡或更换设备身份。",
++                    )
+                 raise ValueError("时间卡不能使用积分合并，请使用 /api/license/time/renew 续期。")
++        if authentication_error is not None:
++            raise authentication_error
++        if target_primary and str(target_primary["code_id"]) != code_id:
+             if not bool(confirm_merge):
+                 raise ValueError("当前电脑已有主激活码，合并积分前必须明确确认。")
+             expected_primary = str(target_primary["code_id"])
+@@ -4445,6 +4611,15 @@
+                         if not hmac.compare_digest(stored_hash, _credential_hash(supplied_credential)):
+                             raise ValueError("设备凭证不匹配。")
+                         plain_credential = supplied_credential
++                    elif canonical_resolution and canonical_resolution["kind"] == "resume" and canonical_resolution["recovery_secret"]:
++                        from ai_media_canonical_activation import deterministic_credential
++                        recovered = deterministic_credential(
++                            DEVICE_SESSION_SECRET, code_id, clean_machine.lower(),
++                            canonical_resolution["recovery_secret"],
++                        )
++                        if not hmac.compare_digest(stored_hash, _credential_hash(recovered)):
++                            raise ValueError("设备恢复凭证不匹配，请联系管理员。")
++                        plain_credential = recovered
+                     else:
+                         raise ValueError("设备凭证缺失，不能覆盖已有凭证；请使用当前设备凭证或联系管理员。")
+                 else:
+@@ -4473,7 +4648,14 @@
+                     conn, clean_app, code_id, code_id,
+                     old_machine, clean_machine, now,
+                 )
+-                plain_credential = secrets.token_urlsafe(48)
++                if canonical_resolution and canonical_resolution["kind"] == "resume" and canonical_resolution["recovery_secret"]:
++                    from ai_media_canonical_activation import deterministic_credential
++                    plain_credential = deterministic_credential(
++                        DEVICE_SESSION_SECRET, code_id, clean_machine.lower(),
++                        canonical_resolution["recovery_secret"],
++                    )
++                else:
++                    plain_credential = secrets.token_urlsafe(48)
+                 conn.execute(
+                     """
+                     UPDATE activations
+@@ -4506,7 +4688,14 @@
+                     datetime.utcnow() + timedelta(days=duration_days)
+                 ).isoformat(timespec="seconds") + "Z"
+             payload_text = json.dumps(public_payload, ensure_ascii=False, sort_keys=True)
+-            plain_credential = secrets.token_urlsafe(48)
++            if canonical_resolution and canonical_resolution["kind"] == "new":
++                from ai_media_canonical_activation import deterministic_credential
++                plain_credential = deterministic_credential(
++                    DEVICE_SESSION_SECRET, code_id, clean_machine.lower(),
++                    canonical_resolution["recovery_secret"],
++                )
++            else:
++                plain_credential = secrets.token_urlsafe(48)
+             conn.execute(
+                 """
+                 INSERT INTO activations
+@@ -4605,6 +4794,8 @@
+         state_details["balance"] = actual_balance
+         state_details["remaining_credits"] = actual_balance
+     license_state.update(state_details)
++    if canonical_resolution and canonical_resolution["kind"] in ("new", "resume"):
++        license_state["canonical_machine_code"] = clean_machine.lower()
+     if plain_credential and action != "balance_merged":
+         license_state["device_credential"] = plain_credential
+         license_state["device_session"] = _issue_device_session(
+@@ -4980,10 +5171,16 @@
+ def handle_activation_payload(data, user_ip="", headers=None):
+     requested_app = str(data.get("app_name") or "").strip()
+     authenticated_row = None
++    authentication_error = None
+     authorization = str((headers or {}).get("Authorization") or "")
+     uses_v2 = _uses_device_rebind_protocol(data, headers)
+     if authorization and uses_v2:
+-        authenticated_row = _device_auth(headers or {})
++        try:
++            authenticated_row = _device_auth(headers or {})
++        except DeviceApiError as exc:
++            if requested_app != "ai-media-library":
++                raise
++            authentication_error = exc
+     activation_code = str(data.get("code") or data.get("activation_code") or "").strip()
+     with qianchuan_redeem_lock(requested_app):
+         _guard_qianchuan_central_activation(
+@@ -4999,6 +5196,8 @@
+                 bool(data.get("confirm_merge")),
+                 bool(data.get("credential_refresh")),
+                 authenticated_row,
++                authentication_error,
++                data,
+             )
+         else:
+             license_state = activate_remote_legacy(
+@@ -6094,7 +6293,10 @@
+             try:
+                 json_response(self, 200, handle_device_status(self.headers))
+             except DeviceApiError as exc:
+-                json_response(self, exc.status, {"ok": False, "error": str(exc), "message": str(exc)})
++                _device_body = {"ok": False, "error": str(exc), "message": str(exc)}
++                if getattr(exc, "code", ""):
++                    _device_body["error_code"] = exc.code
++                json_response(self, exc.status, _device_body)
+             except Exception as exc:
+                 json_response(self, 500, {"ok": False, "error": str(exc), "message": str(exc)})
+             return
+@@ -6188,10 +6390,45 @@
+             try:
+                 json_response(self, 200, handle_device_refresh(read_json(self), self.headers))
+             except DeviceApiError as exc:
+-                json_response(self, exc.status, {"ok": False, "error": str(exc), "message": str(exc)})
++                _device_body = {"ok": False, "error": str(exc), "message": str(exc)}
++                if getattr(exc, "code", ""):
++                    _device_body["error_code"] = exc.code
++                json_response(self, exc.status, _device_body)
+             except Exception as exc:
+                 json_response(self, 500, {"ok": False, "error": str(exc), "message": str(exc)})
+             return
++        if parsed.path == "/api/license/device-diagnostic/submit":
++            try:
++                _diagnostic_data = read_json(self)
++                if str((_diagnostic_data or {}).get("app_name") or "").strip() != "ai-media-library":
++                    json_response(self, 404, {"ok": False, "error": "unknown endpoint"})
++                    return
++                json_response(self, 200, handle_ai_media_device_diagnostic_submit(_diagnostic_data))
++            except Exception as exc:
++                try:
++                    from ai_media_device_diagnostic import DeviceDiagnosticError
++                    if isinstance(exc, DeviceDiagnosticError):
++                        json_response(self, exc.status, {
++                            "ok": False, "error_code": exc.code,
++                            "error": str(exc), "message": str(exc),
++                        })
++                        return
++                except Exception:
++                    pass
++                json_response(self, 500, {"ok": False, "message": "设备核验信息提交失败。"})
++            return
++        if parsed.path == "/api/license/identity/baseline":
++            try:
++                _aiml_data = read_json(self)
++                if str((_aiml_data or {}).get("app_name") or "").strip() != "ai-media-library":
++                    json_response(self, 404, {"ok": False, "error": "unknown endpoint"})
++                    return
++                json_response(self, 200, handle_ai_media_identity_baseline(_aiml_data, self.headers))
++            except DeviceApiError as exc:
++                json_response(self, exc.status, {"ok": False, "message": str(exc)})
++            except Exception:
++                json_response(self, 500, {"ok": False, "message": "身份基线登记失败。"})
++            return
+         if parsed.path == "/api/license/identity/observe":
+             # 唯一改动点：ai-media-library 的 v3 机器身份观测。
+             #
+@@ -6247,6 +6484,30 @@
+                 json_response(self, exc.status, {"ok": False, "error": str(exc), "message": str(exc)})
+             except Exception as exc:
+                 json_response(self, 500, {"ok": False, "error": str(exc), "message": str(exc)})
++            return
++        diagnostic_admin_handlers = {
++            "/api/license/admin/device-diagnostic/challenge": handle_admin_device_diagnostic_challenge,
++            "/api/license/admin/device-diagnostic/list": handle_admin_device_diagnostic_list,
++            "/api/license/admin/device-diagnostic/review": handle_admin_device_diagnostic_review,
++        }
++        if parsed.path in diagnostic_admin_handlers:
++            try:
++                result = diagnostic_admin_handlers[parsed.path](read_json(self), self.headers)
++                json_response(self, 200, result)
++            except DeviceApiError as exc:
++                json_response(self, exc.status, {"ok": False, "error": str(exc), "message": str(exc)})
++            except Exception as exc:
++                try:
++                    from ai_media_device_diagnostic import DeviceDiagnosticError
++                    if isinstance(exc, DeviceDiagnosticError):
++                        json_response(self, exc.status, {
++                            "ok": False, "error_code": exc.code,
++                            "error": str(exc), "message": str(exc),
++                        })
++                        return
++                except Exception:
++                    pass
++                json_response(self, 500, {"ok": False, "message": "设备核验管理操作失败。"})
+             return
+         if parsed.path == "/api/license/admin/unbind":
+             try:
+@@ -6360,16 +6621,29 @@
+                     )
+                 except Exception:
+                     pass
+-            json_response(
+-                self,
+-                400,
+-                {
+-                    "ok": False,
+-                    "success": False,
+-                    "error": str(exc),
+-                    "message": str(exc),
+-                },
+-            )
++            if activation_app_name == "ai-media-library" and isinstance(exc, AiMediaTimeConflictError):
++                json_response(
++                    self, exc.status,
++                    {
++                        "ok": False,
++                        "success": False,
++                        "error_code": exc.error_code,
++                        "action": exc.action,
++                        "error": str(exc),
++                        "message": str(exc),
++                    },
++                )
++            else:
++                json_response(
++                    self,
++                    400,
++                    {
++                        "ok": False,
++                        "success": False,
++                        "error": str(exc),
++                        "message": str(exc),
++                    },
++                )
+ 
+ 
+ def main():

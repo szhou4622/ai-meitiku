@@ -1,0 +1,479 @@
+module: xiaoguan_classifier.source
+bytecode: src/xiaoguan_classifier/source.pyc
+sha256: 7d42d82558a8fbc9b6dffe11321816da20260300f0e1ed75b8016a063a5285bf
+python: 3.12.14
+source_filename: xiaoguan_classifier\source.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (('dataclass',))
+             18 IMPORT_NAME              2 (dataclasses)
+             20 IMPORT_FROM              3 (dataclass)
+             22 STORE_NAME               3 (dataclass)
+             24 POP_TOP
+
+  4          26 LOAD_CONST               0 (0)
+             28 LOAD_CONST               3 (('Path',))
+             30 IMPORT_NAME              4 (pathlib)
+             32 IMPORT_FROM              5 (Path)
+             34 STORE_NAME               5 (Path)
+             36 POP_TOP
+
+  7          38 LOAD_CONST               4 (('达人', 'KOC', 'kol', 'KOL', '博主', '创作者'))
+             40 STORE_NAME               6 (CREATOR_MARKERS)
+
+  8          42 LOAD_CONST               5 (('自拍', '自有', '内部', '主播', '演员', '素人'))
+             44 STORE_NAME               7 (SELF_MARKERS)
+
+ 11          46 PUSH_NULL
+             48 LOAD_NAME                3 (dataclass)
+             50 LOAD_CONST               6 (True)
+             52 KW_NAMES                 7 (('frozen',))
+             54 CALL                     1
+
+ 12          62 PUSH_NULL
+             64 LOAD_BUILD_CLASS
+             66 LOAD_CONST               8 (<code object SourceInfo at <address>, file "xiaoguan_classifier\source.py", line 11>)
+             68 MAKE_FUNCTION            0
+             70 LOAD_CONST               9 ('SourceInfo')
+             72 CALL                     2
+
+ 11          80 CALL                     0
+
+ 12          88 STORE_NAME               8 (SourceInfo)
+
+ 26          90 LOAD_CONST              13 ((True,))
+             92 LOAD_CONST              14 (('value', 'str', 'fallback', 'str', 'strip_markers', 'bool', 'return', 'str'))
+             94 LOAD_CONST              10 (<code object _clean_source_name at <address>, file "xiaoguan_classifier\source.py", line 26>)
+             96 MAKE_FUNCTION            5 (defaults, annotations)
+             98 STORE_NAME               9 (_clean_source_name)
+
+ 35         100 LOAD_CONST              15 (('root', 'Path', 'material', 'Path', 'return', 'SourceInfo'))
+            102 LOAD_CONST              11 (<code object infer_source_info at <address>, file "xiaoguan_classifier\source.py", line 35>)
+            104 MAKE_FUNCTION            4 (annotations)
+            106 STORE_NAME              10 (infer_source_info)
+            108 RETURN_CONST            12 (None)
+
+Disassembly of <code object SourceInfo at <address>, file "xiaoguan_classifier\source.py", line 11>:
+ 11           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('SourceInfo')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 13          12 LOAD_CONST               1 ('str')
+             14 LOAD_NAME                3 (__annotations__)
+             16 LOAD_CONST               2 ('source_type')
+             18 STORE_SUBSCR
+
+ 14          22 LOAD_CONST               1 ('str')
+             24 LOAD_NAME                3 (__annotations__)
+             26 LOAD_CONST               3 ('source_name')
+             28 STORE_SUBSCR
+
+ 15          32 LOAD_CONST               1 ('str')
+             34 LOAD_NAME                3 (__annotations__)
+             36 LOAD_CONST               4 ('relative_path')
+             38 STORE_SUBSCR
+
+ 17          42 LOAD_NAME                4 (property)
+
+ 18          44 LOAD_CONST               7 (('return', 'str'))
+             46 LOAD_CONST               5 (<code object prompt_hint at <address>, file "xiaoguan_classifier\source.py", line 17>)
+             48 MAKE_FUNCTION            4 (annotations)
+
+ 17          50 CALL                     0
+
+ 18          58 STORE_NAME               5 (prompt_hint)
+             60 RETURN_CONST             6 (None)
+
+Disassembly of <code object prompt_hint at <address>, file "xiaoguan_classifier\source.py", line 17>:
+ 17           0 RESUME                   0
+
+ 19           2 LOAD_FAST                0 (self)
+              4 LOAD_ATTR                0 (source_type)
+             24 LOAD_CONST               1 ('达人素材')
+             26 COMPARE_OP              40 (==)
+             30 POP_JUMP_IF_FALSE       28 (to 88)
+
+ 20          32 LOAD_CONST               2 ('来源线索：外部达人/创作者素材，来源名称：')
+             34 LOAD_FAST                0 (self)
+             36 LOAD_ATTR                2 (source_name)
+             56 FORMAT_VALUE             0
+             58 LOAD_CONST               3 ('，原相对路径：')
+             60 LOAD_FAST                0 (self)
+             62 LOAD_ATTR                4 (relative_path)
+             82 FORMAT_VALUE             0
+             84 BUILD_STRING             4
+             86 RETURN_VALUE
+
+ 21     >>   88 LOAD_FAST                0 (self)
+             90 LOAD_ATTR                0 (source_type)
+            110 LOAD_CONST               4 ('自有素材')
+            112 COMPARE_OP              40 (==)
+            116 POP_JUMP_IF_FALSE       28 (to 174)
+
+ 22         118 LOAD_CONST               5 ('来源线索：自有/自拍/内部素材，来源名称：')
+            120 LOAD_FAST                0 (self)
+            122 LOAD_ATTR                2 (source_name)
+            142 FORMAT_VALUE             0
+            144 LOAD_CONST               3 ('，原相对路径：')
+            146 LOAD_FAST                0 (self)
+            148 LOAD_ATTR                4 (relative_path)
+            168 FORMAT_VALUE             0
+            170 BUILD_STRING             4
+            172 RETURN_VALUE
+
+ 23     >>  174 LOAD_CONST               6 ('来源线索：未知，原相对路径：')
+            176 LOAD_FAST                0 (self)
+            178 LOAD_ATTR                4 (relative_path)
+            198 FORMAT_VALUE             0
+            200 BUILD_STRING             2
+            202 RETURN_VALUE
+
+Disassembly of <code object _clean_source_name at <address>, file "xiaoguan_classifier\source.py", line 26>:
+ 26           0 RESUME                   0
+
+ 27           2 LOAD_FAST                0 (value)
+              4 LOAD_ATTR                1 (NULL|self + strip)
+             24 CALL                     0
+             32 STORE_FAST               0 (value)
+
+ 28          34 LOAD_FAST                2 (strip_markers)
+             36 POP_JUMP_IF_FALSE       39 (to 116)
+
+ 29          38 LOAD_GLOBAL              2 (CREATOR_MARKERS)
+             48 LOAD_GLOBAL              4 (SELF_MARKERS)
+             58 BINARY_OP                0 (+)
+             62 LOAD_CONST               1 (('素材', '口播'))
+             64 BINARY_OP                0 (+)
+             68 GET_ITER
+        >>   70 FOR_ITER                20 (to 114)
+             74 STORE_FAST               3 (marker)
+
+ 30          76 LOAD_FAST                0 (value)
+             78 LOAD_ATTR                7 (NULL|self + replace)
+             98 LOAD_FAST                3 (marker)
+            100 LOAD_CONST               2 ('')
+            102 CALL                     2
+            110 STORE_FAST               0 (value)
+            112 JUMP_BACKWARD           22 (to 70)
+
+ 29     >>  114 END_FOR
+
+ 31     >>  116 LOAD_FAST                0 (value)
+            118 LOAD_ATTR                1 (NULL|self + strip)
+            138 LOAD_CONST               3 ('_- ')
+            140 CALL                     1
+            148 STORE_FAST               0 (value)
+
+ 32         150 LOAD_FAST                0 (value)
+            152 COPY                     1
+            154 POP_JUMP_IF_TRUE         2 (to 160)
+            156 POP_TOP
+            158 LOAD_FAST                1 (fallback)
+        >>  160 RETURN_VALUE
+
+Disassembly of <code object infer_source_info at <address>, file "xiaoguan_classifier\source.py", line 35>:
+              0 MAKE_CELL                7 (filename_stem)
+              2 MAKE_CELL                8 (part)
+
+ 35           4 RESUME                   0
+
+ 36           6 LOAD_FAST                1 (material)
+              8 LOAD_ATTR                1 (NULL|self + resolve)
+             28 CALL                     0
+             36 LOAD_ATTR                3 (NULL|self + relative_to)
+             56 LOAD_FAST                0 (root)
+             58 LOAD_ATTR                1 (NULL|self + resolve)
+             78 CALL                     0
+             86 CALL                     1
+             94 STORE_FAST               2 (relative)
+
+ 37          96 LOAD_GLOBAL              5 (NULL + list)
+            106 LOAD_FAST                2 (relative)
+            108 LOAD_ATTR                6 (parts)
+            128 LOAD_CONST               0 (None)
+            130 LOAD_CONST               1 (-1)
+            132 BINARY_SLICE
+            134 CALL                     1
+            142 STORE_FAST               3 (parts)
+
+ 38         144 LOAD_GLOBAL              9 (NULL + str)
+            154 LOAD_FAST                2 (relative)
+            156 CALL                     1
+            164 STORE_FAST               4 (relative_text)
+
+ 40         166 LOAD_GLOBAL             11 (NULL + enumerate)
+            176 LOAD_FAST                3 (parts)
+            178 CALL                     1
+            186 GET_ITER
+        >>  188 FOR_ITER                94 (to 380)
+            192 UNPACK_SEQUENCE          2
+            196 STORE_FAST               5 (index)
+            198 STORE_DEREF              8 (part)
+
+ 41         200 LOAD_GLOBAL             13 (NULL + any)
+            210 LOAD_CLOSURE             8 (part)
+            212 BUILD_TUPLE              1
+            214 LOAD_CONST               2 (<code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 41>)
+            216 MAKE_FUNCTION            8 (closure)
+            218 LOAD_GLOBAL             14 (CREATOR_MARKERS)
+            228 GET_ITER
+            230 CALL                     0
+            238 CALL                     1
+            246 POP_JUMP_IF_TRUE         1 (to 250)
+            248 JUMP_BACKWARD           31 (to 188)
+
+ 42     >>  250 LOAD_FAST                5 (index)
+            252 LOAD_CONST               3 (1)
+            254 BINARY_OP                0 (+)
+            258 LOAD_GLOBAL             17 (NULL + len)
+            268 LOAD_FAST                3 (parts)
+            270 CALL                     1
+            278 COMPARE_OP               2 (<)
+            282 POP_JUMP_IF_FALSE       21 (to 326)
+
+ 43         284 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            294 LOAD_FAST                3 (parts)
+            296 LOAD_FAST                5 (index)
+            298 LOAD_CONST               3 (1)
+            300 BINARY_OP                0 (+)
+            304 BINARY_SUBSCR
+            308 LOAD_CONST               4 ('达人未知')
+            310 LOAD_CONST               5 (False)
+            312 KW_NAMES                 6 (('strip_markers',))
+            314 CALL                     3
+            322 STORE_FAST               6 (name)
+            324 JUMP_FORWARD            12 (to 350)
+
+ 45     >>  326 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            336 LOAD_DEREF               8 (part)
+            338 LOAD_CONST               4 ('达人未知')
+            340 CALL                     2
+            348 STORE_FAST               6 (name)
+
+ 46     >>  350 LOAD_GLOBAL             21 (NULL + SourceInfo)
+            360 LOAD_CONST               7 ('达人素材')
+            362 LOAD_FAST                6 (name)
+            364 LOAD_FAST                4 (relative_text)
+            366 CALL                     3
+            374 SWAP                     2
+            376 POP_TOP
+            378 RETURN_VALUE
+
+ 40     >>  380 END_FOR
+
+ 48         382 LOAD_GLOBAL             11 (NULL + enumerate)
+            392 LOAD_FAST                3 (parts)
+            394 CALL                     1
+            402 GET_ITER
+        >>  404 FOR_ITER                94 (to 596)
+            408 UNPACK_SEQUENCE          2
+            412 STORE_FAST               5 (index)
+            414 STORE_DEREF              8 (part)
+
+ 49         416 LOAD_GLOBAL             13 (NULL + any)
+            426 LOAD_CLOSURE             8 (part)
+            428 BUILD_TUPLE              1
+            430 LOAD_CONST               8 (<code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 49>)
+            432 MAKE_FUNCTION            8 (closure)
+            434 LOAD_GLOBAL             22 (SELF_MARKERS)
+            444 GET_ITER
+            446 CALL                     0
+            454 CALL                     1
+            462 POP_JUMP_IF_TRUE         1 (to 466)
+            464 JUMP_BACKWARD           31 (to 404)
+
+ 50     >>  466 LOAD_FAST                5 (index)
+            468 LOAD_CONST               3 (1)
+            470 BINARY_OP                0 (+)
+            474 LOAD_GLOBAL             17 (NULL + len)
+            484 LOAD_FAST                3 (parts)
+            486 CALL                     1
+            494 COMPARE_OP               2 (<)
+            498 POP_JUMP_IF_FALSE       21 (to 542)
+
+ 51         500 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            510 LOAD_FAST                3 (parts)
+            512 LOAD_FAST                5 (index)
+            514 LOAD_CONST               3 (1)
+            516 BINARY_OP                0 (+)
+            520 BINARY_SUBSCR
+            524 LOAD_CONST               9 ('自有未知')
+            526 LOAD_CONST               5 (False)
+            528 KW_NAMES                 6 (('strip_markers',))
+            530 CALL                     3
+            538 STORE_FAST               6 (name)
+            540 JUMP_FORWARD            12 (to 566)
+
+ 53     >>  542 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            552 LOAD_DEREF               8 (part)
+            554 LOAD_CONST               9 ('自有未知')
+            556 CALL                     2
+            564 STORE_FAST               6 (name)
+
+ 54     >>  566 LOAD_GLOBAL             21 (NULL + SourceInfo)
+            576 LOAD_CONST              10 ('自有素材')
+            578 LOAD_FAST                6 (name)
+            580 LOAD_FAST                4 (relative_text)
+            582 CALL                     3
+            590 SWAP                     2
+            592 POP_TOP
+            594 RETURN_VALUE
+
+ 48     >>  596 END_FOR
+
+ 56         598 LOAD_FAST                1 (material)
+            600 LOAD_ATTR               24 (stem)
+            620 STORE_DEREF              7 (filename_stem)
+
+ 57         622 LOAD_GLOBAL             13 (NULL + any)
+            632 LOAD_CLOSURE             7 (filename_stem)
+            634 BUILD_TUPLE              1
+            636 LOAD_CONST              11 (<code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 57>)
+            638 MAKE_FUNCTION            8 (closure)
+            640 LOAD_GLOBAL             14 (CREATOR_MARKERS)
+            650 GET_ITER
+            652 CALL                     0
+            660 CALL                     1
+            668 POP_JUMP_IF_FALSE       23 (to 716)
+
+ 58         670 LOAD_GLOBAL             21 (NULL + SourceInfo)
+            680 LOAD_CONST               7 ('达人素材')
+            682 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            692 LOAD_DEREF               7 (filename_stem)
+            694 LOAD_CONST               4 ('达人未知')
+            696 CALL                     2
+            704 LOAD_FAST                4 (relative_text)
+            706 CALL                     3
+            714 RETURN_VALUE
+
+ 59     >>  716 LOAD_GLOBAL             13 (NULL + any)
+            726 LOAD_CLOSURE             7 (filename_stem)
+            728 BUILD_TUPLE              1
+            730 LOAD_CONST              12 (<code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 59>)
+            732 MAKE_FUNCTION            8 (closure)
+            734 LOAD_GLOBAL             22 (SELF_MARKERS)
+            744 GET_ITER
+            746 CALL                     0
+            754 CALL                     1
+            762 POP_JUMP_IF_FALSE       23 (to 810)
+
+ 60         764 LOAD_GLOBAL             21 (NULL + SourceInfo)
+            774 LOAD_CONST              10 ('自有素材')
+            776 LOAD_GLOBAL             19 (NULL + _clean_source_name)
+            786 LOAD_DEREF               7 (filename_stem)
+            788 LOAD_CONST               9 ('自有未知')
+            790 CALL                     2
+            798 LOAD_FAST                4 (relative_text)
+            800 CALL                     3
+            808 RETURN_VALUE
+
+ 62     >>  810 LOAD_GLOBAL             21 (NULL + SourceInfo)
+            820 LOAD_CONST              13 ('未知')
+            822 LOAD_CONST              14 ('')
+            824 LOAD_FAST                4 (relative_text)
+            826 CALL                     3
+            834 RETURN_VALUE
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 41>:
+              0 COPY_FREE_VARS           1
+
+ 41           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (marker)
+             16 LOAD_FAST                1 (marker)
+             18 LOAD_DEREF               2 (part)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 49>:
+              0 COPY_FREE_VARS           1
+
+ 49           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (marker)
+             16 LOAD_FAST                1 (marker)
+             18 LOAD_DEREF               2 (part)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 57>:
+              0 COPY_FREE_VARS           1
+
+ 57           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (marker)
+             16 LOAD_FAST                1 (marker)
+             18 LOAD_DEREF               2 (filename_stem)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\source.py", line 59>:
+              0 COPY_FREE_VARS           1
+
+ 59           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (marker)
+             16 LOAD_FAST                1 (marker)
+             18 LOAD_DEREF               2 (filename_stem)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti

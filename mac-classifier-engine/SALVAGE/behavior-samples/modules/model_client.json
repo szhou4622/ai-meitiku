@@ -1,0 +1,23 @@
+{
+  "module": "xiaoguan_classifier.model_client",
+  "bytecode_sha256": "d8d0152221c7aed132ee3961a8f992217266ac1f5da9353a67af071d310066ab",
+  "observed_in_classification_run": true,
+  "sample_count": 2,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.model_client",
+      "function": "<module>",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.model_client",
+      "function": "ModelClientError",
+      "calls": 1,
+      "input": {},
+      "output": null
+    }
+  ],
+  "note": ""
+}

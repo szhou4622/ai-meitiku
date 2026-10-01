@@ -1,0 +1,281 @@
+"""统一只读能力的进程内运行时。"""
+
+from xhs_adapters import (
+    BrowserRuntime,
+    HttpReadProvider,
+    PublicationRuntime,
+)
+from xhs_adapters.config import AppSettings
+from xhs_core.application import (
+    BrowserReadinessService,
+    BrowserReadProvider,
+    CapabilityRouter,
+    OneTimeAccountConsistencyGuard,
+)
+from xhs_core.domain import (
+    AccountConsistencyGuard,
+    BrowserDriver,
+    FeedDetailResult,
+    FeedListResult,
+    ReadAccountScope,
+    RoutedCapabilityResult,
+    UserProfileResult,
+)
+from xhs_core.domain.browser_requests import SearchFilters
+
+from .account_proof_runtime import ExtensionAccountProofProvider
+
+_BROWSER_READ_TIMEOUT_SECONDS = 60.0
+_ACCOUNT_GUARD_TIMEOUT_SECONDS = 60.0
+
+
+class ReadCapabilityRuntime:
+    """固定一份路由配置及其 HTTP、浏览器只读 Provider。
+
+    每个请求租用一个运行时快照，因此请求执行期间不会混用更新前后的
+    Cookie、代理、路由策略或浏览器驱动。
+
+    Args:
+        settings: 本运行时采用的已验证配置。
+        http: Cookie HTTP 统一只读 Provider。
+        browser: 固定浏览器驱动的只读 Provider。
+        account_guard: 跨提供方回退前的一次性账号一致性门禁。
+    """
+
+    def __init__(
+        self,
+        settings: AppSettings,
+        http: HttpReadProvider,
+        browser: BrowserReadProvider,
+        account_guard: AccountConsistencyGuard,
+    ) -> None:
+        self.strategy = settings.route_strategy
+        self.browser_driver = settings.browser_driver
+        self._http = http
+        self._browser = browser
+        self._account_guard = account_guard
+        self._router = CapabilityRouter()
+
+    async def close(self) -> None:
+        """关闭本运行时持有的 HTTP 连接池。"""
+        await self._http.close()
+
+    async def list_feeds(
+        self,
+        request_id: str | None = None,
+    ) -> RoutedCapabilityResult[FeedListResult]:
+        """按当前策略读取首页推荐。
+
+        Args:
+            request_id: 可选的浏览器任务幂等标识。
+
+        Returns:
+            推荐列表及实际路由轨迹。
+
+        Raises:
+            ProviderError: 所选提供方无法完成读取。
+        """
+        return await self._router.execute_read(
+            self.strategy,
+            http=self._http.list_feeds,
+            browser=lambda: self._browser.list_feeds(request_id),
+            account_scope=ReadAccountScope.ACCOUNT_SCOPED,
+            account_guard=self._account_guard,
+        )
+
+    async def search_feeds(
+        self,
+        keyword: str,
+        filters: SearchFilters,
+        request_id: str | None = None,
+    ) -> RoutedCapabilityResult[FeedListResult]:
+        """按当前策略搜索帖子。
+
+        Args:
+            keyword: 搜索关键词。
+            filters: 页面筛选条件。
+            request_id: 可选的浏览器任务幂等标识。
+
+        Returns:
+            搜索结果及实际路由轨迹。
+
+        Raises:
+            ProviderError: 所选提供方无法完成读取。
+        """
+        return await self._router.execute_read(
+            self.strategy,
+            http=lambda: self._http.search_feeds(keyword, filters),
+            browser=lambda: self._browser.search_feeds(
+                keyword,
+                filters,
+                request_id,
+            ),
+            account_scope=ReadAccountScope.ACCOUNT_SCOPED,
+            account_guard=self._account_guard,
+        )
+
+    async def get_feed_detail(
+        self,
+        feed_id: str,
+        xsec_token: str,
+        *,
+        comment_limit: int,
+        include_replies: bool,
+        reply_limit: int,
+        request_id: str | None = None,
+    ) -> RoutedCapabilityResult[FeedDetailResult]:
+        """按当前策略读取帖子详情。
+
+        Args:
+            feed_id: 目标帖子标识。
+            xsec_token: 页面访问令牌。
+            comment_limit: 最多读取的一级评论数。
+            include_replies: 是否读取当前已加载回复。
+            reply_limit: 每条评论最多读取的回复数。
+            request_id: 可选的浏览器任务幂等标识。
+
+        Returns:
+            帖子详情及实际路由轨迹。
+
+        Raises:
+            ProviderError: 所选提供方无法完成读取。
+        """
+        options = {
+            "comment_limit": comment_limit,
+            "include_replies": include_replies,
+            "reply_limit": reply_limit,
+        }
+        return await self._router.execute_read(
+            self.strategy,
+            http=lambda: self._http.get_feed_detail(
+                feed_id,
+                xsec_token,
+                **options,
+            ),
+            browser=lambda: self._browser.get_feed_detail(
+                feed_id,
+                xsec_token,
+                request_id=request_id,
+                **options,
+            ),
+            account_scope=ReadAccountScope.ACCOUNT_SCOPED,
+            account_guard=self._account_guard,
+        )
+
+    async def get_user_profile(
+        self,
+        user_id: str,
+        xsec_token: str,
+        request_id: str | None = None,
+    ) -> RoutedCapabilityResult[UserProfileResult]:
+        """按当前策略读取指定用户主页。
+
+        Args:
+            user_id: 目标用户标识。
+            xsec_token: 页面访问令牌。
+            request_id: 可选的浏览器任务幂等标识。
+
+        Returns:
+            用户主页及实际路由轨迹。
+
+        Raises:
+            ProviderError: 所选提供方无法完成读取。
+        """
+        return await self._router.execute_read(
+            self.strategy,
+            http=lambda: self._http.get_user_profile(user_id, xsec_token),
+            browser=lambda: self._browser.get_user_profile(
+                user_id,
+                xsec_token,
+                request_id,
+            ),
+            account_scope=ReadAccountScope.ACCOUNT_SCOPED,
+            account_guard=self._account_guard,
+        )
+
+    async def get_my_profile(
+        self,
+        request_id: str | None = None,
+    ) -> RoutedCapabilityResult[UserProfileResult]:
+        """按当前策略读取已登录账号主页。
+
+        Args:
+            request_id: 可选的浏览器任务幂等标识。
+
+        Returns:
+            当前账号主页及实际路由轨迹。
+
+        Raises:
+            ProviderError: 所选提供方无法完成读取。
+        """
+        return await self._router.execute_read(
+            self.strategy,
+            http=self._http.get_my_profile,
+            browser=lambda: self._browser.get_my_profile(request_id),
+            account_scope=ReadAccountScope.ACCOUNT_SCOPED,
+            account_guard=self._account_guard,
+        )
+
+
+def create_browser_readiness(
+    browser: BrowserRuntime,
+    publication: PublicationRuntime,
+) -> BrowserReadinessService:
+    """构造浏览器驱动的提交前就绪探针。
+
+    只读能力与登录、写操作三条路径必须共用同一个判定，否则同一个"驱动没启动"
+    在不同入口会得到不一致的结论。
+
+    Args:
+        browser: 浏览器任务与受管浏览器生命周期。
+        publication: 提供扩展在线状态的运行时。
+
+    Returns:
+        可供多个路由共享的就绪探针。
+    """
+    return BrowserReadinessService(publication.credentials, browser.managed)
+
+
+def create_read_capability_runtime(
+    settings: AppSettings,
+    browser: BrowserRuntime,
+    publication: PublicationRuntime,
+) -> ReadCapabilityRuntime:
+    """创建一份可由请求原子租用的只读能力运行时。
+
+    Args:
+        settings: 本运行时采用的已验证配置。
+        browser: 浏览器任务及受管浏览器生命周期。
+        publication: 提供扩展在线状态的共享运行时。
+
+    Returns:
+        固定配置且尚未关闭的运行时。
+    """
+    readiness = create_browser_readiness(browser, publication)
+    http = HttpReadProvider(settings)
+    browser_proof = (
+        browser.managed_account_proof
+        if settings.browser_driver is BrowserDriver.MANAGED
+        else ExtensionAccountProofProvider(
+            browser.account_challenges,
+            publication.credentials,
+        )
+    )
+    return ReadCapabilityRuntime(
+        settings,
+        http,
+        BrowserReadProvider(
+            browser.tasks,
+            readiness,
+            settings.browser_driver,
+            timeout_seconds=max(
+                settings.timeout,
+                _BROWSER_READ_TIMEOUT_SECONDS,
+            ),
+        ),
+        OneTimeAccountConsistencyGuard(
+            http,
+            browser_proof,
+            timeout_seconds=_ACCOUNT_GUARD_TIMEOUT_SECONDS,
+        ),
+    )

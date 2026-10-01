@@ -1,0 +1,2203 @@
+module: xiaoguan_classifier.review_tools
+bytecode: src/xiaoguan_classifier/review_tools.pyc
+sha256: 627447866a679dc0786bcd3b0d1895526c6753c688da10164b3b6dd0c32ad119
+python: 3.12.14
+source_filename: xiaoguan_classifier\review_tools.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (csv)
+             20 STORE_NAME               2 (csv)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (re)
+             28 STORE_NAME               3 (re)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               2 (None)
+             34 IMPORT_NAME              4 (shutil)
+             36 STORE_NAME               4 (shutil)
+
+  6          38 LOAD_CONST               0 (0)
+             40 LOAD_CONST               3 (('datetime',))
+             42 IMPORT_NAME              5 (datetime)
+             44 IMPORT_FROM              5 (datetime)
+             46 STORE_NAME               5 (datetime)
+             48 POP_TOP
+
+  7          50 LOAD_CONST               0 (0)
+             52 LOAD_CONST               4 (('Path',))
+             54 IMPORT_NAME              6 (pathlib)
+             56 IMPORT_FROM              7 (Path)
+             58 STORE_NAME               7 (Path)
+             60 POP_TOP
+
+  8          62 LOAD_CONST               0 (0)
+             64 LOAD_CONST               5 (('Any',))
+             66 IMPORT_NAME              8 (typing)
+             68 IMPORT_FROM              9 (Any)
+             70 STORE_NAME               9 (Any)
+             72 POP_TOP
+
+ 10          74 LOAD_CONST               6 (1)
+             76 LOAD_CONST               7 (('SCENE_OR_FORM', 'Classification', 'build_material_filename', 'safe_filename_part'))
+             78 IMPORT_NAME             10 (taxonomy)
+             80 IMPORT_FROM             11 (SCENE_OR_FORM)
+             82 STORE_NAME              11 (SCENE_OR_FORM)
+             84 IMPORT_FROM             12 (Classification)
+             86 STORE_NAME              12 (Classification)
+             88 IMPORT_FROM             13 (build_material_filename)
+             90 STORE_NAME              13 (build_material_filename)
+             92 IMPORT_FROM             14 (safe_filename_part)
+             94 STORE_NAME              14 (safe_filename_part)
+             96 POP_TOP
+
+ 16          98 LOAD_CONST               6 (1)
+            100 LOAD_CONST               8 (('ClassificationTemplate',))
+            102 IMPORT_NAME             15 (templates)
+            104 IMPORT_FROM             16 (ClassificationTemplate)
+            106 STORE_NAME              16 (ClassificationTemplate)
+            108 POP_TOP
+
+ 19         110 LOAD_CONST               9 ('分类清单.csv')
+            112 STORE_NAME              17 (MANIFEST_NAME)
+
+ 20         114 LOAD_CONST              10 ('待筛清单.csv')
+            116 STORE_NAME              18 (PENDING_NAME)
+
+ 21         118 LOAD_CONST              11 ('人工修正表.csv')
+            120 STORE_NAME              19 (CORRECTION_SHEET_NAME)
+
+ 22         122 LOAD_CONST              12 ('人工修正记录.csv')
+            124 STORE_NAME              20 (CORRECTION_LOG_NAME)
+
+ 23         126 LOAD_CONST              13 ('分类自检报告.csv')
+            128 STORE_NAME              21 (SELF_CHECK_CSV_NAME)
+
+ 24         130 LOAD_CONST              14 ('分类自检报告.md')
+            132 STORE_NAME              22 (SELF_CHECK_MD_NAME)
+
+ 26         134 LOAD_CONST              15 (('修正一级分类', '修正二级分类', '修正具体画面', '修正景别或形态'))
+            136 STORE_NAME              23 (CORRECTION_FIELDS)
+
+ 27         138 LOAD_CONST              16 (('可能', '疑似', '不确定', '看不清', '无法', '不明显', '弱线索', '低置信'))
+            140 STORE_NAME              24 (UNSTABLE_REASON_MARKERS)
+
+ 30         142 LOAD_CONST              31 (('path', 'Path', 'return', 'list[dict[str, str]]'))
+            144 LOAD_CONST              17 (<code object _read_csv_rows at <address>, file "xiaoguan_classifier\review_tools.py", line 30>)
+            146 MAKE_FUNCTION            4 (annotations)
+            148 STORE_NAME              25 (_read_csv_rows)
+
+ 37         150 LOAD_CONST              32 (('path', 'Path', 'rows', 'list[dict[str, str]]', 'return', 'None'))
+            152 LOAD_CONST              18 (<code object _write_csv at <address>, file "xiaoguan_classifier\review_tools.py", line 37>)
+            154 MAKE_FUNCTION            4 (annotations)
+            156 STORE_NAME              26 (_write_csv)
+
+ 53         158 LOAD_CONST              33 (('library_root', 'Path', 'return', 'Path'))
+            160 LOAD_CONST              19 (<code object _manifest_path at <address>, file "xiaoguan_classifier\review_tools.py", line 53>)
+            162 MAKE_FUNCTION            4 (annotations)
+            164 STORE_NAME              27 (_manifest_path)
+
+ 57         166 LOAD_CONST              33 (('library_root', 'Path', 'return', 'Path'))
+            168 LOAD_CONST              20 (<code object _correction_sheet_path at <address>, file "xiaoguan_classifier\review_tools.py", line 57>)
+            170 MAKE_FUNCTION            4 (annotations)
+            172 STORE_NAME              28 (_correction_sheet_path)
+
+ 61         174 LOAD_CONST              34 (('row', 'dict[str, str]', 'return', 'str'))
+            176 LOAD_CONST              21 (<code object _row_key at <address>, file "xiaoguan_classifier\review_tools.py", line 61>)
+            178 MAKE_FUNCTION            4 (annotations)
+            180 STORE_NAME              29 (_row_key)
+
+ 67         182 LOAD_CONST              35 (('value', 'str', 'taxonomy', 'dict[str, list[str]]', 'return', 'str'))
+            184 LOAD_CONST              22 (<code object _normalize_manual_category at <address>, file "xiaoguan_classifier\review_tools.py", line 67>)
+            186 MAKE_FUNCTION            4 (annotations)
+            188 STORE_NAME              30 (_normalize_manual_category)
+
+ 77         190 LOAD_CONST              36 (('value', 'str', 'return', 'str'))
+            192 LOAD_CONST              23 (<code object _normalize_manual_form at <address>, file "xiaoguan_classifier\review_tools.py", line 77>)
+            194 MAKE_FUNCTION            4 (annotations)
+            196 STORE_NAME              31 (_normalize_manual_form)
+
+ 84         198 LOAD_CONST              37 (('path', 'Path', 'return', 'Path'))
+            200 LOAD_CONST              24 (<code object _unique_destination at <address>, file "xiaoguan_classifier\review_tools.py", line 84>)
+            202 MAKE_FUNCTION            4 (annotations)
+            204 STORE_NAME              32 (_unique_destination)
+
+ 95         206 LOAD_CONST              38 (('dest_dir', 'Path', 'suffix', 'str', 'return', 'int'))
+            208 LOAD_CONST              25 (<code object _next_sequence at <address>, file "xiaoguan_classifier\review_tools.py", line 95>)
+            210 MAKE_FUNCTION            4 (annotations)
+            212 STORE_NAME              33 (_next_sequence)
+
+100         214 LOAD_CONST              39 (('row', 'dict[str, str]', 'return', 'bool'))
+            216 LOAD_CONST              26 (<code object _is_pending_row at <address>, file "xiaoguan_classifier\review_tools.py", line 100>)
+            218 MAKE_FUNCTION            4 (annotations)
+            220 STORE_NAME              34 (_is_pending_row)
+
+109         222 LOAD_CONST              40 (('path', 'Path', 'manifest_rows', 'list[dict[str, str]]', 'return', 'None'))
+            224 LOAD_CONST              27 (<code object _write_current_cleanup_script at <address>, file "xiaoguan_classifier\review_tools.py", line 109>)
+            226 MAKE_FUNCTION            4 (annotations)
+            228 STORE_NAME              35 (_write_current_cleanup_script)
+
+124         230 LOAD_CONST              41 (('library_root', 'Path', 'template', 'ClassificationTemplate', 'return', 'Path'))
+            232 LOAD_CONST              28 (<code object build_correction_sheet at <address>, file "xiaoguan_classifier\review_tools.py", line 124>)
+            234 MAKE_FUNCTION            4 (annotations)
+            236 STORE_NAME              36 (build_correction_sheet)
+
+170         238 LOAD_CONST              42 (('library_root', 'Path', 'template', 'ClassificationTemplate', 'return', 'dict[str, Any]'))
+            240 LOAD_CONST              29 (<code object apply_correction_sheet at <address>, file "xiaoguan_classifier\review_tools.py", line 170>)
+            242 MAKE_FUNCTION            4 (annotations)
+            244 STORE_NAME              37 (apply_correction_sheet)
+
+281         246 LOAD_CONST              42 (('library_root', 'Path', 'template', 'ClassificationTemplate', 'return', 'dict[str, Any]'))
+            248 LOAD_CONST              30 (<code object run_classification_self_check at <address>, file "xiaoguan_classifier\review_tools.py", line 281>)
+            250 MAKE_FUNCTION            4 (annotations)
+            252 STORE_NAME              38 (run_classification_self_check)
+            254 RETURN_CONST             2 (None)
+
+Disassembly of <code object _read_csv_rows at <address>, file "xiaoguan_classifier\review_tools.py", line 30>:
+ 30           0 RESUME                   0
+
+ 31           2 LOAD_FAST                0 (path)
+              4 LOAD_ATTR                1 (NULL|self + exists)
+             24 CALL                     0
+             32 POP_JUMP_IF_FALSE       29 (to 92)
+             34 LOAD_FAST                0 (path)
+             36 LOAD_ATTR                3 (NULL|self + stat)
+             56 CALL                     0
+             64 LOAD_ATTR                4 (st_size)
+             84 LOAD_CONST               1 (3)
+             86 COMPARE_OP              26 (<=)
+             90 POP_JUMP_IF_FALSE        2 (to 96)
+
+ 32     >>   92 BUILD_LIST               0
+             94 RETURN_VALUE
+
+ 33     >>   96 LOAD_FAST                0 (path)
+             98 LOAD_ATTR                7 (NULL|self + open)
+            118 LOAD_CONST               2 ('r')
+            120 LOAD_CONST               3 ('')
+            122 LOAD_CONST               4 ('utf-8-sig')
+            124 KW_NAMES                 5 (('newline', 'encoding'))
+            126 CALL                     3
+            134 BEFORE_WITH
+            136 STORE_FAST               1 (handle)
+
+ 34         138 LOAD_GLOBAL              9 (NULL + list)
+            148 LOAD_GLOBAL             11 (NULL + csv)
+            158 LOAD_ATTR               12 (DictReader)
+            178 LOAD_FAST                1 (handle)
+            180 CALL                     1
+            188 CALL                     1
+
+ 33         196 SWAP                     2
+            198 LOAD_CONST               0 (None)
+            200 LOAD_CONST               0 (None)
+            202 LOAD_CONST               0 (None)
+            204 CALL                     2
+            212 POP_TOP
+            214 RETURN_VALUE
+        >>  216 PUSH_EXC_INFO
+            218 WITH_EXCEPT_START
+            220 POP_JUMP_IF_TRUE         1 (to 224)
+            222 RERAISE                  2
+        >>  224 POP_TOP
+            226 POP_EXCEPT
+            228 POP_TOP
+            230 POP_TOP
+            232 RETURN_CONST             0 (None)
+        >>  234 COPY                     3
+            236 POP_EXCEPT
+            238 RERAISE                  1
+ExceptionTable:
+  136 to 194 -> 216 [1] lasti
+  216 to 224 -> 234 [3] lasti
+
+Disassembly of <code object _write_csv at <address>, file "xiaoguan_classifier\review_tools.py", line 37>:
+ 37           0 RESUME                   0
+
+ 38           2 LOAD_FAST                0 (path)
+              4 LOAD_ATTR                0 (parent)
+             24 LOAD_ATTR                3 (NULL|self + mkdir)
+             44 LOAD_CONST               1 (True)
+             46 LOAD_CONST               1 (True)
+             48 KW_NAMES                 2 (('parents', 'exist_ok'))
+             50 CALL                     2
+             58 POP_TOP
+
+ 39          60 LOAD_FAST                1 (rows)
+             62 POP_JUMP_IF_TRUE        20 (to 104)
+
+ 40          64 LOAD_FAST                0 (path)
+             66 LOAD_ATTR                5 (NULL|self + write_text)
+             86 LOAD_CONST               3 ('')
+             88 LOAD_CONST               4 ('utf-8-sig')
+             90 KW_NAMES                 5 (('encoding',))
+             92 CALL                     2
+            100 POP_TOP
+
+ 41         102 RETURN_CONST             0 (None)
+
+ 42     >>  104 BUILD_LIST               0
+            106 STORE_FAST               2 (fieldnames)
+
+ 43         108 LOAD_FAST                1 (rows)
+            110 GET_ITER
+        >>  112 FOR_ITER                31 (to 178)
+            116 STORE_FAST               3 (row)
+
+ 44         118 LOAD_FAST                3 (row)
+            120 GET_ITER
+        >>  122 FOR_ITER                24 (to 174)
+            126 STORE_FAST               4 (key)
+
+ 45         128 LOAD_FAST                4 (key)
+            130 LOAD_FAST                2 (fieldnames)
+            132 CONTAINS_OP              1
+            134 POP_JUMP_IF_TRUE         1 (to 138)
+            136 JUMP_BACKWARD            8 (to 122)
+
+ 46     >>  138 LOAD_FAST                2 (fieldnames)
+            140 LOAD_ATTR                7 (NULL|self + append)
+            160 LOAD_FAST                4 (key)
+            162 CALL                     1
+            170 POP_TOP
+            172 JUMP_BACKWARD           26 (to 122)
+
+ 44     >>  174 END_FOR
+            176 JUMP_BACKWARD           33 (to 112)
+
+ 43     >>  178 END_FOR
+
+ 47         180 LOAD_FAST                0 (path)
+            182 LOAD_ATTR                9 (NULL|self + open)
+            202 LOAD_CONST               6 ('w')
+            204 LOAD_CONST               3 ('')
+            206 LOAD_CONST               4 ('utf-8-sig')
+            208 KW_NAMES                 7 (('newline', 'encoding'))
+            210 CALL                     3
+            218 BEFORE_WITH
+            220 STORE_FAST               5 (handle)
+
+ 48         222 LOAD_GLOBAL             11 (NULL + csv)
+            232 LOAD_ATTR               12 (DictWriter)
+            252 LOAD_FAST                5 (handle)
+            254 LOAD_FAST                2 (fieldnames)
+            256 KW_NAMES                 8 (('fieldnames',))
+            258 CALL                     2
+            266 STORE_FAST               6 (writer)
+
+ 49         268 LOAD_FAST                6 (writer)
+            270 LOAD_ATTR               15 (NULL|self + writeheader)
+            290 CALL                     0
+            298 POP_TOP
+
+ 50         300 LOAD_FAST                6 (writer)
+            302 LOAD_ATTR               17 (NULL|self + writerows)
+            322 LOAD_FAST                1 (rows)
+            324 CALL                     1
+            332 POP_TOP
+
+ 47         334 LOAD_CONST               0 (None)
+            336 LOAD_CONST               0 (None)
+            338 LOAD_CONST               0 (None)
+            340 CALL                     2
+            348 POP_TOP
+            350 RETURN_CONST             0 (None)
+        >>  352 PUSH_EXC_INFO
+            354 WITH_EXCEPT_START
+            356 POP_JUMP_IF_TRUE         1 (to 360)
+            358 RERAISE                  2
+        >>  360 POP_TOP
+            362 POP_EXCEPT
+            364 POP_TOP
+            366 POP_TOP
+            368 RETURN_CONST             0 (None)
+        >>  370 COPY                     3
+            372 POP_EXCEPT
+            374 RERAISE                  1
+ExceptionTable:
+  220 to 332 -> 352 [1] lasti
+  352 to 360 -> 370 [3] lasti
+
+Disassembly of <code object _manifest_path at <address>, file "xiaoguan_classifier\review_tools.py", line 53>:
+ 53           0 RESUME                   0
+
+ 54           2 LOAD_FAST                0 (library_root)
+              4 LOAD_CONST               1 ('outputs')
+              6 BINARY_OP               11 (/)
+             10 LOAD_GLOBAL              0 (MANIFEST_NAME)
+             20 BINARY_OP               11 (/)
+             24 RETURN_VALUE
+
+Disassembly of <code object _correction_sheet_path at <address>, file "xiaoguan_classifier\review_tools.py", line 57>:
+ 57           0 RESUME                   0
+
+ 58           2 LOAD_FAST                0 (library_root)
+              4 LOAD_CONST               1 ('outputs')
+              6 BINARY_OP               11 (/)
+             10 LOAD_GLOBAL              0 (CORRECTION_SHEET_NAME)
+             20 BINARY_OP               11 (/)
+             24 RETURN_VALUE
+
+Disassembly of <code object _row_key at <address>, file "xiaoguan_classifier\review_tools.py", line 61>:
+ 61           0 RESUME                   0
+
+ 62           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (row)
+             14 LOAD_ATTR                3 (NULL|self + get)
+             34 LOAD_CONST               1 ('序号')
+             36 CALL                     1
+             44 COPY                     1
+             46 POP_JUMP_IF_TRUE         2 (to 52)
+             48 POP_TOP
+             50 LOAD_CONST               2 ('')
+        >>   52 CALL                     1
+             60 LOAD_ATTR                5 (NULL|self + strip)
+             80 CALL                     0
+             88 STORE_FAST               1 (index)
+
+ 63          90 LOAD_GLOBAL              1 (NULL + str)
+            100 LOAD_FAST                0 (row)
+            102 LOAD_ATTR                3 (NULL|self + get)
+            122 LOAD_CONST               3 ('原文件路径')
+            124 CALL                     1
+            132 COPY                     1
+            134 POP_JUMP_IF_TRUE         2 (to 140)
+            136 POP_TOP
+            138 LOAD_CONST               2 ('')
+        >>  140 CALL                     1
+            148 LOAD_ATTR                5 (NULL|self + strip)
+            168 CALL                     0
+            176 STORE_FAST               2 (source)
+
+ 64         178 LOAD_FAST                1 (index)
+            180 FORMAT_VALUE             0
+            182 LOAD_CONST               4 ('|')
+            184 LOAD_FAST                2 (source)
+            186 FORMAT_VALUE             0
+            188 BUILD_STRING             3
+            190 RETURN_VALUE
+
+Disassembly of <code object _normalize_manual_category at <address>, file "xiaoguan_classifier\review_tools.py", line 67>:
+ 67           0 RESUME                   0
+
+ 68           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (value)
+             14 COPY                     1
+             16 POP_JUMP_IF_TRUE         2 (to 22)
+             18 POP_TOP
+             20 LOAD_CONST               1 ('')
+        >>   22 CALL                     1
+             30 LOAD_ATTR                3 (NULL|self + strip)
+             50 CALL                     0
+             58 STORE_FAST               2 (raw)
+
+ 69          60 LOAD_FAST                2 (raw)
+             62 LOAD_FAST                1 (taxonomy)
+             64 CONTAINS_OP              0
+             66 POP_JUMP_IF_FALSE        2 (to 72)
+
+ 70          68 LOAD_FAST                2 (raw)
+             70 RETURN_VALUE
+
+ 71     >>   72 LOAD_FAST                1 (taxonomy)
+             74 GET_ITER
+        >>   76 FOR_ITER                30 (to 140)
+             80 STORE_FAST               3 (category)
+
+ 72          82 LOAD_FAST                2 (raw)
+             84 LOAD_FAST                3 (category)
+             86 LOAD_ATTR                5 (NULL|self + split)
+            106 LOAD_CONST               2 ('_')
+            108 LOAD_CONST               3 (1)
+            110 CALL                     2
+            118 LOAD_CONST               4 (-1)
+            120 BINARY_SUBSCR
+            124 COMPARE_OP              40 (==)
+            128 POP_JUMP_IF_TRUE         1 (to 132)
+            130 JUMP_BACKWARD           28 (to 76)
+
+ 73     >>  132 LOAD_FAST                3 (category)
+            134 SWAP                     2
+            136 POP_TOP
+            138 RETURN_VALUE
+
+ 71     >>  140 END_FOR
+
+ 74         142 LOAD_GLOBAL              7 (NULL + ValueError)
+            152 LOAD_CONST               5 ('一级分类不在当前方案里：')
+            154 LOAD_FAST                2 (raw)
+            156 FORMAT_VALUE             0
+            158 BUILD_STRING             2
+            160 CALL                     1
+            168 RAISE_VARARGS            1
+
+Disassembly of <code object _normalize_manual_form at <address>, file "xiaoguan_classifier\review_tools.py", line 77>:
+ 77           0 RESUME                   0
+
+ 78           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (value)
+             14 COPY                     1
+             16 POP_JUMP_IF_TRUE         2 (to 22)
+             18 POP_TOP
+             20 LOAD_CONST               1 ('')
+        >>   22 CALL                     1
+             30 LOAD_ATTR                3 (NULL|self + strip)
+             50 CALL                     0
+             58 STORE_FAST               1 (raw)
+
+ 79          60 LOAD_FAST                1 (raw)
+             62 LOAD_GLOBAL              4 (SCENE_OR_FORM)
+             72 CONTAINS_OP              0
+             74 POP_JUMP_IF_FALSE        2 (to 80)
+
+ 80          76 LOAD_FAST                1 (raw)
+             78 RETURN_VALUE
+
+ 81     >>   80 RETURN_CONST             2 ('特写')
+
+Disassembly of <code object _unique_destination at <address>, file "xiaoguan_classifier\review_tools.py", line 84>:
+ 84           0 RESUME                   0
+
+ 85           2 LOAD_FAST                0 (path)
+              4 LOAD_ATTR                1 (NULL|self + exists)
+             24 CALL                     0
+             32 POP_JUMP_IF_TRUE         2 (to 38)
+
+ 86          34 LOAD_FAST                0 (path)
+             36 RETURN_VALUE
+
+ 87     >>   38 LOAD_CONST               1 (2)
+             40 STORE_FAST               1 (counter)
+
+ 88          42 NOP
+
+ 89     >>   44 LOAD_FAST                0 (path)
+             46 LOAD_ATTR                3 (NULL|self + with_name)
+             66 LOAD_FAST                0 (path)
+             68 LOAD_ATTR                4 (stem)
+             88 FORMAT_VALUE             0
+             90 LOAD_CONST               2 ('_重复')
+             92 LOAD_FAST                1 (counter)
+             94 LOAD_CONST               3 ('02d')
+             96 FORMAT_VALUE             4 (with format)
+             98 LOAD_FAST                0 (path)
+            100 LOAD_ATTR                6 (suffix)
+            120 FORMAT_VALUE             0
+            122 BUILD_STRING             4
+            124 CALL                     1
+            132 STORE_FAST               2 (candidate)
+
+ 90         134 LOAD_FAST                2 (candidate)
+            136 LOAD_ATTR                1 (NULL|self + exists)
+            156 CALL                     0
+            164 POP_JUMP_IF_TRUE         2 (to 170)
+
+ 91         166 LOAD_FAST                2 (candidate)
+            168 RETURN_VALUE
+
+ 92     >>  170 LOAD_FAST                1 (counter)
+            172 LOAD_CONST               4 (1)
+            174 BINARY_OP               13 (+=)
+            178 STORE_FAST               1 (counter)
+
+ 88         180 JUMP_BACKWARD           69 (to 44)
+
+Disassembly of <code object _next_sequence at <address>, file "xiaoguan_classifier\review_tools.py", line 95>:
+ 95           0 RESUME                   0
+
+ 96           2 LOAD_GLOBAL              1 (NULL + list)
+             12 LOAD_FAST                0 (dest_dir)
+             14 LOAD_ATTR                3 (NULL|self + glob)
+             34 LOAD_CONST               1 ('*')
+             36 LOAD_FAST                1 (suffix)
+             38 LOAD_ATTR                5 (NULL|self + lower)
+             58 CALL                     0
+             66 FORMAT_VALUE             0
+             68 BUILD_STRING             2
+             70 CALL                     1
+             78 CALL                     1
+             86 LOAD_GLOBAL              1 (NULL + list)
+             96 LOAD_FAST                0 (dest_dir)
+             98 LOAD_ATTR                3 (NULL|self + glob)
+            118 LOAD_CONST               1 ('*')
+            120 LOAD_FAST                1 (suffix)
+            122 LOAD_ATTR                7 (NULL|self + upper)
+            142 CALL                     0
+            150 FORMAT_VALUE             0
+            152 BUILD_STRING             2
+            154 CALL                     1
+            162 CALL                     1
+            170 BINARY_OP                0 (+)
+            174 STORE_FAST               2 (existing)
+
+ 97         176 LOAD_GLOBAL              9 (NULL + len)
+            186 LOAD_FAST                2 (existing)
+            188 CALL                     1
+            196 LOAD_CONST               2 (1)
+            198 BINARY_OP                0 (+)
+            202 RETURN_VALUE
+
+Disassembly of <code object _is_pending_row at <address>, file "xiaoguan_classifier\review_tools.py", line 100>:
+100           0 RESUME                   0
+
+101           2 LOAD_FAST                0 (row)
+              4 LOAD_ATTR                1 (NULL|self + get)
+             24 LOAD_CONST               1 ('一级分类')
+             26 CALL                     1
+             34 LOAD_CONST               2 ('00_待筛素材')
+             36 COMPARE_OP              40 (==)
+             40 POP_JUMP_IF_FALSE        1 (to 44)
+
+102          42 RETURN_CONST             3 (True)
+
+103     >>   44 NOP
+
+104          46 LOAD_GLOBAL              3 (NULL + float)
+             56 LOAD_FAST                0 (row)
+             58 LOAD_ATTR                1 (NULL|self + get)
+             78 LOAD_CONST               4 ('置信度')
+             80 CALL                     1
+             88 COPY                     1
+             90 POP_JUMP_IF_TRUE         2 (to 96)
+             92 POP_TOP
+             94 LOAD_CONST               5 ('0')
+        >>   96 CALL                     1
+            104 LOAD_CONST               6 (0.6)
+            106 COMPARE_OP               2 (<)
+            110 RETURN_VALUE
+        >>  112 PUSH_EXC_INFO
+
+105         114 LOAD_GLOBAL              4 (ValueError)
+            124 CHECK_EXC_MATCH
+            126 POP_JUMP_IF_FALSE        3 (to 134)
+            128 POP_TOP
+
+106         130 POP_EXCEPT
+            132 RETURN_CONST             3 (True)
+
+105     >>  134 RERAISE                  0
+        >>  136 COPY                     3
+            138 POP_EXCEPT
+            140 RERAISE                  1
+ExceptionTable:
+  46 to 108 -> 112 [0]
+  112 to 128 -> 136 [1] lasti
+  134 to 134 -> 136 [1] lasti
+
+Disassembly of <code object _write_current_cleanup_script at <address>, file "xiaoguan_classifier\review_tools.py", line 109>:
+109           0 RESUME                   0
+
+110           2 BUILD_LIST               0
+              4 LOAD_CONST               1 (('@echo off', 'chcp 65001 >nul', 'echo 正在清理当前分类副本...'))
+              6 LIST_EXTEND              1
+              8 STORE_FAST               2 (lines)
+
+115          10 LOAD_GLOBAL              1 (NULL + reversed)
+             20 LOAD_FAST                1 (manifest_rows)
+             22 CALL                     1
+             30 GET_ITER
+        >>   32 FOR_ITER                73 (to 182)
+             36 STORE_FAST               3 (row)
+
+116          38 LOAD_GLOBAL              3 (NULL + str)
+             48 LOAD_FAST                3 (row)
+             50 LOAD_ATTR                5 (NULL|self + get)
+             70 LOAD_CONST               2 ('新文件路径')
+             72 CALL                     1
+             80 COPY                     1
+             82 POP_JUMP_IF_TRUE         2 (to 88)
+             84 POP_TOP
+             86 LOAD_CONST               3 ('')
+        >>   88 CALL                     1
+             96 LOAD_ATTR                7 (NULL|self + strip)
+            116 CALL                     0
+            124 STORE_FAST               4 (new_path)
+
+117         126 LOAD_FAST                4 (new_path)
+            128 POP_JUMP_IF_TRUE         1 (to 132)
+            130 JUMP_BACKWARD           50 (to 32)
+
+118     >>  132 LOAD_FAST                2 (lines)
+            134 LOAD_ATTR                9 (NULL|self + append)
+            154 LOAD_CONST               4 ('if exist "')
+            156 LOAD_FAST                4 (new_path)
+            158 FORMAT_VALUE             0
+            160 LOAD_CONST               5 ('" del /F /Q "')
+            162 LOAD_FAST                4 (new_path)
+            164 FORMAT_VALUE             0
+            166 LOAD_CONST               6 ('" >nul')
+            168 BUILD_STRING             5
+            170 CALL                     1
+            178 POP_TOP
+            180 JUMP_BACKWARD           75 (to 32)
+
+115     >>  182 END_FOR
+
+119         184 LOAD_FAST                2 (lines)
+            186 LOAD_ATTR                9 (NULL|self + append)
+            206 LOAD_CONST               7 ('echo 清理完成。源文件没有被移动。')
+            208 CALL                     1
+            216 POP_TOP
+
+120         218 LOAD_FAST                2 (lines)
+            220 LOAD_ATTR                9 (NULL|self + append)
+            240 LOAD_CONST               8 ('pause')
+            242 CALL                     1
+            250 POP_TOP
+
+121         252 LOAD_FAST                0 (path)
+            254 LOAD_ATTR               11 (NULL|self + write_text)
+            274 LOAD_CONST               9 ('\r\n')
+            276 LOAD_ATTR               13 (NULL|self + join)
+            296 LOAD_FAST                2 (lines)
+            298 CALL                     1
+            306 LOAD_CONST               9 ('\r\n')
+            308 BINARY_OP                0 (+)
+            312 LOAD_CONST              10 ('utf-8')
+            314 KW_NAMES                11 (('encoding',))
+            316 CALL                     2
+            324 POP_TOP
+            326 RETURN_CONST             0 (None)
+
+Disassembly of <code object build_correction_sheet at <address>, file "xiaoguan_classifier\review_tools.py", line 124>:
+124           0 RESUME                   0
+
+125           2 LOAD_FAST                0 (library_root)
+              4 LOAD_ATTR                1 (NULL|self + resolve)
+             24 CALL                     0
+             32 STORE_FAST               0 (library_root)
+
+126          34 LOAD_GLOBAL              3 (NULL + _read_csv_rows)
+             44 LOAD_GLOBAL              5 (NULL + _manifest_path)
+             54 LOAD_FAST                0 (library_root)
+             56 CALL                     1
+             64 CALL                     1
+             72 STORE_FAST               2 (manifest_rows)
+
+127          74 LOAD_FAST                2 (manifest_rows)
+             76 POP_JUMP_IF_TRUE        11 (to 100)
+
+128          78 LOAD_GLOBAL              7 (NULL + ValueError)
+             88 LOAD_CONST               1 ('没有找到分类清单，请先完成一次分类。')
+             90 CALL                     1
+             98 RAISE_VARARGS            1
+
+130     >>  100 LOAD_CONST               2 ('；')
+            102 LOAD_ATTR                9 (NULL|self + join)
+            122 LOAD_FAST                1 (template)
+            124 LOAD_ATTR               10 (taxonomy)
+            144 LOAD_ATTR               13 (NULL|self + keys)
+            164 CALL                     0
+            172 CALL                     1
+            180 STORE_FAST               3 (category_options)
+
+131         182 BUILD_LIST               0
+            184 STORE_FAST               4 (rows)
+
+132         186 LOAD_FAST                2 (manifest_rows)
+            188 GET_ITER
+        >>  190 EXTENDED_ARG             1
+            192 FOR_ITER               261 (to 718)
+            196 STORE_FAST               5 (row)
+
+133         198 LOAD_FAST                5 (row)
+            200 LOAD_ATTR               15 (NULL|self + get)
+            220 LOAD_CONST               3 ('一级分类')
+            222 CALL                     1
+            230 COPY                     1
+            232 POP_JUMP_IF_TRUE         2 (to 238)
+            234 POP_TOP
+            236 LOAD_CONST               4 ('')
+        >>  238 STORE_FAST               6 (category)
+
+134         240 LOAD_FAST                4 (rows)
+            242 LOAD_ATTR               17 (NULL|self + append)
+
+135         262 BUILD_MAP                0
+
+136         264 LOAD_CONST               5 ('处理状态')
+            266 LOAD_CONST               4 ('')
+
+135         268 MAP_ADD                  1
+
+137         270 LOAD_CONST               6 ('序号')
+            272 LOAD_FAST                5 (row)
+            274 LOAD_ATTR               15 (NULL|self + get)
+            294 LOAD_CONST               6 ('序号')
+            296 LOAD_CONST               4 ('')
+            298 CALL                     2
+
+135         306 MAP_ADD                  1
+
+138         308 LOAD_CONST               7 ('原文件路径')
+            310 LOAD_FAST                5 (row)
+            312 LOAD_ATTR               15 (NULL|self + get)
+            332 LOAD_CONST               7 ('原文件路径')
+            334 LOAD_CONST               4 ('')
+            336 CALL                     2
+
+135         344 MAP_ADD                  1
+
+139         346 LOAD_CONST               8 ('当前新文件路径')
+            348 LOAD_FAST                5 (row)
+            350 LOAD_ATTR               15 (NULL|self + get)
+            370 LOAD_CONST               9 ('新文件路径')
+            372 LOAD_CONST               4 ('')
+            374 CALL                     2
+
+135         382 MAP_ADD                  1
+
+140         384 LOAD_CONST              10 ('当前一级分类')
+            386 LOAD_FAST                6 (category)
+
+135         388 MAP_ADD                  1
+
+141         390 LOAD_CONST              11 ('当前二级分类')
+            392 LOAD_FAST                5 (row)
+            394 LOAD_ATTR               15 (NULL|self + get)
+            414 LOAD_CONST              12 ('二级分类')
+            416 LOAD_CONST               4 ('')
+            418 CALL                     2
+
+135         426 MAP_ADD                  1
+
+142         428 LOAD_CONST              13 ('当前具体画面')
+            430 LOAD_FAST                5 (row)
+            432 LOAD_ATTR               15 (NULL|self + get)
+            452 LOAD_CONST              14 ('具体画面')
+            454 LOAD_CONST               4 ('')
+            456 CALL                     2
+
+135         464 MAP_ADD                  1
+
+143         466 LOAD_CONST              15 ('当前景别或形态')
+            468 LOAD_FAST                5 (row)
+            470 LOAD_ATTR               15 (NULL|self + get)
+            490 LOAD_CONST              16 ('景别或形态')
+            492 LOAD_CONST               4 ('')
+            494 CALL                     2
+
+135         502 MAP_ADD                  1
+
+144         504 LOAD_CONST              17 ('当前置信度')
+            506 LOAD_FAST                5 (row)
+            508 LOAD_ATTR               15 (NULL|self + get)
+            528 LOAD_CONST              18 ('置信度')
+            530 LOAD_CONST               4 ('')
+            532 CALL                     2
+
+135         540 MAP_ADD                  1
+
+145         542 LOAD_CONST              19 ('当前原因')
+            544 LOAD_FAST                5 (row)
+            546 LOAD_ATTR               15 (NULL|self + get)
+            566 LOAD_CONST              20 ('原因')
+            568 LOAD_CONST               4 ('')
+            570 CALL                     2
+
+135         578 MAP_ADD                  1
+
+146         580 LOAD_CONST              21 ('可选一级分类')
+            582 LOAD_FAST                3 (category_options)
+
+135         584 MAP_ADD                  1
+
+147         586 LOAD_CONST              22 ('当前一级可选二级')
+            588 LOAD_CONST               2 ('；')
+            590 LOAD_ATTR                9 (NULL|self + join)
+            610 LOAD_FAST                1 (template)
+            612 LOAD_ATTR               10 (taxonomy)
+            632 LOAD_ATTR               15 (NULL|self + get)
+            652 LOAD_FAST                6 (category)
+            654 BUILD_LIST               0
+            656 CALL                     2
+            664 CALL                     1
+
+135         672 MAP_ADD                  1
+
+148         674 LOAD_CONST              23 ('修正一级分类')
+            676 LOAD_CONST               4 ('')
+
+135         678 MAP_ADD                  1
+
+149         680 LOAD_CONST              24 ('修正二级分类')
+            682 LOAD_CONST               4 ('')
+
+135         684 MAP_ADD                  1
+
+150         686 LOAD_CONST              25 ('修正具体画面')
+            688 LOAD_CONST               4 ('')
+
+135         690 MAP_ADD                  1
+
+151         692 LOAD_CONST              26 ('修正景别或形态')
+            694 LOAD_CONST               4 ('')
+
+135         696 MAP_ADD                  1
+
+152         698 LOAD_CONST              27 ('修正备注')
+            700 LOAD_CONST               4 ('')
+
+135         702 MAP_ADD                  1
+
+134         704 CALL                     1
+            712 POP_TOP
+            714 EXTENDED_ARG             1
+            716 JUMP_BACKWARD          264 (to 190)
+
+132     >>  718 END_FOR
+
+156         720 LOAD_GLOBAL             19 (NULL + _correction_sheet_path)
+            730 LOAD_FAST                0 (library_root)
+            732 CALL                     1
+            740 STORE_FAST               7 (sheet_path)
+
+157         742 LOAD_GLOBAL             21 (NULL + _write_csv)
+            752 LOAD_FAST                7 (sheet_path)
+            754 LOAD_FAST                4 (rows)
+            756 CALL                     2
+            764 POP_TOP
+
+158         766 LOAD_FAST                0 (library_root)
+            768 LOAD_CONST              28 ('outputs')
+            770 BINARY_OP               11 (/)
+            774 LOAD_CONST              29 ('人工修正说明.txt')
+            776 BINARY_OP               11 (/)
+            780 STORE_FAST               8 (guide_path)
+
+159         782 LOAD_FAST                8 (guide_path)
+            784 LOAD_ATTR               23 (NULL|self + write_text)
+
+160         804 LOAD_CONST              30 ('只需要修改错分的行。\n1. 在“修正一级分类”“修正二级分类”填写要改到的类目。\n2. 可选填写“修正具体画面”“修正景别或形态”，软件会按新内容重命名。\n3. 不需要修改的行保持修正列为空。\n4. 填好后回到软件点击“应用修正表”。源文件不会被移动。\n')
+
+165         806 LOAD_CONST              31 ('utf-8')
+
+159         808 KW_NAMES                32 (('encoding',))
+            810 CALL                     2
+            818 POP_TOP
+
+167         820 LOAD_FAST                7 (sheet_path)
+            822 RETURN_VALUE
+
+Disassembly of <code object apply_correction_sheet at <address>, file "xiaoguan_classifier\review_tools.py", line 170>:
+              0 MAKE_CELL               31 (correction)
+
+170           2 RESUME                   0
+
+171           4 LOAD_FAST                0 (library_root)
+              6 LOAD_ATTR                1 (NULL|self + resolve)
+             26 CALL                     0
+             34 STORE_FAST               0 (library_root)
+
+172          36 LOAD_FAST                0 (library_root)
+             38 LOAD_CONST               1 ('outputs')
+             40 BINARY_OP               11 (/)
+             44 STORE_FAST               2 (outputs)
+
+173          46 LOAD_GLOBAL              3 (NULL + _manifest_path)
+             56 LOAD_FAST                0 (library_root)
+             58 CALL                     1
+             66 STORE_FAST               3 (manifest_path)
+
+174          68 LOAD_GLOBAL              5 (NULL + _correction_sheet_path)
+             78 LOAD_FAST                0 (library_root)
+             80 CALL                     1
+             88 STORE_FAST               4 (correction_path)
+
+175          90 LOAD_GLOBAL              7 (NULL + _read_csv_rows)
+            100 LOAD_FAST                3 (manifest_path)
+            102 CALL                     1
+            110 STORE_FAST               5 (manifest_rows)
+
+176         112 LOAD_GLOBAL              7 (NULL + _read_csv_rows)
+            122 LOAD_FAST                4 (correction_path)
+            124 CALL                     1
+            132 STORE_FAST               6 (correction_rows)
+
+177         134 LOAD_FAST                5 (manifest_rows)
+            136 POP_JUMP_IF_TRUE        11 (to 160)
+
+178         138 LOAD_GLOBAL              9 (NULL + ValueError)
+            148 LOAD_CONST               2 ('没有找到分类清单，请先完成一次分类。')
+            150 CALL                     1
+            158 RAISE_VARARGS            1
+
+179     >>  160 LOAD_FAST                6 (correction_rows)
+            162 POP_JUMP_IF_TRUE        11 (to 186)
+
+180         164 LOAD_GLOBAL              9 (NULL + ValueError)
+            174 LOAD_CONST               3 ('没有找到人工修正表，请先点击“生成修正表”。')
+            176 CALL                     1
+            184 RAISE_VARARGS            1
+
+182     >>  186 LOAD_FAST                5 (manifest_rows)
+            188 GET_ITER
+            190 LOAD_FAST_AND_CLEAR      7 (row)
+            192 SWAP                     2
+            194 BUILD_MAP                0
+            196 SWAP                     2
+        >>  198 FOR_ITER                14 (to 230)
+            202 STORE_FAST               7 (row)
+            204 LOAD_GLOBAL             11 (NULL + _row_key)
+            214 LOAD_FAST                7 (row)
+            216 CALL                     1
+            224 LOAD_FAST                7 (row)
+            226 MAP_ADD                  2
+            228 JUMP_BACKWARD           16 (to 198)
+        >>  230 END_FOR
+            232 STORE_FAST               8 (manifest_by_key)
+            234 STORE_FAST               7 (row)
+
+183         236 BUILD_LIST               0
+            238 STORE_FAST               9 (applied_rows)
+
+184         240 BUILD_LIST               0
+            242 STORE_FAST              10 (failed_rows)
+
+185         244 LOAD_GLOBAL             13 (NULL + datetime)
+            254 LOAD_ATTR               14 (now)
+            274 CALL                     0
+            282 LOAD_ATTR               17 (NULL|self + strftime)
+            302 LOAD_CONST               4 ('%Y-%m-%d %H:%M:%S')
+            304 CALL                     1
+            312 STORE_FAST              11 (now_text)
+
+187         314 LOAD_FAST                6 (correction_rows)
+            316 GET_ITER
+        >>  318 EXTENDED_ARG             3
+            320 FOR_ITER               981 (to 2286)
+            324 STORE_DEREF             31 (correction)
+
+188         326 LOAD_GLOBAL             19 (NULL + str)
+            336 LOAD_DEREF              31 (correction)
+            338 LOAD_ATTR               21 (NULL|self + get)
+            358 LOAD_CONST               5 ('处理状态')
+            360 CALL                     1
+            368 COPY                     1
+            370 POP_JUMP_IF_TRUE         2 (to 376)
+            372 POP_TOP
+            374 LOAD_CONST               6 ('')
+        >>  376 CALL                     1
+            384 LOAD_ATTR               23 (NULL|self + strip)
+            404 CALL                     0
+            412 LOAD_CONST               7 ('跳过')
+            414 COMPARE_OP              40 (==)
+            418 POP_JUMP_IF_FALSE        1 (to 422)
+
+189         420 JUMP_BACKWARD           52 (to 318)
+
+190     >>  422 LOAD_GLOBAL             25 (NULL + any)
+            432 LOAD_CLOSURE            31 (correction)
+            434 BUILD_TUPLE              1
+            436 LOAD_CONST               8 (<code object <genexpr> at <address>, file "xiaoguan_classifier\review_tools.py", line 190>)
+            438 MAKE_FUNCTION            8 (closure)
+            440 LOAD_GLOBAL             26 (CORRECTION_FIELDS)
+            450 GET_ITER
+            452 CALL                     0
+            460 CALL                     1
+            468 POP_JUMP_IF_TRUE         1 (to 472)
+
+191         470 JUMP_BACKWARD           77 (to 318)
+
+193     >>  472 LOAD_GLOBAL             11 (NULL + _row_key)
+            482 LOAD_DEREF              31 (correction)
+            484 LOAD_ATTR               21 (NULL|self + get)
+            504 LOAD_CONST               9 ('序号')
+            506 LOAD_CONST               6 ('')
+            508 CALL                     2
+            516 LOAD_DEREF              31 (correction)
+            518 LOAD_ATTR               21 (NULL|self + get)
+            538 LOAD_CONST              10 ('原文件路径')
+            540 LOAD_CONST               6 ('')
+            542 CALL                     2
+            550 LOAD_CONST              11 (('序号', '原文件路径'))
+            552 BUILD_CONST_KEY_MAP      2
+            554 CALL                     1
+            562 STORE_FAST              12 (key)
+
+194         564 LOAD_FAST                8 (manifest_by_key)
+            566 LOAD_ATTR               21 (NULL|self + get)
+            586 LOAD_FAST               12 (key)
+            588 CALL                     1
+            596 STORE_FAST              13 (manifest_row)
+
+195         598 LOAD_FAST               13 (manifest_row)
+            600 POP_JUMP_IF_NOT_NONE    24 (to 650)
+
+196         602 LOAD_FAST               10 (failed_rows)
+            604 LOAD_ATTR               29 (NULL|self + append)
+            624 BUILD_MAP                0
+            626 LOAD_DEREF              31 (correction)
+            628 DICT_UPDATE              1
+            630 LOAD_CONST              12 ('失败原因')
+            632 LOAD_CONST              13 ('在分类清单里找不到对应行')
+            634 BUILD_MAP                1
+            636 DICT_UPDATE              1
+            638 CALL                     1
+            646 POP_TOP
+
+197         648 JUMP_BACKWARD          166 (to 318)
+
+199     >>  650 NOP
+
+200         652 LOAD_GLOBAL             31 (NULL + Path)
+            662 LOAD_DEREF              31 (correction)
+            664 LOAD_ATTR               21 (NULL|self + get)
+            684 LOAD_CONST              14 ('当前新文件路径')
+            686 CALL                     1
+            694 COPY                     1
+            696 POP_JUMP_IF_TRUE        21 (to 740)
+            698 POP_TOP
+            700 LOAD_FAST               13 (manifest_row)
+            702 LOAD_ATTR               21 (NULL|self + get)
+            722 LOAD_CONST              15 ('新文件路径')
+            724 CALL                     1
+            732 COPY                     1
+            734 POP_JUMP_IF_TRUE         2 (to 740)
+            736 POP_TOP
+            738 LOAD_CONST               6 ('')
+        >>  740 CALL                     1
+            748 STORE_FAST              14 (current_output)
+
+201         750 LOAD_FAST               14 (current_output)
+            752 LOAD_ATTR               33 (NULL|self + exists)
+            772 CALL                     0
+            780 POP_JUMP_IF_TRUE        14 (to 810)
+
+202         782 LOAD_GLOBAL             35 (NULL + FileNotFoundError)
+            792 LOAD_CONST              16 ('当前分类副本不存在：')
+            794 LOAD_FAST               14 (current_output)
+            796 FORMAT_VALUE             0
+            798 BUILD_STRING             2
+            800 CALL                     1
+            808 RAISE_VARARGS            1
+
+204     >>  810 LOAD_FAST               13 (manifest_row)
+            812 LOAD_ATTR               21 (NULL|self + get)
+            832 LOAD_CONST              17 ('一级分类')
+            834 LOAD_CONST               6 ('')
+            836 CALL                     2
+            844 STORE_FAST              15 (old_category)
+
+205         846 LOAD_FAST               13 (manifest_row)
+            848 LOAD_ATTR               21 (NULL|self + get)
+            868 LOAD_CONST              18 ('二级分类')
+            870 LOAD_CONST               6 ('')
+            872 CALL                     2
+            880 STORE_FAST              16 (old_subcategory)
+
+206         882 LOAD_FAST               13 (manifest_row)
+            884 LOAD_ATTR               21 (NULL|self + get)
+            904 LOAD_CONST              19 ('具体画面')
+            906 LOAD_CONST               6 ('')
+            908 CALL                     2
+            916 STORE_FAST              17 (old_detail)
+
+207         918 LOAD_FAST               13 (manifest_row)
+            920 LOAD_ATTR               21 (NULL|self + get)
+            940 LOAD_CONST              20 ('景别或形态')
+            942 LOAD_CONST               6 ('')
+            944 CALL                     2
+            952 STORE_FAST              18 (old_form)
+
+209         954 LOAD_GLOBAL             37 (NULL + _normalize_manual_category)
+            964 LOAD_DEREF              31 (correction)
+            966 LOAD_ATTR               21 (NULL|self + get)
+            986 LOAD_CONST              21 ('修正一级分类')
+            988 CALL                     1
+            996 COPY                     1
+            998 POP_JUMP_IF_TRUE         2 (to 1004)
+           1000 POP_TOP
+           1002 LOAD_FAST               15 (old_category)
+        >> 1004 LOAD_FAST                1 (template)
+           1006 LOAD_ATTR               38 (taxonomy)
+           1026 CALL                     2
+           1034 STORE_FAST              19 (category)
+
+210        1036 LOAD_GLOBAL             19 (NULL + str)
+           1046 LOAD_DEREF              31 (correction)
+           1048 LOAD_ATTR               21 (NULL|self + get)
+           1068 LOAD_CONST              22 ('修正二级分类')
+           1070 CALL                     1
+           1078 COPY                     1
+           1080 POP_JUMP_IF_TRUE         6 (to 1094)
+           1082 POP_TOP
+           1084 LOAD_FAST               16 (old_subcategory)
+           1086 COPY                     1
+           1088 POP_JUMP_IF_TRUE         2 (to 1094)
+           1090 POP_TOP
+           1092 LOAD_CONST               6 ('')
+        >> 1094 CALL                     1
+           1102 LOAD_ATTR               23 (NULL|self + strip)
+           1122 CALL                     0
+           1130 STORE_FAST              20 (subcategory)
+
+211        1132 LOAD_FAST               20 (subcategory)
+           1134 LOAD_FAST                1 (template)
+           1136 LOAD_ATTR               38 (taxonomy)
+           1156 LOAD_FAST               19 (category)
+           1158 BINARY_SUBSCR
+           1162 CONTAINS_OP              1
+           1164 POP_JUMP_IF_FALSE       17 (to 1200)
+
+212        1166 LOAD_GLOBAL              9 (NULL + ValueError)
+           1176 LOAD_CONST              23 ('二级分类不属于 ')
+           1178 LOAD_FAST               19 (category)
+           1180 FORMAT_VALUE             0
+           1182 LOAD_CONST              24 ('：')
+           1184 LOAD_FAST               20 (subcategory)
+           1186 FORMAT_VALUE             0
+           1188 BUILD_STRING             4
+           1190 CALL                     1
+           1198 RAISE_VARARGS            1
+
+213     >> 1200 LOAD_GLOBAL             41 (NULL + safe_filename_part)
+           1210 LOAD_DEREF              31 (correction)
+           1212 LOAD_ATTR               21 (NULL|self + get)
+           1232 LOAD_CONST              25 ('修正具体画面')
+           1234 CALL                     1
+           1242 COPY                     1
+           1244 POP_JUMP_IF_TRUE         6 (to 1258)
+           1246 POP_TOP
+           1248 LOAD_FAST               17 (old_detail)
+           1250 COPY                     1
+           1252 POP_JUMP_IF_TRUE         2 (to 1258)
+           1254 POP_TOP
+           1256 LOAD_FAST               20 (subcategory)
+        >> 1258 LOAD_FAST               20 (subcategory)
+           1260 CALL                     2
+           1268 STORE_FAST              21 (detail)
+
+214        1270 LOAD_GLOBAL             43 (NULL + _normalize_manual_form)
+           1280 LOAD_DEREF              31 (correction)
+           1282 LOAD_ATTR               21 (NULL|self + get)
+           1302 LOAD_CONST              26 ('修正景别或形态')
+           1304 CALL                     1
+           1312 COPY                     1
+           1314 POP_JUMP_IF_TRUE         2 (to 1320)
+           1316 POP_TOP
+           1318 LOAD_FAST               18 (old_form)
+        >> 1320 CALL                     1
+           1328 STORE_FAST              22 (form)
+
+215        1330 LOAD_GLOBAL             41 (NULL + safe_filename_part)
+           1340 LOAD_FAST               13 (manifest_row)
+           1342 LOAD_ATTR               21 (NULL|self + get)
+           1362 LOAD_CONST              27 ('命名日期')
+           1364 CALL                     1
+           1372 COPY                     1
+           1374 POP_JUMP_IF_TRUE        35 (to 1446)
+           1376 POP_TOP
+           1378 LOAD_GLOBAL             13 (NULL + datetime)
+           1388 LOAD_ATTR               14 (now)
+           1408 CALL                     0
+           1416 LOAD_ATTR               17 (NULL|self + strftime)
+           1436 LOAD_CONST              28 ('%y%m%d')
+           1438 CALL                     1
+        >> 1446 LOAD_GLOBAL             13 (NULL + datetime)
+           1456 LOAD_ATTR               14 (now)
+           1476 CALL                     0
+           1484 LOAD_ATTR               17 (NULL|self + strftime)
+           1504 LOAD_CONST              28 ('%y%m%d')
+           1506 CALL                     1
+           1514 CALL                     2
+           1522 STORE_FAST              23 (date_code)
+
+216        1524 LOAD_FAST                0 (library_root)
+           1526 LOAD_FAST               19 (category)
+           1528 BINARY_OP               11 (/)
+           1532 LOAD_FAST               20 (subcategory)
+           1534 BINARY_OP               11 (/)
+           1538 STORE_FAST              24 (dest_dir)
+
+217        1540 LOAD_FAST               24 (dest_dir)
+           1542 LOAD_ATTR               45 (NULL|self + mkdir)
+           1562 LOAD_CONST              29 (True)
+           1564 LOAD_CONST              29 (True)
+           1566 KW_NAMES                30 (('parents', 'exist_ok'))
+           1568 CALL                     2
+           1576 POP_TOP
+
+218        1578 LOAD_GLOBAL             47 (NULL + _next_sequence)
+           1588 LOAD_FAST               24 (dest_dir)
+           1590 LOAD_FAST               14 (current_output)
+           1592 LOAD_ATTR               48 (suffix)
+           1612 CALL                     2
+           1620 STORE_FAST              25 (sequence)
+
+219        1622 LOAD_GLOBAL             51 (NULL + Classification)
+           1632 LOAD_FAST               19 (category)
+           1634 LOAD_FAST               20 (subcategory)
+           1636 LOAD_FAST               21 (detail)
+           1638 LOAD_FAST               22 (form)
+           1640 LOAD_CONST              31 (1.0)
+           1642 LOAD_CONST              32 ('人工修正')
+           1644 CALL                     6
+           1652 STORE_FAST              26 (classification)
+
+220        1654 LOAD_GLOBAL             53 (NULL + build_material_filename)
+
+221        1664 LOAD_FAST               26 (classification)
+
+222        1666 LOAD_FAST               23 (date_code)
+
+223        1668 LOAD_FAST               25 (sequence)
+
+224        1670 LOAD_FAST               14 (current_output)
+           1672 LOAD_ATTR               48 (suffix)
+
+225        1692 LOAD_FAST                1 (template)
+           1694 LOAD_ATTR               54 (product_name)
+
+226        1714 LOAD_FAST                1 (template)
+           1716 LOAD_ATTR               38 (taxonomy)
+
+220        1736 KW_NAMES                33 (('product_name', 'taxonomy'))
+           1738 CALL                     6
+           1746 STORE_FAST              27 (dest_name)
+
+228        1748 LOAD_GLOBAL             57 (NULL + _unique_destination)
+           1758 LOAD_FAST               24 (dest_dir)
+           1760 LOAD_FAST               27 (dest_name)
+           1762 BINARY_OP               11 (/)
+           1766 CALL                     1
+           1774 STORE_FAST              28 (destination)
+
+229        1776 LOAD_FAST               14 (current_output)
+           1778 LOAD_ATTR                1 (NULL|self + resolve)
+           1798 CALL                     0
+           1806 LOAD_FAST               28 (destination)
+           1808 LOAD_ATTR                1 (NULL|self + resolve)
+           1828 CALL                     0
+           1836 COMPARE_OP              55 (!=)
+           1840 POP_JUMP_IF_FALSE       40 (to 1922)
+
+230        1842 LOAD_GLOBAL             59 (NULL + shutil)
+           1852 LOAD_ATTR               60 (move)
+           1872 LOAD_GLOBAL             19 (NULL + str)
+           1882 LOAD_FAST               14 (current_output)
+           1884 CALL                     1
+           1892 LOAD_GLOBAL             19 (NULL + str)
+           1902 LOAD_FAST               28 (destination)
+           1904 CALL                     1
+           1912 CALL                     2
+           1920 POP_TOP
+
+232     >> 1922 LOAD_GLOBAL             19 (NULL + str)
+           1932 LOAD_FAST               28 (destination)
+           1934 CALL                     1
+           1942 LOAD_FAST               13 (manifest_row)
+           1944 LOAD_CONST              15 ('新文件路径')
+           1946 STORE_SUBSCR
+
+233        1950 LOAD_FAST               19 (category)
+           1952 LOAD_FAST               13 (manifest_row)
+           1954 LOAD_CONST              17 ('一级分类')
+           1956 STORE_SUBSCR
+
+234        1960 LOAD_FAST               20 (subcategory)
+           1962 LOAD_FAST               13 (manifest_row)
+           1964 LOAD_CONST              18 ('二级分类')
+           1966 STORE_SUBSCR
+
+235        1970 LOAD_FAST               21 (detail)
+           1972 LOAD_FAST               13 (manifest_row)
+           1974 LOAD_CONST              19 ('具体画面')
+           1976 STORE_SUBSCR
+
+236        1980 LOAD_FAST               22 (form)
+           1982 LOAD_FAST               13 (manifest_row)
+           1984 LOAD_CONST              20 ('景别或形态')
+           1986 STORE_SUBSCR
+
+237        1990 LOAD_FAST               19 (category)
+           1992 LOAD_CONST              34 ('00_待筛素材')
+           1994 COMPARE_OP              55 (!=)
+           1998 POP_JUMP_IF_FALSE        2 (to 2004)
+           2000 LOAD_CONST              35 ('1.00')
+           2002 JUMP_FORWARD             1 (to 2006)
+        >> 2004 LOAD_CONST              36 ('0.50')
+        >> 2006 LOAD_FAST               13 (manifest_row)
+           2008 LOAD_CONST              37 ('置信度')
+           2010 STORE_SUBSCR
+
+238        2014 LOAD_CONST              38 ('人工修正：')
+           2016 LOAD_DEREF              31 (correction)
+           2018 LOAD_ATTR               21 (NULL|self + get)
+           2038 LOAD_CONST              39 ('修正备注')
+           2040 CALL                     1
+           2048 COPY                     1
+           2050 POP_JUMP_IF_TRUE         2 (to 2056)
+           2052 POP_TOP
+           2054 LOAD_CONST              40 ('已按人工复核结果调整')
+        >> 2056 FORMAT_VALUE             0
+           2058 BUILD_STRING             2
+           2060 LOAD_FAST               13 (manifest_row)
+           2062 LOAD_CONST              41 ('原因')
+           2064 STORE_SUBSCR
+
+239        2068 LOAD_CONST              42 ('是')
+           2070 LOAD_FAST               13 (manifest_row)
+           2072 LOAD_CONST              32 ('人工修正')
+           2074 STORE_SUBSCR
+
+240        2078 LOAD_FAST               11 (now_text)
+           2080 LOAD_FAST               13 (manifest_row)
+           2082 LOAD_CONST              43 ('修正时间')
+           2084 STORE_SUBSCR
+
+241        2088 LOAD_FAST               15 (old_category)
+           2090 LOAD_FAST               13 (manifest_row)
+           2092 LOAD_CONST              44 ('修正前一级分类')
+           2094 STORE_SUBSCR
+
+242        2098 LOAD_FAST               16 (old_subcategory)
+           2100 LOAD_FAST               13 (manifest_row)
+           2102 LOAD_CONST              45 ('修正前二级分类')
+           2104 STORE_SUBSCR
+
+243        2108 LOAD_FAST               17 (old_detail)
+           2110 LOAD_FAST               13 (manifest_row)
+           2112 LOAD_CONST              46 ('修正前具体画面')
+           2114 STORE_SUBSCR
+
+244        2118 LOAD_FAST               18 (old_form)
+           2120 LOAD_FAST               13 (manifest_row)
+           2122 LOAD_CONST              47 ('修正前景别或形态')
+           2124 STORE_SUBSCR
+
+246        2128 LOAD_FAST                9 (applied_rows)
+           2130 LOAD_ATTR               29 (NULL|self + append)
+
+248        2150 LOAD_FAST               11 (now_text)
+
+249        2152 LOAD_FAST               13 (manifest_row)
+           2154 LOAD_ATTR               21 (NULL|self + get)
+           2174 LOAD_CONST              10 ('原文件路径')
+           2176 LOAD_CONST               6 ('')
+           2178 CALL                     2
+
+250        2186 LOAD_GLOBAL             19 (NULL + str)
+           2196 LOAD_FAST               14 (current_output)
+           2198 CALL                     1
+
+251        2206 LOAD_GLOBAL             19 (NULL + str)
+           2216 LOAD_FAST               28 (destination)
+           2218 CALL                     1
+
+252        2226 LOAD_FAST               15 (old_category)
+
+253        2228 LOAD_FAST               16 (old_subcategory)
+
+254        2230 LOAD_FAST               19 (category)
+
+255        2232 LOAD_FAST               20 (subcategory)
+
+256        2234 LOAD_DEREF              31 (correction)
+           2236 LOAD_ATTR               21 (NULL|self + get)
+           2256 LOAD_CONST              39 ('修正备注')
+           2258 LOAD_CONST               6 ('')
+           2260 CALL                     2
+
+247        2268 LOAD_CONST              48 (('修正时间', '原文件路径', '修正前路径', '修正后路径', '修正前一级分类', '修正前二级分类', '修正后一级分类', '修正后二级分类', '修正备注'))
+           2270 BUILD_CONST_KEY_MAP      9
+
+246        2272 CALL                     1
+           2280 POP_TOP
+           2282 EXTENDED_ARG             3
+           2284 JUMP_BACKWARD          984 (to 318)
+
+187     >> 2286 END_FOR
+
+262        2288 LOAD_GLOBAL             65 (NULL + _write_csv)
+           2298 LOAD_FAST                3 (manifest_path)
+           2300 LOAD_FAST                5 (manifest_rows)
+           2302 CALL                     2
+           2310 POP_TOP
+
+263        2312 LOAD_GLOBAL             65 (NULL + _write_csv)
+           2322 LOAD_FAST                2 (outputs)
+           2324 LOAD_GLOBAL             66 (PENDING_NAME)
+           2334 BINARY_OP               11 (/)
+           2338 LOAD_FAST                5 (manifest_rows)
+           2340 GET_ITER
+           2342 LOAD_FAST_AND_CLEAR      7 (row)
+           2344 SWAP                     2
+           2346 BUILD_LIST               0
+           2348 SWAP                     2
+        >> 2350 FOR_ITER                16 (to 2386)
+           2354 STORE_FAST               7 (row)
+           2356 LOAD_GLOBAL             69 (NULL + _is_pending_row)
+           2366 LOAD_FAST                7 (row)
+           2368 CALL                     1
+           2376 POP_JUMP_IF_TRUE         1 (to 2380)
+           2378 JUMP_BACKWARD           15 (to 2350)
+        >> 2380 LOAD_FAST                7 (row)
+           2382 LIST_APPEND              2
+           2384 JUMP_BACKWARD           18 (to 2350)
+        >> 2386 END_FOR
+           2388 SWAP                     2
+           2390 STORE_FAST               7 (row)
+           2392 CALL                     2
+           2400 POP_TOP
+
+264        2402 LOAD_FAST                9 (applied_rows)
+           2404 POP_JUMP_IF_FALSE       40 (to 2486)
+
+265        2406 LOAD_GLOBAL              7 (NULL + _read_csv_rows)
+           2416 LOAD_FAST                2 (outputs)
+           2418 LOAD_GLOBAL             70 (CORRECTION_LOG_NAME)
+           2428 BINARY_OP               11 (/)
+           2432 CALL                     1
+           2440 STORE_FAST              30 (existing_log)
+
+266        2442 LOAD_GLOBAL             65 (NULL + _write_csv)
+           2452 LOAD_FAST                2 (outputs)
+           2454 LOAD_GLOBAL             70 (CORRECTION_LOG_NAME)
+           2464 BINARY_OP               11 (/)
+           2468 LOAD_FAST               30 (existing_log)
+           2470 LOAD_FAST                9 (applied_rows)
+           2472 BINARY_OP                0 (+)
+           2476 CALL                     2
+           2484 POP_TOP
+
+267     >> 2486 LOAD_FAST               10 (failed_rows)
+           2488 POP_JUMP_IF_FALSE       15 (to 2520)
+
+268        2490 LOAD_GLOBAL             65 (NULL + _write_csv)
+           2500 LOAD_FAST                2 (outputs)
+           2502 LOAD_CONST              49 ('人工修正失败清单.csv')
+           2504 BINARY_OP               11 (/)
+           2508 LOAD_FAST               10 (failed_rows)
+           2510 CALL                     2
+           2518 POP_TOP
+
+269     >> 2520 LOAD_GLOBAL             73 (NULL + _write_current_cleanup_script)
+           2530 LOAD_FAST                2 (outputs)
+           2532 LOAD_CONST              50 ('清理当前分类副本.bat')
+           2534 BINARY_OP               11 (/)
+           2538 LOAD_FAST                5 (manifest_rows)
+           2540 CALL                     2
+           2548 POP_TOP
+
+272        2550 LOAD_FAST                4 (correction_path)
+
+273        2552 LOAD_FAST                3 (manifest_path)
+
+274        2554 LOAD_GLOBAL             75 (NULL + len)
+           2564 LOAD_FAST                9 (applied_rows)
+           2566 CALL                     1
+
+275        2574 LOAD_GLOBAL             75 (NULL + len)
+           2584 LOAD_FAST               10 (failed_rows)
+           2586 CALL                     1
+
+276        2594 LOAD_FAST                2 (outputs)
+           2596 LOAD_GLOBAL             70 (CORRECTION_LOG_NAME)
+           2606 BINARY_OP               11 (/)
+
+277        2610 LOAD_FAST                2 (outputs)
+           2612 LOAD_CONST              49 ('人工修正失败清单.csv')
+           2614 BINARY_OP               11 (/)
+
+271        2618 LOAD_CONST              51 (('sheet', 'manifest', 'applied_count', 'failed_count', 'log', 'failed'))
+           2620 BUILD_CONST_KEY_MAP      6
+           2622 RETURN_VALUE
+        >> 2624 SWAP                     2
+           2626 POP_TOP
+
+182        2628 SWAP                     2
+           2630 STORE_FAST               7 (row)
+           2632 RERAISE                  0
+        >> 2634 PUSH_EXC_INFO
+
+259        2636 LOAD_GLOBAL             62 (Exception)
+           2646 CHECK_EXC_MATCH
+           2648 POP_JUMP_IF_FALSE       43 (to 2736)
+           2650 STORE_FAST              29 (exc)
+
+260        2652 LOAD_FAST               10 (failed_rows)
+           2654 LOAD_ATTR               29 (NULL|self + append)
+           2674 BUILD_MAP                0
+           2676 LOAD_DEREF              31 (correction)
+           2678 DICT_UPDATE              1
+           2680 LOAD_CONST              12 ('失败原因')
+           2682 LOAD_GLOBAL             19 (NULL + str)
+           2692 LOAD_FAST               29 (exc)
+           2694 CALL                     1
+           2702 BUILD_MAP                1
+           2704 DICT_UPDATE              1
+           2706 CALL                     1
+           2714 POP_TOP
+           2716 POP_EXCEPT
+           2718 LOAD_CONST               0 (None)
+           2720 STORE_FAST              29 (exc)
+           2722 DELETE_FAST             29 (exc)
+           2724 EXTENDED_ARG             4
+           2726 JUMP_BACKWARD         1205 (to 318)
+        >> 2728 LOAD_CONST               0 (None)
+           2730 STORE_FAST              29 (exc)
+           2732 DELETE_FAST             29 (exc)
+           2734 RERAISE                  1
+
+259     >> 2736 RERAISE                  0
+        >> 2738 COPY                     3
+           2740 POP_EXCEPT
+           2742 RERAISE                  1
+        >> 2744 SWAP                     2
+           2746 POP_TOP
+
+263        2748 SWAP                     2
+           2750 STORE_FAST               7 (row)
+           2752 RERAISE                  0
+ExceptionTable:
+  194 to 230 -> 2624 [2]
+  652 to 2280 -> 2634 [1]
+  2346 to 2376 -> 2744 [5]
+  2380 to 2386 -> 2744 [5]
+  2634 to 2650 -> 2738 [2] lasti
+  2652 to 2714 -> 2728 [2] lasti
+  2728 to 2736 -> 2738 [2] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\review_tools.py", line 190>:
+              0 COPY_FREE_VARS           1
+
+190           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                48 (to 110)
+             14 STORE_FAST               1 (field)
+             16 LOAD_GLOBAL              1 (NULL + str)
+             26 LOAD_DEREF               2 (correction)
+             28 LOAD_ATTR                3 (NULL|self + get)
+             48 LOAD_FAST                1 (field)
+             50 CALL                     1
+             58 COPY                     1
+             60 POP_JUMP_IF_TRUE         2 (to 66)
+             62 POP_TOP
+             64 LOAD_CONST               0 ('')
+        >>   66 CALL                     1
+             74 LOAD_ATTR                5 (NULL|self + strip)
+             94 CALL                     0
+            102 YIELD_VALUE              1
+            104 RESUME                   1
+            106 POP_TOP
+            108 JUMP_BACKWARD           50 (to 10)
+        >>  110 END_FOR
+            112 RETURN_CONST             1 (None)
+        >>  114 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+            116 RERAISE                  1
+ExceptionTable:
+  6 to 112 -> 114 [0] lasti
+
+Disassembly of <code object run_classification_self_check at <address>, file "xiaoguan_classifier\review_tools.py", line 281>:
+              0 MAKE_CELL               25 (reason_text)
+
+281           2 RESUME                   0
+
+282           4 LOAD_FAST                0 (library_root)
+              6 LOAD_ATTR                1 (NULL|self + resolve)
+             26 CALL                     0
+             34 STORE_FAST               0 (library_root)
+
+283          36 LOAD_FAST                0 (library_root)
+             38 LOAD_CONST               1 ('outputs')
+             40 BINARY_OP               11 (/)
+             44 STORE_FAST               2 (outputs)
+
+284          46 LOAD_GLOBAL              3 (NULL + _read_csv_rows)
+             56 LOAD_GLOBAL              5 (NULL + _manifest_path)
+             66 LOAD_FAST                0 (library_root)
+             68 CALL                     1
+             76 CALL                     1
+             84 STORE_FAST               3 (manifest_rows)
+
+285          86 LOAD_FAST                3 (manifest_rows)
+             88 POP_JUMP_IF_TRUE        11 (to 112)
+
+286          90 LOAD_GLOBAL              7 (NULL + ValueError)
+            100 LOAD_CONST               2 ('没有找到分类清单，请先完成一次分类。')
+            102 CALL                     1
+            110 RAISE_VARARGS            1
+
+288     >>  112 BUILD_LIST               0
+            114 STORE_FAST               4 (issues)
+
+289         116 LOAD_GLOBAL              9 (NULL + set)
+            126 CALL                     0
+            134 STORE_FAST               5 (output_paths_in_manifest)
+
+290         136 LOAD_GLOBAL              9 (NULL + set)
+            146 CALL                     0
+            154 STORE_FAST               6 (duplicate_outputs)
+
+291         156 LOAD_GLOBAL              9 (NULL + set)
+            166 CALL                     0
+            174 STORE_FAST               7 (seen_outputs)
+
+293         176 LOAD_FAST                3 (manifest_rows)
+            178 GET_ITER
+        >>  180 EXTENDED_ARG             2
+            182 FOR_ITER               635 (to 1456)
+            186 STORE_FAST               8 (row)
+
+294         188 BUILD_LIST               0
+            190 STORE_FAST               9 (issue_reasons)
+
+295         192 LOAD_FAST                8 (row)
+            194 LOAD_ATTR               11 (NULL|self + get)
+            214 LOAD_CONST               3 ('一级分类')
+            216 LOAD_CONST               4 ('')
+            218 CALL                     2
+            226 STORE_FAST              10 (category)
+
+296         228 LOAD_FAST                8 (row)
+            230 LOAD_ATTR               11 (NULL|self + get)
+            250 LOAD_CONST               5 ('二级分类')
+            252 LOAD_CONST               4 ('')
+            254 CALL                     2
+            262 STORE_FAST              11 (subcategory)
+
+297         264 LOAD_GLOBAL             13 (NULL + str)
+            274 LOAD_FAST                8 (row)
+            276 LOAD_ATTR               11 (NULL|self + get)
+            296 LOAD_CONST               6 ('新文件路径')
+            298 CALL                     1
+            306 COPY                     1
+            308 POP_JUMP_IF_TRUE         2 (to 314)
+            310 POP_TOP
+            312 LOAD_CONST               4 ('')
+        >>  314 CALL                     1
+            322 LOAD_ATTR               15 (NULL|self + strip)
+            342 CALL                     0
+            350 STORE_FAST              12 (output_text)
+
+298         352 LOAD_FAST               12 (output_text)
+            354 POP_JUMP_IF_FALSE      235 (to 826)
+
+299         356 LOAD_GLOBAL             17 (NULL + Path)
+            366 LOAD_FAST               12 (output_text)
+            368 CALL                     1
+            376 STORE_FAST              13 (output_path)
+
+300         378 LOAD_GLOBAL             13 (NULL + str)
+            388 LOAD_FAST               13 (output_path)
+            390 LOAD_ATTR                1 (NULL|self + resolve)
+            410 CALL                     0
+            418 CALL                     1
+            426 STORE_FAST              14 (resolved_output)
+
+301         428 LOAD_FAST               14 (resolved_output)
+            430 LOAD_FAST                7 (seen_outputs)
+            432 CONTAINS_OP              0
+            434 POP_JUMP_IF_FALSE       17 (to 470)
+
+302         436 LOAD_FAST                6 (duplicate_outputs)
+            438 LOAD_ATTR               19 (NULL|self + add)
+            458 LOAD_FAST               14 (resolved_output)
+            460 CALL                     1
+            468 POP_TOP
+
+303     >>  470 LOAD_FAST                7 (seen_outputs)
+            472 LOAD_ATTR               19 (NULL|self + add)
+            492 LOAD_FAST               14 (resolved_output)
+            494 CALL                     1
+            502 POP_TOP
+
+304         504 LOAD_FAST                5 (output_paths_in_manifest)
+            506 LOAD_ATTR               19 (NULL|self + add)
+            526 LOAD_FAST               14 (resolved_output)
+            528 CALL                     1
+            536 POP_TOP
+
+305         538 LOAD_FAST               13 (output_path)
+            540 LOAD_ATTR               21 (NULL|self + exists)
+            560 CALL                     0
+            568 POP_JUMP_IF_TRUE        18 (to 606)
+
+306         570 LOAD_FAST                9 (issue_reasons)
+            572 LOAD_ATTR               23 (NULL|self + append)
+            592 LOAD_CONST               7 ('清单里的分类副本不存在')
+            594 CALL                     1
+            602 POP_TOP
+            604 JUMP_FORWARD           127 (to 860)
+
+308     >>  606 NOP
+
+309         608 LOAD_FAST               13 (output_path)
+            610 LOAD_ATTR                1 (NULL|self + resolve)
+            630 CALL                     0
+            638 LOAD_ATTR               25 (NULL|self + relative_to)
+            658 LOAD_FAST                0 (library_root)
+            660 CALL                     1
+            668 STORE_FAST              15 (relative)
+
+310         670 LOAD_GLOBAL             27 (NULL + len)
+            680 LOAD_FAST               15 (relative)
+            682 LOAD_ATTR               28 (parts)
+            702 CALL                     1
+            710 LOAD_CONST               8 (3)
+            712 COMPARE_OP               2 (<)
+            716 POP_JUMP_IF_TRUE        36 (to 790)
+            718 LOAD_FAST               15 (relative)
+            720 LOAD_ATTR               28 (parts)
+            740 LOAD_CONST               9 (0)
+            742 BINARY_SUBSCR
+            746 LOAD_FAST               10 (category)
+            748 COMPARE_OP              55 (!=)
+            752 POP_JUMP_IF_TRUE        18 (to 790)
+            754 LOAD_FAST               15 (relative)
+            756 LOAD_ATTR               28 (parts)
+            776 LOAD_CONST              10 (1)
+            778 BINARY_SUBSCR
+            782 LOAD_FAST               11 (subcategory)
+            784 COMPARE_OP              55 (!=)
+            788 POP_JUMP_IF_FALSE       17 (to 824)
+
+311     >>  790 LOAD_FAST                9 (issue_reasons)
+            792 LOAD_ATTR               23 (NULL|self + append)
+            812 LOAD_CONST              11 ('文件所在目录和清单分类不一致')
+            814 CALL                     1
+            822 POP_TOP
+        >>  824 JUMP_FORWARD            17 (to 860)
+
+315     >>  826 LOAD_FAST                9 (issue_reasons)
+            828 LOAD_ATTR               23 (NULL|self + append)
+            848 LOAD_CONST              13 ('没有分类副本路径')
+            850 CALL                     1
+            858 POP_TOP
+
+317     >>  860 LOAD_FAST               10 (category)
+            862 LOAD_FAST                1 (template)
+            864 LOAD_ATTR               30 (taxonomy)
+            884 CONTAINS_OP              1
+            886 POP_JUMP_IF_FALSE       18 (to 924)
+
+318         888 LOAD_FAST                9 (issue_reasons)
+            890 LOAD_ATTR               23 (NULL|self + append)
+            910 LOAD_CONST              14 ('一级分类不在当前方案里')
+            912 CALL                     1
+            920 POP_TOP
+            922 JUMP_FORWARD            34 (to 992)
+
+319     >>  924 LOAD_FAST               11 (subcategory)
+            926 LOAD_FAST                1 (template)
+            928 LOAD_ATTR               30 (taxonomy)
+            948 LOAD_FAST               10 (category)
+            950 BINARY_SUBSCR
+            954 CONTAINS_OP              1
+            956 POP_JUMP_IF_FALSE       17 (to 992)
+
+320         958 LOAD_FAST                9 (issue_reasons)
+            960 LOAD_ATTR               23 (NULL|self + append)
+            980 LOAD_CONST              15 ('二级分类不属于当前一级分类')
+            982 CALL                     1
+            990 POP_TOP
+
+321     >>  992 LOAD_FAST               10 (category)
+            994 LOAD_CONST              16 ('00_待筛素材')
+            996 COMPARE_OP              40 (==)
+           1000 POP_JUMP_IF_FALSE       17 (to 1036)
+
+322        1002 LOAD_FAST                9 (issue_reasons)
+           1004 LOAD_ATTR               23 (NULL|self + append)
+           1024 LOAD_CONST              17 ('待筛素材需要人工判断')
+           1026 CALL                     1
+           1034 POP_TOP
+
+323     >> 1036 NOP
+
+324        1038 LOAD_GLOBAL             33 (NULL + float)
+           1048 LOAD_FAST                8 (row)
+           1050 LOAD_ATTR               11 (NULL|self + get)
+           1070 LOAD_CONST              18 ('置信度')
+           1072 CALL                     1
+           1080 COPY                     1
+           1082 POP_JUMP_IF_TRUE         2 (to 1088)
+           1084 POP_TOP
+           1086 LOAD_CONST              19 ('0')
+        >> 1088 CALL                     1
+           1096 LOAD_CONST              20 (0.7)
+           1098 COMPARE_OP               2 (<)
+           1102 POP_JUMP_IF_FALSE       17 (to 1138)
+
+325        1104 LOAD_FAST                9 (issue_reasons)
+           1106 LOAD_ATTR               23 (NULL|self + append)
+           1126 LOAD_CONST              21 ('置信度偏低')
+           1128 CALL                     1
+           1136 POP_TOP
+
+328     >> 1138 LOAD_FAST                8 (row)
+           1140 LOAD_ATTR               11 (NULL|self + get)
+           1160 LOAD_CONST              23 ('原因')
+           1162 LOAD_CONST               4 ('')
+           1164 CALL                     2
+           1172 STORE_DEREF             25 (reason_text)
+
+329        1174 LOAD_GLOBAL             35 (NULL + any)
+           1184 LOAD_CLOSURE            25 (reason_text)
+           1186 BUILD_TUPLE              1
+           1188 LOAD_CONST              24 (<code object <genexpr> at <address>, file "xiaoguan_classifier\review_tools.py", line 329>)
+           1190 MAKE_FUNCTION            8 (closure)
+           1192 LOAD_GLOBAL             36 (UNSTABLE_REASON_MARKERS)
+           1202 GET_ITER
+           1204 CALL                     0
+           1212 CALL                     1
+           1220 POP_JUMP_IF_FALSE       17 (to 1256)
+
+330        1222 LOAD_FAST                9 (issue_reasons)
+           1224 LOAD_ATTR               23 (NULL|self + append)
+           1244 LOAD_CONST              25 ('模型理由含不稳定判断词')
+           1246 CALL                     1
+           1254 POP_TOP
+
+332     >> 1256 LOAD_FAST                9 (issue_reasons)
+           1258 GET_ITER
+        >> 1260 FOR_ITER                93 (to 1450)
+           1264 STORE_FAST              16 (reason)
+
+333        1266 LOAD_FAST                4 (issues)
+           1268 LOAD_ATTR               23 (NULL|self + append)
+
+335        1288 LOAD_FAST               16 (reason)
+
+336        1290 LOAD_FAST                8 (row)
+           1292 LOAD_ATTR               11 (NULL|self + get)
+           1312 LOAD_CONST              26 ('序号')
+           1314 LOAD_CONST               4 ('')
+           1316 CALL                     2
+
+337        1324 LOAD_FAST                8 (row)
+           1326 LOAD_ATTR               11 (NULL|self + get)
+           1346 LOAD_CONST              27 ('原文件路径')
+           1348 LOAD_CONST               4 ('')
+           1350 CALL                     2
+
+338        1358 LOAD_FAST               12 (output_text)
+
+339        1360 LOAD_FAST               10 (category)
+
+340        1362 LOAD_FAST               11 (subcategory)
+
+341        1364 LOAD_FAST                8 (row)
+           1366 LOAD_ATTR               11 (NULL|self + get)
+           1386 LOAD_CONST              28 ('具体画面')
+           1388 LOAD_CONST               4 ('')
+           1390 CALL                     2
+
+342        1398 LOAD_FAST                8 (row)
+           1400 LOAD_ATTR               11 (NULL|self + get)
+           1420 LOAD_CONST              18 ('置信度')
+           1422 LOAD_CONST               4 ('')
+           1424 CALL                     2
+
+343        1432 LOAD_CONST              29 ('人工复核；必要时填写人工修正表后应用修正')
+
+334        1434 LOAD_CONST              30 (('问题类型', '序号', '原文件路径', '新文件路径', '一级分类', '二级分类', '具体画面', '置信度', '建议动作'))
+           1436 BUILD_CONST_KEY_MAP      9
+
+333        1438 CALL                     1
+           1446 POP_TOP
+           1448 JUMP_BACKWARD           95 (to 1260)
+
+332     >> 1450 END_FOR
+           1452 EXTENDED_ARG             2
+           1454 JUMP_BACKWARD          638 (to 180)
+
+293     >> 1456 END_FOR
+
+347        1458 LOAD_FAST                6 (duplicate_outputs)
+           1460 GET_ITER
+        >> 1462 FOR_ITER                23 (to 1512)
+           1466 STORE_FAST              17 (duplicate)
+
+348        1468 LOAD_FAST                4 (issues)
+           1470 LOAD_ATTR               23 (NULL|self + append)
+           1490 LOAD_CONST              31 ('同一个分类副本路径在清单中重复')
+           1492 LOAD_FAST               17 (duplicate)
+           1494 LOAD_CONST              32 ('检查分类清单或重新分类')
+           1496 LOAD_CONST              33 (('问题类型', '新文件路径', '建议动作'))
+           1498 BUILD_CONST_KEY_MAP      3
+           1500 CALL                     1
+           1508 POP_TOP
+           1510 JUMP_BACKWARD           25 (to 1462)
+
+347     >> 1512 END_FOR
+
+350        1514 LOAD_FAST                0 (library_root)
+           1516 LOAD_CONST              34 ('分类结果')
+           1518 BINARY_OP               11 (/)
+           1522 LOAD_FAST                0 (library_root)
+           1524 LOAD_CONST               1 ('outputs')
+           1526 BINARY_OP               11 (/)
+           1530 LOAD_CONST              34 ('分类结果')
+           1532 BINARY_OP               11 (/)
+           1536 BUILD_TUPLE              2
+           1538 GET_ITER
+        >> 1540 FOR_ITER                49 (to 1642)
+           1544 STORE_FAST              18 (legacy_root)
+
+351        1546 LOAD_FAST               18 (legacy_root)
+           1548 LOAD_ATTR               21 (NULL|self + exists)
+           1568 CALL                     0
+           1576 POP_JUMP_IF_TRUE         1 (to 1580)
+           1578 JUMP_BACKWARD           20 (to 1540)
+
+352     >> 1580 LOAD_FAST                4 (issues)
+           1582 LOAD_ATTR               23 (NULL|self + append)
+           1602 LOAD_CONST              35 ('存在旧版中间分类结果目录')
+           1604 LOAD_GLOBAL             13 (NULL + str)
+           1614 LOAD_FAST               18 (legacy_root)
+           1616 CALL                     1
+           1624 LOAD_CONST              36 ('确认里面没有有效文件后删除或迁移')
+           1626 LOAD_CONST              33 (('问题类型', '新文件路径', '建议动作'))
+           1628 BUILD_CONST_KEY_MAP      3
+           1630 CALL                     1
+           1638 POP_TOP
+           1640 JUMP_BACKWARD           51 (to 1540)
+
+350     >> 1642 END_FOR
+
+354        1644 LOAD_FAST                1 (template)
+           1646 LOAD_ATTR               30 (taxonomy)
+           1666 GET_ITER
+        >> 1668 FOR_ITER               124 (to 1920)
+           1672 STORE_FAST              10 (category)
+
+355        1674 LOAD_FAST                0 (library_root)
+           1676 LOAD_FAST               10 (category)
+           1678 BINARY_OP               11 (/)
+           1682 STORE_FAST              19 (category_dir)
+
+356        1684 LOAD_FAST               19 (category_dir)
+           1686 LOAD_ATTR               21 (NULL|self + exists)
+           1706 CALL                     0
+           1714 POP_JUMP_IF_TRUE         1 (to 1718)
+
+357        1716 JUMP_BACKWARD           25 (to 1668)
+
+358     >> 1718 LOAD_FAST               19 (category_dir)
+           1720 LOAD_ATTR               39 (NULL|self + rglob)
+           1740 LOAD_CONST              37 ('*')
+           1742 CALL                     1
+           1750 GET_ITER
+        >> 1752 FOR_ITER                80 (to 1916)
+           1756 STORE_FAST              20 (path)
+
+359        1758 LOAD_FAST               20 (path)
+           1760 LOAD_ATTR               41 (NULL|self + is_file)
+           1780 CALL                     0
+           1788 POP_JUMP_IF_TRUE         1 (to 1792)
+
+360        1790 JUMP_BACKWARD           20 (to 1752)
+
+361     >> 1792 LOAD_GLOBAL             13 (NULL + str)
+           1802 LOAD_FAST               20 (path)
+           1804 LOAD_ATTR                1 (NULL|self + resolve)
+           1824 CALL                     0
+           1832 CALL                     1
+           1840 STORE_FAST              21 (resolved)
+
+362        1842 LOAD_FAST               21 (resolved)
+           1844 LOAD_FAST                5 (output_paths_in_manifest)
+           1846 CONTAINS_OP              1
+           1848 POP_JUMP_IF_TRUE         1 (to 1852)
+           1850 JUMP_BACKWARD           50 (to 1752)
+
+363     >> 1852 LOAD_FAST                4 (issues)
+           1854 LOAD_ATTR               23 (NULL|self + append)
+
+365        1874 LOAD_CONST              38 ('目录中有未登记分类副本')
+
+366        1876 LOAD_GLOBAL             13 (NULL + str)
+           1886 LOAD_FAST               20 (path)
+           1888 CALL                     1
+
+367        1896 LOAD_FAST               10 (category)
+
+368        1898 LOAD_CONST              39 ('确认是否手工放入；需要的话重新生成分类清单或保留为手工素材')
+
+364        1900 LOAD_CONST              40 (('问题类型', '新文件路径', '一级分类', '建议动作'))
+           1902 BUILD_CONST_KEY_MAP      4
+
+363        1904 CALL                     1
+           1912 POP_TOP
+           1914 JUMP_BACKWARD           82 (to 1752)
+
+358     >> 1916 END_FOR
+           1918 JUMP_BACKWARD          126 (to 1668)
+
+354     >> 1920 END_FOR
+
+372        1922 LOAD_FAST                2 (outputs)
+           1924 LOAD_GLOBAL             42 (SELF_CHECK_CSV_NAME)
+           1934 BINARY_OP               11 (/)
+           1938 STORE_FAST              22 (csv_path)
+
+373        1940 LOAD_FAST                2 (outputs)
+           1942 LOAD_GLOBAL             44 (SELF_CHECK_MD_NAME)
+           1952 BINARY_OP               11 (/)
+           1956 STORE_FAST              23 (md_path)
+
+374        1958 LOAD_GLOBAL             47 (NULL + _write_csv)
+           1968 LOAD_FAST               22 (csv_path)
+           1970 LOAD_FAST                4 (issues)
+           1972 CALL                     2
+           1980 POP_TOP
+
+376        1982 LOAD_CONST              41 ('# 分类自检报告')
+
+377        1984 LOAD_CONST               4 ('')
+
+378        1986 LOAD_CONST              42 ('- 自检时间：')
+           1988 LOAD_GLOBAL             49 (NULL + datetime)
+           1998 LOAD_ATTR               50 (now)
+           2018 CALL                     0
+           2026 LOAD_ATTR               53 (NULL|self + strftime)
+           2046 LOAD_CONST              43 ('%Y-%m-%d %H:%M:%S')
+           2048 CALL                     1
+           2056 FORMAT_VALUE             0
+           2058 BUILD_STRING             2
+
+379        2060 LOAD_CONST              44 ('- 素材库根目录：')
+           2062 LOAD_FAST                0 (library_root)
+           2064 FORMAT_VALUE             0
+           2066 BUILD_STRING             2
+
+380        2068 LOAD_CONST              45 ('- 分类清单行数：')
+           2070 LOAD_GLOBAL             27 (NULL + len)
+           2080 LOAD_FAST                3 (manifest_rows)
+           2082 CALL                     1
+           2090 FORMAT_VALUE             0
+           2092 BUILD_STRING             2
+
+381        2094 LOAD_CONST              46 ('- 发现问题数：')
+           2096 LOAD_GLOBAL             27 (NULL + len)
+           2106 LOAD_FAST                4 (issues)
+           2108 CALL                     1
+           2116 FORMAT_VALUE             0
+           2118 BUILD_STRING             2
+
+382        2120 LOAD_CONST               4 ('')
+
+383        2122 LOAD_CONST              47 ('## 说明')
+
+384        2124 LOAD_CONST               4 ('')
+
+385        2126 LOAD_CONST              48 ('自检会检查清单、目录、置信度、待筛、旧版中间目录和未登记副本；它不会替代人工看画面。')
+
+386        2128 LOAD_CONST              49 ('发现问题后，优先使用“生成修正表”填写错分行，再点击“应用修正表”。')
+
+375        2130 BUILD_LIST              11
+           2132 STORE_FAST              24 (summary_lines)
+
+388        2134 LOAD_FAST               23 (md_path)
+           2136 LOAD_ATTR               55 (NULL|self + write_text)
+           2156 LOAD_CONST              50 ('\n')
+           2158 LOAD_ATTR               57 (NULL|self + join)
+           2178 LOAD_FAST               24 (summary_lines)
+           2180 CALL                     1
+           2188 LOAD_CONST              50 ('\n')
+           2190 BINARY_OP                0 (+)
+           2194 LOAD_CONST              51 ('utf-8')
+           2196 KW_NAMES                52 (('encoding',))
+           2198 CALL                     2
+           2206 POP_TOP
+
+390        2208 LOAD_GLOBAL             27 (NULL + len)
+           2218 LOAD_FAST                4 (issues)
+           2220 CALL                     1
+
+391        2228 LOAD_GLOBAL             27 (NULL + len)
+           2238 LOAD_FAST                3 (manifest_rows)
+           2240 CALL                     1
+
+392        2248 LOAD_FAST               22 (csv_path)
+
+393        2250 LOAD_FAST               23 (md_path)
+
+389        2252 LOAD_CONST              53 (('issue_count', 'manifest_count', 'csv', 'report'))
+           2254 BUILD_CONST_KEY_MAP      4
+           2256 RETURN_VALUE
+        >> 2258 PUSH_EXC_INFO
+
+312        2260 LOAD_GLOBAL              6 (ValueError)
+           2270 CHECK_EXC_MATCH
+           2272 POP_JUMP_IF_FALSE       21 (to 2316)
+           2274 POP_TOP
+
+313        2276 LOAD_FAST                9 (issue_reasons)
+           2278 LOAD_ATTR               23 (NULL|self + append)
+           2298 LOAD_CONST              12 ('分类副本不在当前素材库根目录下')
+           2300 CALL                     1
+           2308 POP_TOP
+           2310 POP_EXCEPT
+           2312 EXTENDED_ARG             2
+           2314 JUMP_BACKWARD          728 (to 860)
+
+312     >> 2316 RERAISE                  0
+        >> 2318 COPY                     3
+           2320 POP_EXCEPT
+           2322 RERAISE                  1
+        >> 2324 PUSH_EXC_INFO
+
+326        2326 LOAD_GLOBAL              6 (ValueError)
+           2336 CHECK_EXC_MATCH
+           2338 POP_JUMP_IF_FALSE       21 (to 2382)
+           2340 POP_TOP
+
+327        2342 LOAD_FAST                9 (issue_reasons)
+           2344 LOAD_ATTR               23 (NULL|self + append)
+           2364 LOAD_CONST              22 ('置信度不是有效数字')
+           2366 CALL                     1
+           2374 POP_TOP
+           2376 POP_EXCEPT
+           2378 EXTENDED_ARG             2
+           2380 JUMP_BACKWARD          622 (to 1138)
+
+326     >> 2382 RERAISE                  0
+        >> 2384 COPY                     3
+           2386 POP_EXCEPT
+           2388 RERAISE                  1
+ExceptionTable:
+  608 to 822 -> 2258 [1]
+  1038 to 1136 -> 2324 [1]
+  2258 to 2308 -> 2318 [2] lasti
+  2316 to 2316 -> 2318 [2] lasti
+  2324 to 2374 -> 2384 [2] lasti
+  2382 to 2382 -> 2384 [2] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\review_tools.py", line 329>:
+              0 COPY_FREE_VARS           1
+
+329           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (marker)
+             16 LOAD_FAST                1 (marker)
+             18 LOAD_DEREF               2 (reason_text)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti

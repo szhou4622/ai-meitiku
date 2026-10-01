@@ -1,0 +1,901 @@
+module: xiaoguan_classifier.taxonomy
+bytecode: src/xiaoguan_classifier/taxonomy.pyc
+sha256: 5eb286c7b1a375ba2d37fffa238b8d2b8e0854db79c38fd2a430df37aa4b1b5d
+python: 3.12.14
+source_filename: xiaoguan_classifier\taxonomy.py
+
+  0           0 RESUME                   0
+
+  1           2 SETUP_ANNOTATIONS
+              4 LOAD_CONST               0 (0)
+              6 LOAD_CONST               1 (('annotations',))
+              8 IMPORT_NAME              0 (__future__)
+             10 IMPORT_FROM              1 (annotations)
+             12 STORE_NAME               1 (annotations)
+             14 POP_TOP
+
+  3          16 LOAD_CONST               0 (0)
+             18 LOAD_CONST               2 (('dataclass',))
+             20 IMPORT_NAME              2 (dataclasses)
+             22 IMPORT_FROM              3 (dataclass)
+             24 STORE_NAME               3 (dataclass)
+             26 POP_TOP
+
+  4          28 LOAD_CONST               0 (0)
+             30 LOAD_CONST               3 (('Path',))
+             32 IMPORT_NAME              4 (pathlib)
+             34 IMPORT_FROM              5 (Path)
+             36 STORE_NAME               5 (Path)
+             38 POP_TOP
+
+  5          40 LOAD_CONST               0 (0)
+             42 LOAD_CONST               4 (('Any',))
+             44 IMPORT_NAME              6 (typing)
+             46 IMPORT_FROM              7 (Any)
+             48 STORE_NAME               7 (Any)
+             50 POP_TOP
+
+  7          52 LOAD_CONST               5 ('浓萃乌龙')
+             54 STORE_NAME               8 (PRODUCT_NAME)
+
+  8          56 LOAD_CONST               6 ('%y%m%d')
+             58 STORE_NAME               9 (DEFAULT_DATE_FORMAT)
+
+ 11          60 LOAD_CONST               7 ('画面不明确或低相关')
+             62 BUILD_LIST               1
+
+ 12          64 BUILD_LIST               0
+             66 LOAD_CONST               8 (('上课备考犯困', '办公开会犯困', '午后工作犯困', '加班熬夜犯困', '通勤路上犯困', '开车出行犯困'))
+             68 LIST_EXTEND              1
+
+ 13          70 BUILD_LIST               0
+             72 LOAD_CONST               9 (('瓶身展示', '整箱展示', '产品组合', '包装信息', '配料表', '营养成分', '活动机制', '产品空镜', '冰爽清冽', '液体质感'))
+             74 LIST_EXTEND              1
+
+ 14          76 BUILD_LIST               0
+             78 LOAD_CONST              10 (('上课备考', '办公开会', '午后工位', '加班续航', '通勤外带', '开车出行', '冰饮畅饮'))
+             80 LIST_EXTEND              1
+
+ 15          82 BUILD_LIST               0
+             84 LOAD_CONST              11 (('提神醒脑', '配料干净低负担', '好喝体验'))
+             86 LIST_EXTEND              1
+
+ 16          88 BUILD_LIST               0
+             90 LOAD_CONST              12 (('喝前喝后', '对比普通咖啡', '对比含糖饮料', '对比能量饮料', '对比普通茶饮', '成分负担对比'))
+             92 LIST_EXTEND              1
+
+ 17          94 BUILD_LIST               0
+             96 LOAD_CONST              13 (('痛点口播', '卖点口播', '场景口播', '测评口播', '活动口播', '主播讲解'))
+             98 LIST_EXTEND              1
+
+ 18         100 BUILD_LIST               0
+            102 LOAD_CONST              14 (('小罐茶品牌', '现代中国茶', '工厂矩阵', '门店销量', '专利技术', '茶饮研发'))
+            104 LIST_EXTEND              1
+
+ 19         106 LOAD_CONST              15 ('达人原片')
+            108 LOAD_CONST              16 ('达人口播')
+            110 BUILD_LIST               2
+
+ 20         112 BUILD_LIST               0
+            114 LOAD_CONST              17 (('脑雾清醒特效', '茶咖融合视觉', '咖啡因示意', '液体漩涡', '场景补充', '转场动效'))
+            116 LIST_EXTEND              1
+
+ 10         118 LOAD_CONST              18 (('00_待筛素材', '01_痛点镜头', '02_产品镜头', '03_使用镜头', '04_卖点镜头', '05_对比镜头', '06_真人口播', '07_品牌背书', '08_达人素材', '10_AI生成'))
+            120 BUILD_CONST_KEY_MAP     10
+            122 STORE_NAME              10 (TAXONOMY)
+            124 LOAD_CONST              19 ('dict[str, list[str]]')
+            126 LOAD_NAME               11 (__annotations__)
+            128 LOAD_CONST              20 ('TAXONOMY')
+            130 STORE_SUBSCR
+
+ 23         134 BUILD_LIST               0
+            136 LOAD_CONST              21 (('特写', '近景', '中景', '远景', '俯拍', '手持', '海报', '详情页', '截图', '空镜', '动效'))
+            138 LIST_EXTEND              1
+            140 STORE_NAME              12 (SCENE_OR_FORM)
+
+ 26         142 PUSH_NULL
+            144 LOAD_NAME                3 (dataclass)
+            146 LOAD_CONST              22 (True)
+            148 KW_NAMES                23 (('frozen',))
+            150 CALL                     1
+
+ 27         158 PUSH_NULL
+            160 LOAD_BUILD_CLASS
+            162 LOAD_CONST              24 (<code object Classification at <address>, file "xiaoguan_classifier\taxonomy.py", line 26>)
+            164 MAKE_FUNCTION            0
+            166 LOAD_CONST              25 ('Classification')
+            168 CALL                     2
+
+ 26         176 CALL                     0
+
+ 27         184 STORE_NAME              13 (Classification)
+
+ 47         186 LOAD_CONST              34 (('未命名',))
+            188 LOAD_CONST              35 (('value', 'str', 'fallback', 'str', 'return', 'str'))
+            190 LOAD_CONST              26 (<code object safe_filename_part at <address>, file "xiaoguan_classifier\taxonomy.py", line 47>)
+            192 MAKE_FUNCTION            5 (defaults, annotations)
+            194 STORE_NAME              14 (safe_filename_part)
+
+ 56         196 LOAD_CONST              36 ((None,))
+            198 LOAD_CONST              37 (('value', 'str', 'taxonomy', 'dict[str, list[str]] | None', 'return', 'str'))
+            200 LOAD_CONST              28 (<code object normalize_category at <address>, file "xiaoguan_classifier\taxonomy.py", line 56>)
+            202 MAKE_FUNCTION            5 (defaults, annotations)
+            204 STORE_NAME              15 (normalize_category)
+
+ 70         206 LOAD_CONST              36 ((None,))
+            208 LOAD_CONST              38 (('raw', 'dict[str, Any] | Classification', 'taxonomy', 'dict[str, list[str]] | None', 'return', 'Classification'))
+            210 LOAD_CONST              29 (<code object normalize_classification at <address>, file "xiaoguan_classifier\taxonomy.py", line 70>)
+            212 MAKE_FUNCTION            5 (defaults, annotations)
+            214 STORE_NAME              16 (normalize_classification)
+
+105         216 LOAD_CONST              39 (('value', 'Any', 'return', 'int'))
+            218 LOAD_CONST              30 (<code object _safe_int at <address>, file "xiaoguan_classifier\taxonomy.py", line 105>)
+            220 MAKE_FUNCTION            4 (annotations)
+            222 STORE_NAME              17 (_safe_int)
+
+117         224 LOAD_CONST              31 ('')
+
+118         226 LOAD_NAME                8 (PRODUCT_NAME)
+
+119         228 LOAD_CONST              27 (None)
+
+112         230 BUILD_TUPLE              3
+
+113         232 NOP
+
+112         234 NOP
+
+114         236 NOP
+
+112         238 NOP
+
+115         240 NOP
+
+112         242 NOP
+
+116         244 NOP
+
+112         246 NOP
+
+117         248 NOP
+
+112         250 NOP
+
+118         252 NOP
+
+112         254 NOP
+
+119         256 NOP
+
+112         258 NOP
+
+120         260 NOP
+
+112         262 LOAD_CONST              40 (('classification', 'Classification', 'date_code', 'str', 'sequence', 'int', 'suffix', 'str', 'source_name', 'str', 'product_name', 'str', 'taxonomy', 'dict[str, list[str]] | None', 'return', 'str'))
+            264 LOAD_CONST              32 (<code object build_material_filename at <address>, file "xiaoguan_classifier\taxonomy.py", line 112>)
+            266 MAKE_FUNCTION            5 (defaults, annotations)
+            268 STORE_NAME              18 (build_material_filename)
+
+134         270 LOAD_CONST              41 (('path', 'Path', 'return', 'bool'))
+            272 LOAD_CONST              33 (<code object is_category_dir at <address>, file "xiaoguan_classifier\taxonomy.py", line 134>)
+            274 MAKE_FUNCTION            4 (annotations)
+            276 STORE_NAME              19 (is_category_dir)
+            278 RETURN_CONST            27 (None)
+
+Disassembly of <code object Classification at <address>, file "xiaoguan_classifier\taxonomy.py", line 26>:
+ 26           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('Classification')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 28          12 LOAD_CONST               1 ('str')
+             14 LOAD_NAME                3 (__annotations__)
+             16 LOAD_CONST               2 ('category')
+             18 STORE_SUBSCR
+
+ 29          22 LOAD_CONST               1 ('str')
+             24 LOAD_NAME                3 (__annotations__)
+             26 LOAD_CONST               3 ('subcategory')
+             28 STORE_SUBSCR
+
+ 30          32 LOAD_CONST               1 ('str')
+             34 LOAD_NAME                3 (__annotations__)
+             36 LOAD_CONST               4 ('detail')
+             38 STORE_SUBSCR
+
+ 31          42 LOAD_CONST               1 ('str')
+             44 LOAD_NAME                3 (__annotations__)
+             46 LOAD_CONST               5 ('form')
+             48 STORE_SUBSCR
+
+ 32          52 LOAD_CONST               6 ('float')
+             54 LOAD_NAME                3 (__annotations__)
+             56 LOAD_CONST               7 ('confidence')
+             58 STORE_SUBSCR
+
+ 33          62 LOAD_CONST               8 ('')
+             64 STORE_NAME               4 (reason)
+             66 LOAD_CONST               1 ('str')
+             68 LOAD_NAME                3 (__annotations__)
+             70 LOAD_CONST               9 ('reason')
+             72 STORE_SUBSCR
+
+ 34          76 LOAD_CONST              10 (0)
+             78 STORE_NAME               5 (prompt_tokens)
+             80 LOAD_CONST              11 ('int')
+             82 LOAD_NAME                3 (__annotations__)
+             84 LOAD_CONST              12 ('prompt_tokens')
+             86 STORE_SUBSCR
+
+ 35          90 LOAD_CONST              10 (0)
+             92 STORE_NAME               6 (completion_tokens)
+             94 LOAD_CONST              11 ('int')
+             96 LOAD_NAME                3 (__annotations__)
+             98 LOAD_CONST              13 ('completion_tokens')
+            100 STORE_SUBSCR
+
+ 36         104 LOAD_CONST              10 (0)
+            106 STORE_NAME               7 (total_tokens)
+            108 LOAD_CONST              11 ('int')
+            110 LOAD_NAME                3 (__annotations__)
+            112 LOAD_CONST              14 ('total_tokens')
+            114 STORE_SUBSCR
+
+ 38         118 LOAD_NAME                8 (property)
+
+ 39         120 LOAD_CONST              18 (('return', 'str'))
+            122 LOAD_CONST              15 (<code object category_name at <address>, file "xiaoguan_classifier\taxonomy.py", line 38>)
+            124 MAKE_FUNCTION            4 (annotations)
+
+ 38         126 CALL                     0
+
+ 39         134 STORE_NAME               9 (category_name)
+
+ 42         136 LOAD_NAME                8 (property)
+
+ 43         138 LOAD_CONST              19 (('return', 'bool'))
+            140 LOAD_CONST              16 (<code object is_pending at <address>, file "xiaoguan_classifier\taxonomy.py", line 42>)
+            142 MAKE_FUNCTION            4 (annotations)
+
+ 42         144 CALL                     0
+
+ 43         152 STORE_NAME              10 (is_pending)
+            154 RETURN_CONST            17 (None)
+
+Disassembly of <code object category_name at <address>, file "xiaoguan_classifier\taxonomy.py", line 38>:
+ 38           0 RESUME                   0
+
+ 40           2 LOAD_CONST               1 ('_')
+              4 LOAD_FAST                0 (self)
+              6 LOAD_ATTR                0 (category)
+             26 CONTAINS_OP              0
+             28 POP_JUMP_IF_FALSE       31 (to 92)
+             30 LOAD_FAST                0 (self)
+             32 LOAD_ATTR                0 (category)
+             52 LOAD_ATTR                3 (NULL|self + split)
+             72 LOAD_CONST               1 ('_')
+             74 LOAD_CONST               2 (1)
+             76 CALL                     2
+             84 LOAD_CONST               2 (1)
+             86 BINARY_SUBSCR
+             90 RETURN_VALUE
+        >>   92 LOAD_FAST                0 (self)
+             94 LOAD_ATTR                0 (category)
+            114 RETURN_VALUE
+
+Disassembly of <code object is_pending at <address>, file "xiaoguan_classifier\taxonomy.py", line 42>:
+ 42           0 RESUME                   0
+
+ 44           2 LOAD_FAST                0 (self)
+              4 LOAD_ATTR                0 (category)
+             24 LOAD_CONST               1 ('00_待筛素材')
+             26 COMPARE_OP              40 (==)
+             30 COPY                     1
+             32 POP_JUMP_IF_TRUE        15 (to 64)
+             34 POP_TOP
+             36 LOAD_FAST                0 (self)
+             38 LOAD_ATTR                2 (confidence)
+             58 LOAD_CONST               2 (0.6)
+             60 COMPARE_OP               2 (<)
+        >>   64 RETURN_VALUE
+
+Disassembly of <code object safe_filename_part at <address>, file "xiaoguan_classifier\taxonomy.py", line 47>:
+ 47           0 RESUME                   0
+
+ 48           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (value)
+             14 COPY                     1
+             16 POP_JUMP_IF_TRUE         2 (to 22)
+             18 POP_TOP
+             20 LOAD_CONST               1 ('')
+        >>   22 CALL                     1
+             30 LOAD_ATTR                3 (NULL|self + strip)
+             50 CALL                     0
+             58 STORE_FAST               0 (value)
+
+ 49          60 LOAD_CONST               2 ('<>:"/\\|?*')
+             62 GET_ITER
+        >>   64 FOR_ITER                20 (to 108)
+             68 STORE_FAST               2 (char)
+
+ 50          70 LOAD_FAST                0 (value)
+             72 LOAD_ATTR                5 (NULL|self + replace)
+             92 LOAD_FAST                2 (char)
+             94 LOAD_CONST               1 ('')
+             96 CALL                     2
+            104 STORE_FAST               0 (value)
+            106 JUMP_BACKWARD           22 (to 64)
+
+ 49     >>  108 END_FOR
+
+ 51         110 LOAD_FAST                0 (value)
+            112 LOAD_ATTR                5 (NULL|self + replace)
+            132 LOAD_CONST               3 ('\r')
+            134 LOAD_CONST               1 ('')
+            136 CALL                     2
+            144 LOAD_ATTR                5 (NULL|self + replace)
+            164 LOAD_CONST               4 ('\n')
+            166 LOAD_CONST               1 ('')
+            168 CALL                     2
+            176 LOAD_ATTR                5 (NULL|self + replace)
+            196 LOAD_CONST               5 ('\t')
+            198 LOAD_CONST               1 ('')
+            200 CALL                     2
+            208 STORE_FAST               0 (value)
+
+ 52         210 LOAD_FAST                0 (value)
+            212 LOAD_ATTR                5 (NULL|self + replace)
+            232 LOAD_CONST               6 (' ')
+            234 LOAD_CONST               1 ('')
+            236 CALL                     2
+            244 STORE_FAST               0 (value)
+
+ 53         246 LOAD_FAST                0 (value)
+            248 COPY                     1
+            250 POP_JUMP_IF_TRUE         2 (to 256)
+            252 POP_TOP
+            254 LOAD_FAST                1 (fallback)
+        >>  256 RETURN_VALUE
+
+Disassembly of <code object normalize_category at <address>, file "xiaoguan_classifier\taxonomy.py", line 56>:
+ 56           0 RESUME                   0
+
+ 57           2 LOAD_FAST                1 (taxonomy)
+              4 COPY                     1
+              6 POP_JUMP_IF_TRUE         6 (to 20)
+              8 POP_TOP
+             10 LOAD_GLOBAL              0 (TAXONOMY)
+        >>   20 STORE_FAST               1 (taxonomy)
+
+ 58          22 LOAD_GLOBAL              3 (NULL + str)
+             32 LOAD_FAST                0 (value)
+             34 COPY                     1
+             36 POP_JUMP_IF_TRUE         2 (to 42)
+             38 POP_TOP
+             40 LOAD_CONST               1 ('')
+        >>   42 CALL                     1
+             50 LOAD_ATTR                5 (NULL|self + strip)
+             70 CALL                     0
+             78 STORE_FAST               0 (value)
+
+ 59          80 LOAD_FAST                0 (value)
+             82 LOAD_FAST                1 (taxonomy)
+             84 CONTAINS_OP              0
+             86 POP_JUMP_IF_FALSE        2 (to 92)
+
+ 60          88 LOAD_FAST                0 (value)
+             90 RETURN_VALUE
+
+ 61     >>   92 LOAD_FAST                1 (taxonomy)
+             94 GET_ITER
+        >>   96 FOR_ITER                30 (to 160)
+            100 STORE_FAST               2 (category)
+
+ 62         102 LOAD_FAST                0 (value)
+            104 LOAD_FAST                2 (category)
+            106 LOAD_ATTR                7 (NULL|self + split)
+            126 LOAD_CONST               2 ('_')
+            128 LOAD_CONST               3 (1)
+            130 CALL                     2
+            138 LOAD_CONST               4 (-1)
+            140 BINARY_SUBSCR
+            144 COMPARE_OP              40 (==)
+            148 POP_JUMP_IF_TRUE         1 (to 152)
+            150 JUMP_BACKWARD           28 (to 96)
+
+ 63     >>  152 LOAD_FAST                2 (category)
+            154 SWAP                     2
+            156 POP_TOP
+            158 RETURN_VALUE
+
+ 61     >>  160 END_FOR
+
+ 64         162 LOAD_FAST                1 (taxonomy)
+            164 GET_ITER
+        >>  166 FOR_ITER                10 (to 190)
+            170 STORE_FAST               2 (category)
+
+ 65         172 LOAD_CONST               5 ('待筛')
+            174 LOAD_FAST                2 (category)
+            176 CONTAINS_OP              0
+            178 POP_JUMP_IF_TRUE         1 (to 182)
+            180 JUMP_BACKWARD            8 (to 166)
+
+ 66     >>  182 LOAD_FAST                2 (category)
+            184 SWAP                     2
+            186 POP_TOP
+            188 RETURN_VALUE
+
+ 64     >>  190 END_FOR
+
+ 67         192 LOAD_GLOBAL              9 (NULL + next)
+            202 LOAD_GLOBAL             11 (NULL + iter)
+            212 LOAD_FAST                1 (taxonomy)
+            214 CALL                     1
+            222 LOAD_CONST               6 ('00_待筛素材')
+            224 CALL                     2
+            232 RETURN_VALUE
+
+Disassembly of <code object normalize_classification at <address>, file "xiaoguan_classifier\taxonomy.py", line 70>:
+ 70           0 RESUME                   0
+
+ 71           2 LOAD_FAST                1 (taxonomy)
+              4 COPY                     1
+              6 POP_JUMP_IF_TRUE         6 (to 20)
+              8 POP_TOP
+             10 LOAD_GLOBAL              0 (TAXONOMY)
+        >>   20 STORE_FAST               1 (taxonomy)
+
+ 72          22 LOAD_GLOBAL              3 (NULL + isinstance)
+             32 LOAD_FAST                0 (raw)
+             34 LOAD_GLOBAL              4 (Classification)
+             44 CALL                     2
+             52 POP_JUMP_IF_FALSE        2 (to 58)
+
+ 73          54 LOAD_FAST                0 (raw)
+             56 RETURN_VALUE
+
+ 75     >>   58 LOAD_GLOBAL              7 (NULL + normalize_category)
+             68 LOAD_GLOBAL              9 (NULL + str)
+             78 LOAD_FAST                0 (raw)
+             80 LOAD_ATTR               11 (NULL|self + get)
+            100 LOAD_CONST               1 ('category')
+            102 CALL                     1
+            110 COPY                     1
+            112 POP_JUMP_IF_TRUE        21 (to 156)
+            114 POP_TOP
+            116 LOAD_FAST                0 (raw)
+            118 LOAD_ATTR               11 (NULL|self + get)
+            138 LOAD_CONST               2 ('一级分类')
+            140 CALL                     1
+            148 COPY                     1
+            150 POP_JUMP_IF_TRUE         2 (to 156)
+            152 POP_TOP
+            154 LOAD_CONST               3 ('')
+        >>  156 CALL                     1
+            164 LOAD_FAST                1 (taxonomy)
+            166 CALL                     2
+            174 STORE_FAST               2 (category)
+
+ 76         176 LOAD_GLOBAL              9 (NULL + str)
+            186 LOAD_FAST                0 (raw)
+            188 LOAD_ATTR               11 (NULL|self + get)
+            208 LOAD_CONST               4 ('subcategory')
+            210 CALL                     1
+            218 COPY                     1
+            220 POP_JUMP_IF_TRUE        21 (to 264)
+            222 POP_TOP
+            224 LOAD_FAST                0 (raw)
+            226 LOAD_ATTR               11 (NULL|self + get)
+            246 LOAD_CONST               5 ('二级分类')
+            248 CALL                     1
+            256 COPY                     1
+            258 POP_JUMP_IF_TRUE         2 (to 264)
+            260 POP_TOP
+            262 LOAD_CONST               3 ('')
+        >>  264 CALL                     1
+            272 LOAD_ATTR               13 (NULL|self + strip)
+            292 CALL                     0
+            300 STORE_FAST               3 (subcategory)
+
+ 77         302 LOAD_FAST                3 (subcategory)
+            304 LOAD_FAST                1 (taxonomy)
+            306 LOAD_FAST                2 (category)
+            308 BINARY_SUBSCR
+            312 CONTAINS_OP              1
+            314 POP_JUMP_IF_FALSE        8 (to 332)
+
+ 78         316 LOAD_FAST                1 (taxonomy)
+            318 LOAD_FAST                2 (category)
+            320 BINARY_SUBSCR
+            324 LOAD_CONST               6 (0)
+            326 BINARY_SUBSCR
+            330 STORE_FAST               3 (subcategory)
+
+ 80     >>  332 LOAD_GLOBAL             15 (NULL + safe_filename_part)
+            342 LOAD_GLOBAL              9 (NULL + str)
+            352 LOAD_FAST                0 (raw)
+            354 LOAD_ATTR               11 (NULL|self + get)
+            374 LOAD_CONST               7 ('detail')
+            376 CALL                     1
+            384 COPY                     1
+            386 POP_JUMP_IF_TRUE        21 (to 430)
+            388 POP_TOP
+            390 LOAD_FAST                0 (raw)
+            392 LOAD_ATTR               11 (NULL|self + get)
+            412 LOAD_CONST               8 ('具体画面')
+            414 CALL                     1
+            422 COPY                     1
+            424 POP_JUMP_IF_TRUE         2 (to 430)
+            426 POP_TOP
+            428 LOAD_FAST                3 (subcategory)
+        >>  430 CALL                     1
+            438 LOAD_FAST                3 (subcategory)
+            440 CALL                     2
+            448 STORE_FAST               4 (detail)
+
+ 81         450 LOAD_GLOBAL              9 (NULL + str)
+            460 LOAD_FAST                0 (raw)
+            462 LOAD_ATTR               11 (NULL|self + get)
+            482 LOAD_CONST               9 ('form')
+            484 CALL                     1
+            492 COPY                     1
+            494 POP_JUMP_IF_TRUE        21 (to 538)
+            496 POP_TOP
+            498 LOAD_FAST                0 (raw)
+            500 LOAD_ATTR               11 (NULL|self + get)
+            520 LOAD_CONST              10 ('景别或形态')
+            522 CALL                     1
+            530 COPY                     1
+            532 POP_JUMP_IF_TRUE         2 (to 538)
+            534 POP_TOP
+            536 LOAD_CONST               3 ('')
+        >>  538 CALL                     1
+            546 LOAD_ATTR               13 (NULL|self + strip)
+            566 CALL                     0
+            574 STORE_FAST               5 (form)
+
+ 82         576 LOAD_FAST                5 (form)
+            578 LOAD_GLOBAL             16 (SCENE_OR_FORM)
+            588 CONTAINS_OP              1
+            590 POP_JUMP_IF_FALSE        2 (to 596)
+
+ 83         592 LOAD_CONST              11 ('特写')
+            594 STORE_FAST               5 (form)
+
+ 84     >>  596 NOP
+
+ 85         598 LOAD_GLOBAL             19 (NULL + float)
+            608 LOAD_FAST                0 (raw)
+            610 LOAD_ATTR               11 (NULL|self + get)
+            630 LOAD_CONST              12 ('confidence')
+            632 CALL                     1
+            640 COPY                     1
+            642 POP_JUMP_IF_TRUE        21 (to 686)
+            644 POP_TOP
+            646 LOAD_FAST                0 (raw)
+            648 LOAD_ATTR               11 (NULL|self + get)
+            668 LOAD_CONST              13 ('置信度')
+            670 CALL                     1
+            678 COPY                     1
+            680 POP_JUMP_IF_TRUE         2 (to 686)
+            682 POP_TOP
+            684 LOAD_CONST              14 (0.0)
+        >>  686 CALL                     1
+            694 STORE_FAST               6 (confidence)
+
+ 88     >>  696 LOAD_GLOBAL             25 (NULL + max)
+            706 LOAD_CONST              14 (0.0)
+            708 LOAD_GLOBAL             27 (NULL + min)
+            718 LOAD_CONST              15 (1.0)
+            720 LOAD_FAST                6 (confidence)
+            722 CALL                     2
+            730 CALL                     2
+            738 STORE_FAST               6 (confidence)
+
+ 89         740 LOAD_GLOBAL              9 (NULL + str)
+            750 LOAD_FAST                0 (raw)
+            752 LOAD_ATTR               11 (NULL|self + get)
+            772 LOAD_CONST              16 ('reason')
+            774 CALL                     1
+            782 COPY                     1
+            784 POP_JUMP_IF_TRUE        21 (to 828)
+            786 POP_TOP
+            788 LOAD_FAST                0 (raw)
+            790 LOAD_ATTR               11 (NULL|self + get)
+            810 LOAD_CONST              17 ('原因')
+            812 CALL                     1
+            820 COPY                     1
+            822 POP_JUMP_IF_TRUE         2 (to 828)
+            824 POP_TOP
+            826 LOAD_CONST               3 ('')
+        >>  828 CALL                     1
+            836 STORE_FAST               7 (reason)
+
+ 90         838 LOAD_GLOBAL             29 (NULL + _safe_int)
+            848 LOAD_FAST                0 (raw)
+            850 LOAD_ATTR               11 (NULL|self + get)
+            870 LOAD_CONST              18 ('prompt_tokens')
+            872 CALL                     1
+            880 COPY                     1
+            882 POP_JUMP_IF_TRUE        36 (to 956)
+            884 POP_TOP
+            886 LOAD_FAST                0 (raw)
+            888 LOAD_ATTR               11 (NULL|self + get)
+            908 LOAD_CONST              19 ('输入tokens')
+            910 CALL                     1
+            918 COPY                     1
+            920 POP_JUMP_IF_TRUE        17 (to 956)
+            922 POP_TOP
+            924 LOAD_FAST                0 (raw)
+            926 LOAD_ATTR               11 (NULL|self + get)
+            946 LOAD_CONST              20 ('输入Token')
+            948 CALL                     1
+        >>  956 CALL                     1
+            964 STORE_FAST               8 (prompt_tokens)
+
+ 91         966 LOAD_GLOBAL             29 (NULL + _safe_int)
+            976 LOAD_FAST                0 (raw)
+            978 LOAD_ATTR               11 (NULL|self + get)
+            998 LOAD_CONST              21 ('completion_tokens')
+           1000 CALL                     1
+           1008 COPY                     1
+           1010 POP_JUMP_IF_TRUE        36 (to 1084)
+           1012 POP_TOP
+           1014 LOAD_FAST                0 (raw)
+           1016 LOAD_ATTR               11 (NULL|self + get)
+           1036 LOAD_CONST              22 ('输出tokens')
+           1038 CALL                     1
+           1046 COPY                     1
+           1048 POP_JUMP_IF_TRUE        17 (to 1084)
+           1050 POP_TOP
+           1052 LOAD_FAST                0 (raw)
+           1054 LOAD_ATTR               11 (NULL|self + get)
+           1074 LOAD_CONST              23 ('输出Token')
+           1076 CALL                     1
+        >> 1084 CALL                     1
+           1092 STORE_FAST               9 (completion_tokens)
+
+ 92        1094 LOAD_GLOBAL             29 (NULL + _safe_int)
+           1104 LOAD_FAST                0 (raw)
+           1106 LOAD_ATTR               11 (NULL|self + get)
+           1126 LOAD_CONST              24 ('total_tokens')
+           1128 CALL                     1
+           1136 COPY                     1
+           1138 POP_JUMP_IF_TRUE        36 (to 1212)
+           1140 POP_TOP
+           1142 LOAD_FAST                0 (raw)
+           1144 LOAD_ATTR               11 (NULL|self + get)
+           1164 LOAD_CONST              25 ('总tokens')
+           1166 CALL                     1
+           1174 COPY                     1
+           1176 POP_JUMP_IF_TRUE        17 (to 1212)
+           1178 POP_TOP
+           1180 LOAD_FAST                0 (raw)
+           1182 LOAD_ATTR               11 (NULL|self + get)
+           1202 LOAD_CONST              26 ('总Token')
+           1204 CALL                     1
+        >> 1212 CALL                     1
+           1220 STORE_FAST              10 (total_tokens)
+
+ 93        1222 LOAD_FAST               10 (total_tokens)
+           1224 LOAD_CONST               6 (0)
+           1226 COMPARE_OP              26 (<=)
+           1230 POP_JUMP_IF_FALSE        5 (to 1242)
+
+ 94        1232 LOAD_FAST                8 (prompt_tokens)
+           1234 LOAD_FAST                9 (completion_tokens)
+           1236 BINARY_OP                0 (+)
+           1240 STORE_FAST              10 (total_tokens)
+
+ 96     >> 1242 LOAD_GLOBAL             31 (NULL + next)
+           1252 LOAD_CONST              27 (<code object <genexpr> at <address>, file "xiaoguan_classifier\taxonomy.py", line 96>)
+           1254 MAKE_FUNCTION            0
+           1256 LOAD_FAST                1 (taxonomy)
+           1258 GET_ITER
+           1260 CALL                     0
+           1268 LOAD_GLOBAL             31 (NULL + next)
+           1278 LOAD_GLOBAL             33 (NULL + iter)
+           1288 LOAD_FAST                1 (taxonomy)
+           1290 CALL                     1
+           1298 CALL                     1
+           1306 CALL                     2
+           1314 STORE_FAST              11 (pending_category)
+
+ 97        1316 LOAD_FAST                6 (confidence)
+           1318 LOAD_CONST              28 (0.6)
+           1320 COMPARE_OP               2 (<)
+           1324 POP_JUMP_IF_FALSE       17 (to 1360)
+           1326 LOAD_FAST                2 (category)
+           1328 LOAD_FAST               11 (pending_category)
+           1330 COMPARE_OP              55 (!=)
+           1334 POP_JUMP_IF_FALSE       12 (to 1360)
+
+ 98        1336 LOAD_FAST               11 (pending_category)
+           1338 STORE_FAST               2 (category)
+
+ 99        1340 LOAD_FAST                1 (taxonomy)
+           1342 LOAD_FAST                2 (category)
+           1344 BINARY_SUBSCR
+           1348 LOAD_CONST               6 (0)
+           1350 BINARY_SUBSCR
+           1354 STORE_FAST               3 (subcategory)
+
+100        1356 LOAD_CONST              29 ('低置信度待人工复核')
+           1358 STORE_FAST               4 (detail)
+
+102     >> 1360 LOAD_GLOBAL              5 (NULL + Classification)
+           1370 LOAD_FAST                2 (category)
+           1372 LOAD_FAST                3 (subcategory)
+           1374 LOAD_FAST                4 (detail)
+           1376 LOAD_FAST                5 (form)
+           1378 LOAD_FAST                6 (confidence)
+           1380 LOAD_FAST                7 (reason)
+           1382 LOAD_FAST                8 (prompt_tokens)
+           1384 LOAD_FAST                9 (completion_tokens)
+           1386 LOAD_FAST               10 (total_tokens)
+           1388 CALL                     9
+           1396 RETURN_VALUE
+        >> 1398 PUSH_EXC_INFO
+
+ 86        1400 LOAD_GLOBAL             20 (TypeError)
+           1410 LOAD_GLOBAL             22 (ValueError)
+           1420 BUILD_TUPLE              2
+           1422 CHECK_EXC_MATCH
+           1424 POP_JUMP_IF_FALSE        6 (to 1438)
+           1426 POP_TOP
+
+ 87        1428 LOAD_CONST              14 (0.0)
+           1430 STORE_FAST               6 (confidence)
+           1432 POP_EXCEPT
+           1434 EXTENDED_ARG             1
+           1436 JUMP_BACKWARD          371 (to 696)
+
+ 86     >> 1438 RERAISE                  0
+        >> 1440 COPY                     3
+           1442 POP_EXCEPT
+           1444 RERAISE                  1
+ExceptionTable:
+  598 to 694 -> 1398 [0]
+  1398 to 1430 -> 1440 [1] lasti
+  1438 to 1438 -> 1440 [1] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\taxonomy.py", line 96>:
+ 96           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                11 (to 34)
+             12 STORE_FAST               1 (item)
+             14 LOAD_CONST               0 ('待筛')
+             16 LOAD_FAST                1 (item)
+             18 CONTAINS_OP              0
+             20 POP_JUMP_IF_TRUE         1 (to 24)
+             22 JUMP_BACKWARD            8 (to 8)
+        >>   24 LOAD_FAST                1 (item)
+             26 YIELD_VALUE              1
+             28 RESUME                   1
+             30 POP_TOP
+             32 JUMP_BACKWARD           13 (to 8)
+        >>   34 END_FOR
+             36 RETURN_CONST             1 (None)
+        >>   38 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             40 RERAISE                  1
+ExceptionTable:
+  4 to 20 -> 38 [0] lasti
+  24 to 36 -> 38 [0] lasti
+
+Disassembly of <code object _safe_int at <address>, file "xiaoguan_classifier\taxonomy.py", line 105>:
+105           0 RESUME                   0
+
+106           2 NOP
+
+107           4 LOAD_GLOBAL              1 (NULL + max)
+             14 LOAD_CONST               1 (0)
+             16 LOAD_GLOBAL              3 (NULL + int)
+             26 LOAD_FAST                0 (value)
+             28 COPY                     1
+             30 POP_JUMP_IF_TRUE         2 (to 36)
+             32 POP_TOP
+             34 LOAD_CONST               1 (0)
+        >>   36 CALL                     1
+             44 CALL                     2
+             52 RETURN_VALUE
+        >>   54 PUSH_EXC_INFO
+
+108          56 LOAD_GLOBAL              4 (TypeError)
+             66 LOAD_GLOBAL              6 (ValueError)
+             76 BUILD_TUPLE              2
+             78 CHECK_EXC_MATCH
+             80 POP_JUMP_IF_FALSE        3 (to 88)
+             82 POP_TOP
+
+109          84 POP_EXCEPT
+             86 RETURN_CONST             1 (0)
+
+108     >>   88 RERAISE                  0
+        >>   90 COPY                     3
+             92 POP_EXCEPT
+             94 RERAISE                  1
+ExceptionTable:
+  4 to 50 -> 54 [0]
+  54 to 82 -> 90 [1] lasti
+  88 to 88 -> 90 [1] lasti
+
+Disassembly of <code object build_material_filename at <address>, file "xiaoguan_classifier\taxonomy.py", line 112>:
+112           0 RESUME                   0
+
+121           2 LOAD_GLOBAL              1 (NULL + normalize_classification)
+             12 LOAD_FAST                0 (classification)
+             14 LOAD_FAST                6 (taxonomy)
+             16 CALL                     2
+             24 STORE_FAST               7 (cls)
+
+122          26 LOAD_FAST                3 (suffix)
+             28 LOAD_ATTR                3 (NULL|self + startswith)
+             48 LOAD_CONST               1 ('.')
+             50 CALL                     1
+             58 POP_JUMP_IF_FALSE        2 (to 64)
+             60 LOAD_FAST                3 (suffix)
+             62 JUMP_FORWARD             4 (to 72)
+        >>   64 LOAD_CONST               1 ('.')
+             66 LOAD_FAST                3 (suffix)
+             68 FORMAT_VALUE             0
+             70 BUILD_STRING             2
+        >>   72 STORE_FAST               3 (suffix)
+
+124          74 LOAD_FAST                5 (product_name)
+
+125          76 LOAD_GLOBAL              5 (NULL + safe_filename_part)
+             86 LOAD_FAST                7 (cls)
+             88 LOAD_ATTR                6 (subcategory)
+            108 CALL                     1
+
+126         116 LOAD_GLOBAL              5 (NULL + safe_filename_part)
+            126 LOAD_FAST                7 (cls)
+            128 LOAD_ATTR                8 (detail)
+            148 CALL                     1
+
+127         156 LOAD_GLOBAL              5 (NULL + safe_filename_part)
+            166 LOAD_FAST                7 (cls)
+            168 LOAD_ATTR               10 (form)
+            188 CALL                     1
+
+128         196 LOAD_GLOBAL              5 (NULL + safe_filename_part)
+            206 LOAD_FAST                1 (date_code)
+            208 CALL                     1
+
+129         216 LOAD_FAST                2 (sequence)
+            218 LOAD_CONST               2 ('02d')
+            220 FORMAT_VALUE             4 (with format)
+
+123         222 BUILD_LIST               6
+            224 STORE_FAST               8 (parts)
+
+131         226 LOAD_CONST               3 ('_')
+            228 LOAD_ATTR               13 (NULL|self + join)
+            248 LOAD_FAST                8 (parts)
+            250 CALL                     1
+            258 LOAD_FAST                3 (suffix)
+            260 LOAD_ATTR               15 (NULL|self + lower)
+            280 CALL                     0
+            288 BINARY_OP                0 (+)
+            292 RETURN_VALUE
+
+Disassembly of <code object is_category_dir at <address>, file "xiaoguan_classifier\taxonomy.py", line 134>:
+134           0 RESUME                   0
+
+135           2 LOAD_FAST                0 (path)
+              4 LOAD_ATTR                0 (name)
+             24 LOAD_GLOBAL              2 (TAXONOMY)
+             34 CONTAINS_OP              0
+             36 COPY                     1
+             38 POP_JUMP_IF_TRUE        15 (to 70)
+             40 POP_TOP
+             42 LOAD_FAST                0 (path)
+             44 LOAD_ATTR                0 (name)
+             64 LOAD_CONST               1 ('outputs')
+             66 COMPARE_OP              40 (==)
+        >>   70 RETURN_VALUE
