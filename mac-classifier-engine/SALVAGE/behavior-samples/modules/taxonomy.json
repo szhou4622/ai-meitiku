@@ -1,0 +1,260 @@
+{
+  "module": "xiaoguan_classifier.taxonomy",
+  "bytecode_sha256": "5eb286c7b1a375ba2d37fffa238b8d2b8e0854db79c38fd2a430df37aa4b1b5d",
+  "observed_in_classification_run": true,
+  "sample_count": 6,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "<module>",
+      "calls": 7,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "Classification",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "__create_fn__",
+      "calls": 6,
+      "input": {
+        "__dataclass_type_category__": "str",
+        "__dataclass_type_subcategory__": "str",
+        "__dataclass_type_detail__": "str",
+        "__dataclass_type_form__": "str",
+        "__dataclass_type_confidence__": "float",
+        "__dataclass_type_reason__": "str",
+        "__dataclass_type_prompt_tokens__": "<redacted:str>",
+        "__dataclass_type_completion_tokens__": "<redacted:str>",
+        "__dataclass_type_total_tokens__": "<redacted:str>",
+        "__dataclass_HAS_DEFAULT_FACTORY__": {
+          "type": "_HAS_DEFAULT_FACTORY_CLASS",
+          "fields": {}
+        },
+        "__dataclass_builtins_object__": {
+          "type": "type",
+          "fields": "<builtins.mappingproxy>"
+        },
+        "__dataclass_dflt_reason__": "",
+        "__dataclass_dflt_prompt_tokens__": "<redacted:int>",
+        "__dataclass_dflt_completion_tokens__": "<redacted:int>",
+        "__dataclass_dflt_total_tokens__": "<redacted:int>",
+        "__dataclass_return_type__": null
+      },
+      "output": {
+        "type": "function",
+        "fields": {}
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "build_material_filename",
+      "calls": 1,
+      "input": {
+        "classification": {
+          "type": "Classification",
+          "fields": {
+            "category": "01_产品本体展示",
+            "subcategory": "冻干本体外观（形态/颜色/内部结构）",
+            "detail": "展示拿铁小方冻干外观",
+            "form": "特写",
+            "confidence": 0.99,
+            "reason": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示",
+            "prompt_tokens": "<redacted:int>",
+            "completion_tokens": "<redacted:int>",
+            "total_tokens": "<redacted:int>"
+          }
+        },
+        "date_code": "260328",
+        "sequence": 1,
+        "suffix": ".mp4",
+        "source_name": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+        "product_name": "宠物零食兔血冻干「拿铁小方」",
+        "taxonomy": {
+          "01_产品本体展示": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "外包装细节（含新旧包装）",
+              "内独立包装细节",
+              "冻干本体外观（形态/颜色/内部结构）"
+            ]
+          },
+          "02_食用场景应用": {
+            "type": "list",
+            "length": 4,
+            "items": [
+              "直接喂食互动",
+              "拌粮增香演示",
+              "复水食用演示",
+              "外出携带喂食"
+            ]
+          },
+          "03_适口性与宠物互动": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "单只宠物试吃",
+              "多只宠物采食互动",
+              "宠物主动取食"
+            ]
+          },
+          "04_核心卖点展示": {
+            "type": "list",
+            "length": 4,
+            "items": [
+              "原料比例标注展示",
+              "粗蛋白质参数展示",
+              "独立包装优势展示",
+              "多食用方法演示"
+            ]
+          },
+          "05_合规信息展示": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "储存方法说明",
+              "食用注意事项",
+              "产品属性提示（非兽药/主粮替代）"
+            ]
+          },
+          "06_促销活动素材": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "单袋活动价展示",
+              "买赠活动演示",
+              "到手价计算演示"
+            ]
+          },
+          "07_品牌与生产信息": {
+            "type": "list",
+            "length": 2,
+            "items": [
+              "包装品牌商/生产商信息",
+              "执行标准与质检标识"
+            ]
+          }
+        }
+      },
+      "output": "宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4"
+    },
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "normalize_classification",
+      "calls": 1,
+      "input": {
+        "raw": {
+          "type": "Classification",
+          "fields": {
+            "category": "01_产品本体展示",
+            "subcategory": "冻干本体外观（形态/颜色/内部结构）",
+            "detail": "展示拿铁小方冻干外观",
+            "form": "特写",
+            "confidence": 0.99,
+            "reason": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示",
+            "prompt_tokens": "<redacted:int>",
+            "completion_tokens": "<redacted:int>",
+            "total_tokens": "<redacted:int>"
+          }
+        },
+        "taxonomy": {
+          "01_产品本体展示": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "外包装细节（含新旧包装）",
+              "内独立包装细节",
+              "冻干本体外观（形态/颜色/内部结构）"
+            ]
+          },
+          "02_食用场景应用": {
+            "type": "list",
+            "length": 4,
+            "items": [
+              "直接喂食互动",
+              "拌粮增香演示",
+              "复水食用演示",
+              "外出携带喂食"
+            ]
+          },
+          "03_适口性与宠物互动": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "单只宠物试吃",
+              "多只宠物采食互动",
+              "宠物主动取食"
+            ]
+          },
+          "04_核心卖点展示": {
+            "type": "list",
+            "length": 4,
+            "items": [
+              "原料比例标注展示",
+              "粗蛋白质参数展示",
+              "独立包装优势展示",
+              "多食用方法演示"
+            ]
+          },
+          "05_合规信息展示": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "储存方法说明",
+              "食用注意事项",
+              "产品属性提示（非兽药/主粮替代）"
+            ]
+          },
+          "06_促销活动素材": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "单袋活动价展示",
+              "买赠活动演示",
+              "到手价计算演示"
+            ]
+          },
+          "07_品牌与生产信息": {
+            "type": "list",
+            "length": 2,
+            "items": [
+              "包装品牌商/生产商信息",
+              "执行标准与质检标识"
+            ]
+          }
+        }
+      },
+      "output": {
+        "type": "Classification",
+        "fields": {
+          "category": "01_产品本体展示",
+          "subcategory": "冻干本体外观（形态/颜色/内部结构）",
+          "detail": "展示拿铁小方冻干外观",
+          "form": "特写",
+          "confidence": 0.99,
+          "reason": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示",
+          "prompt_tokens": "<redacted:int>",
+          "completion_tokens": "<redacted:int>",
+          "total_tokens": "<redacted:int>"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.taxonomy",
+      "function": "safe_filename_part",
+      "calls": 4,
+      "input": {
+        "value": "冻干本体外观（形态/颜色/内部结构）",
+        "fallback": "未命名"
+      },
+      "output": "冻干本体外观（形态颜色内部结构）"
+    }
+  ],
+  "note": ""
+}

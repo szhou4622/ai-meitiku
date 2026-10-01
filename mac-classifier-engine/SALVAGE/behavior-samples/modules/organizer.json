@@ -1,0 +1,574 @@
+{
+  "module": "xiaoguan_classifier.organizer",
+  "bytecode_sha256": "0f604e3cd965fc9ac261b67dab7a4605253a5498eae4886707dae86cf8abe51c",
+  "observed_in_classification_run": true,
+  "sample_count": 19,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "<module>",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "organize_folder",
+      "calls": 1,
+      "input": {
+        "folder": "<input>",
+        "config": {
+          "type": "ProviderConfig",
+          "fields": {
+            "provider": "volcengine",
+            "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+            "model": "ep-20260408111308-zhqkv",
+            "api_key_env": "<redacted:str>",
+            "max_workers": 4,
+            "frame_count": 8,
+            "classification_mode": "balanced",
+            "smart_frames": true,
+            "auto_retry": false,
+            "max_tokens": "<redacted:int>"
+          }
+        },
+        "progress_callback": {
+          "type": "function",
+          "fields": {}
+        },
+        "output_root": "<output>",
+        "pause_event": null,
+        "template": {
+          "type": "ClassificationTemplate",
+          "fields": {
+            "template_id": "custom-1787753524437",
+            "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+            "product_name": "宠物零食兔血冻干「拿铁小方」",
+            "taxonomy": {
+              "01_产品本体展示": "<list>",
+              "02_食用场景应用": "<list>",
+              "03_适口性与宠物互动": "<list>",
+              "04_核心卖点展示": "<list>",
+              "05_合规信息展示": "<list>",
+              "06_促销活动素材": "<list>",
+              "07_品牌与生产信息": "<list>"
+            },
+            "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+            "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+            "updated_at": "2026-09-12T07:15:56.180Z"
+          }
+        },
+        "review_only": false
+      },
+      "output": {
+        "count": 1,
+        "todo_count": 1,
+        "copied_count": 1,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "pending_count": 0,
+        "request_count": 1,
+        "request_success_count": 1,
+        "request_failed_count": 0,
+        "request_timeout_count": 0,
+        "prompt_tokens": "<redacted:int>",
+        "completion_tokens": "<redacted:int>",
+        "total_tokens": "<redacted:int>",
+        "manifest": "<output>/outputs/分类清单.csv",
+        "pending": "<output>/outputs/待筛清单.csv",
+        "failed": "<output>/outputs/失败清单.csv",
+        "resume": "<output>/outputs/整理断点记录.jsonl",
+        "log": "<output>/outputs/操作日志.json",
+        "report": "<output>/outputs/整理日志_20260916_160435.md",
+        "undo": "<output>/outputs/清理本次分类副本.bat",
+        "classification_root": "<output>",
+        "duration": "15秒"
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_effective_config",
+      "calls": 1,
+      "input": {
+        "config": {
+          "type": "ProviderConfig",
+          "fields": {
+            "provider": "volcengine",
+            "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+            "model": "ep-20260408111308-zhqkv",
+            "api_key_env": "<redacted:str>",
+            "max_workers": 4,
+            "frame_count": 8,
+            "classification_mode": "balanced",
+            "smart_frames": true,
+            "auto_retry": false,
+            "max_tokens": "<redacted:int>"
+          }
+        }
+      },
+      "output": {
+        "type": "ProviderConfig",
+        "fields": {
+          "provider": "volcengine",
+          "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+          "model": "ep-20260408111308-zhqkv",
+          "api_key_env": "<redacted:str>",
+          "max_workers": 4,
+          "frame_count": 8,
+          "classification_mode": "balanced",
+          "smart_frames": true,
+          "auto_retry": false,
+          "max_tokens": "<redacted:int>"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_resolve_library_root",
+      "calls": 1,
+      "input": {
+        "folder": "<input>",
+        "output_root": "<output>"
+      },
+      "output": "<output>"
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_resolve_output_roots",
+      "calls": 1,
+      "input": {
+        "library_root": "<output>",
+        "template": {
+          "type": "ClassificationTemplate",
+          "fields": {
+            "template_id": "custom-1787753524437",
+            "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+            "product_name": "宠物零食兔血冻干「拿铁小方」",
+            "taxonomy": {
+              "01_产品本体展示": "<list>",
+              "02_食用场景应用": "<list>",
+              "03_适口性与宠物互动": "<list>",
+              "04_核心卖点展示": "<list>",
+              "05_合规信息展示": "<list>",
+              "06_促销活动素材": "<list>",
+              "07_品牌与生产信息": "<list>"
+            },
+            "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+            "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+            "updated_at": "2026-09-12T07:15:56.180Z"
+          }
+        }
+      },
+      "output": {
+        "type": "tuple",
+        "length": 2,
+        "items": [
+          "<output>",
+          "<output>/outputs"
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_migrate_legacy_classification_root",
+      "calls": 4,
+      "input": {
+        "legacy_root": "<input>/分类结果",
+        "classification_root": "<output>",
+        "progress_callback": {
+          "type": "function",
+          "fields": {}
+        }
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_exclude_nested_output_dirs",
+      "calls": 1,
+      "input": {
+        "materials": {
+          "type": "list",
+          "length": 1,
+          "items": [
+            "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+          ]
+        },
+        "folder": "<input>"
+      },
+      "exception": {
+        "type": "ValueError",
+        "message": "'<output>' is not in the subpath of '<input>'"
+      },
+      "output": {
+        "type": "list",
+        "length": 1,
+        "items": [
+          "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_load_resume_records",
+      "calls": 1,
+      "input": {
+        "path": "<output>/outputs/整理断点记录.jsonl",
+        "template": {
+          "type": "ClassificationTemplate",
+          "fields": {
+            "template_id": "custom-1787753524437",
+            "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+            "product_name": "宠物零食兔血冻干「拿铁小方」",
+            "taxonomy": {
+              "01_产品本体展示": "<list>",
+              "02_食用场景应用": "<list>",
+              "03_适口性与宠物互动": "<list>",
+              "04_核心卖点展示": "<list>",
+              "05_合规信息展示": "<list>",
+              "06_促销活动素材": "<list>",
+              "07_品牌与生产信息": "<list>"
+            },
+            "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+            "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+            "updated_at": "2026-09-12T07:15:56.180Z"
+          }
+        }
+      },
+      "output": {}
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_source_signature",
+      "calls": 2,
+      "input": {
+        "path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4"
+      },
+      "output": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4|514445|1787753581"
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_emit",
+      "calls": 7,
+      "input": {
+        "callback": {
+          "type": "function",
+          "fields": {}
+        },
+        "message": "找到 1 个素材，本次需要识别 1 个。全量/断点续跑，稳准模式，并发数 4，每条视频抽 8 帧智能拼图。"
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_wait_if_paused",
+      "calls": 2,
+      "input": {
+        "pause_event": null,
+        "progress_callback": {
+          "type": "function",
+          "fields": {}
+        }
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_copy_classified_item",
+      "calls": 1,
+      "input": {
+        "item": {
+          "index": 1,
+          "src": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+          "source": {
+            "type": "SourceInfo",
+            "fields": {
+              "source_type": "<str>",
+              "source_name": "<str>",
+              "relative_path": "<str>"
+            }
+          },
+          "classification": {
+            "type": "Classification",
+            "fields": {
+              "category": "<str>",
+              "subcategory": "<str>",
+              "detail": "<str>",
+              "form": "<str>",
+              "confidence": "<float>",
+              "reason": "<str>",
+              "prompt_tokens": "<redacted:int>",
+              "completion_tokens": "<redacted:int>",
+              "total_tokens": "<redacted:int>"
+            }
+          }
+        },
+        "folder": "<input>",
+        "classification_root": "<output>",
+        "counters": {},
+        "template": {
+          "type": "ClassificationTemplate",
+          "fields": {
+            "template_id": "custom-1787753524437",
+            "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+            "product_name": "宠物零食兔血冻干「拿铁小方」",
+            "taxonomy": {
+              "01_产品本体展示": "<list>",
+              "02_食用场景应用": "<list>",
+              "03_适口性与宠物互动": "<list>",
+              "04_核心卖点展示": "<list>",
+              "05_合规信息展示": "<list>",
+              "06_促销活动素材": "<list>",
+              "07_品牌与生产信息": "<list>"
+            },
+            "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+            "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+            "updated_at": "2026-09-12T07:15:56.180Z"
+          }
+        }
+      },
+      "output": {
+        "type": "tuple",
+        "length": 2,
+        "items": [
+          {
+            "序号": "1",
+            "原文件路径": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+            "原相对路径": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+            "新文件路径": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+            "素材拍摄日期": "2026-03-28",
+            "命名日期": "260328",
+            "日期来源": "filename_date:original_shoot_date",
+            "素材来源": "自有素材",
+            "来源名称": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+            "一级分类": "01_产品本体展示",
+            "二级分类": "冻干本体外观（形态/颜色/内部结构）",
+            "具体画面": "展示拿铁小方冻干外观",
+            "景别或形态": "特写",
+            "置信度": "0.99",
+            "输入Token": "<redacted:str>",
+            "输出Token": "<redacted:str>",
+            "总Token": "<redacted:str>",
+            "失败类型": "",
+            "原因": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示"
+          },
+          {
+            "action": "copy",
+            "old_path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+            "new_path": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+            "shoot_date": "2026-03-28",
+            "date_code": "260328",
+            "date_source": "filename_date:original_shoot_date",
+            "source_type": "自有素材",
+            "source_name": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+            "prompt_tokens": "<redacted:str>",
+            "completion_tokens": "<redacted:str>",
+            "total_tokens": "<redacted:str>",
+            "classification": "{\"category\": \"01_产品本体展示\", \"subcategory\": \"冻干本体外观（形态/颜色/内部结构）\", \"detail\": \"展示拿铁小方冻干外观\", \"form\": \"特写\", \"confidence\": 0.99, \"reason\": \"画面特写展示宠物冻干的形态颜色外观，属于产品本体展示\", \"prompt_tokens\": 2478, \"completion_tokens\": 722, \"total_tokens\": 3200}"
+          }
+        ]
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_unique_destination",
+      "calls": 1,
+      "input": {
+        "dest_dir": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）",
+        "base_name": "宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4"
+      },
+      "output": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4"
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_append_resume_record",
+      "calls": 1,
+      "input": {
+        "path": "<output>/outputs/整理断点记录.jsonl",
+        "row": {
+          "序号": "1",
+          "原文件路径": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+          "原相对路径": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+          "新文件路径": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+          "素材拍摄日期": "2026-03-28",
+          "命名日期": "260328",
+          "日期来源": "filename_date:original_shoot_date",
+          "素材来源": "自有素材",
+          "来源名称": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+          "一级分类": "01_产品本体展示",
+          "二级分类": "冻干本体外观（形态/颜色/内部结构）",
+          "具体画面": "展示拿铁小方冻干外观",
+          "景别或形态": "特写",
+          "置信度": "0.99",
+          "输入Token": "<redacted:str>",
+          "输出Token": "<redacted:str>",
+          "总Token": "<redacted:str>",
+          "失败类型": "",
+          "原因": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示"
+        },
+        "operation": {
+          "action": "copy",
+          "old_path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+          "new_path": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+          "shoot_date": "2026-03-28",
+          "date_code": "260328",
+          "date_source": "filename_date:original_shoot_date",
+          "source_type": "自有素材",
+          "source_name": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+          "prompt_tokens": "<redacted:str>",
+          "completion_tokens": "<redacted:str>",
+          "total_tokens": "<redacted:str>",
+          "classification": "{\"category\": \"01_产品本体展示\", \"subcategory\": \"冻干本体外观（形态/颜色/内部结构）\", \"detail\": \"展示拿铁小方冻干外观\", \"form\": \"特写\", \"confidence\": 0.99, \"reason\": \"画面特写展示宠物冻干的形态颜色外观，属于产品本体展示\", \"prompt_tokens\": 2478, \"completion_tokens\": 722, \"total_tokens\": 3200}"
+        },
+        "template": {
+          "type": "ClassificationTemplate",
+          "fields": {
+            "template_id": "custom-1787753524437",
+            "name": "宝迪路拿铁小方宠物冻干素材分类草案",
+            "product_name": "宠物零食兔血冻干「拿铁小方」",
+            "taxonomy": {
+              "01_产品本体展示": "<list>",
+              "02_食用场景应用": "<list>",
+              "03_适口性与宠物互动": "<list>",
+              "04_核心卖点展示": "<list>",
+              "05_合规信息展示": "<list>",
+              "06_促销活动素材": "<list>",
+              "07_品牌与生产信息": "<list>"
+            },
+            "rules": "<str length=423 sha256=e7bc37f0cb186256>",
+            "naming_rule": "宝迪路拿铁小方_二级分类_具体画面_景别或形态_素材拍摄日期_序号",
+            "updated_at": "2026-09-12T07:15:56.180Z"
+          }
+        }
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "organize_folder.<locals>.<genexpr>",
+      "calls": 4,
+      "input": {
+        ".0": "<builtins.list_iterator>"
+      },
+      "output": 1
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_format_duration",
+      "calls": 1,
+      "input": {
+        "started_at": "<datetime.datetime>",
+        "ended_at": "<datetime.datetime>"
+      },
+      "output": "15秒"
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_write_csv",
+      "calls": 3,
+      "input": {
+        "path": "<output>/outputs/分类清单.csv",
+        "rows": {
+          "type": "list",
+          "length": 1,
+          "items": [
+            {
+              "序号": "1",
+              "原文件路径": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+              "原相对路径": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+              "新文件路径": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+              "素材拍摄日期": "2026-03-28",
+              "命名日期": "260328",
+              "日期来源": "filename_date:original_shoot_date",
+              "素材来源": "自有素材",
+              "来源名称": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+              "一级分类": "01_产品本体展示",
+              "二级分类": "冻干本体外观（形态/颜色/内部结构）",
+              "具体画面": "展示拿铁小方冻干外观",
+              "景别或形态": "特写",
+              "置信度": "0.99",
+              "输入Token": "<redacted:str>",
+              "输出Token": "<redacted:str>",
+              "总Token": "<redacted:str>",
+              "失败类型": "",
+              "原因": "画面特写展示宠物冻干的形态颜色外观，属于产品本体展示"
+            }
+          ]
+        }
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_write_cleanup_script",
+      "calls": 1,
+      "input": {
+        "path": "<output>/outputs/清理本次分类副本.bat",
+        "operations": {
+          "type": "list",
+          "length": 1,
+          "items": [
+            {
+              "action": "copy",
+              "old_path": "<input>/下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-内部结构）_展示拿铁小方冻干本体外观_特写_260328_01.mp4",
+              "new_path": "<output>/01_产品本体展示/冻干本体外观（形态/颜色/内部结构）/宠物零食兔血冻干「拿铁小方」_冻干本体外观（形态颜色内部结构）_展示拿铁小方冻干外观_特写_260328_01.mp4",
+              "shoot_date": "2026-03-28",
+              "date_code": "260328",
+              "date_source": "filename_date:original_shoot_date",
+              "source_type": "自有素材",
+              "source_name": "下载 (23)-原拍摄日期260328-镜头10-000021667-000022800_宝迪路拿铁小方_冻干本体外观（形态-颜色-结构）_展示拿铁小方冻干本体外观_特写_260328_01",
+              "prompt_tokens": "<redacted:str>",
+              "completion_tokens": "<redacted:str>",
+              "total_tokens": "<redacted:str>",
+              "classification": "{\"category\": \"01_产品本体展示\", \"subcategory\": \"冻干本体外观（形态/颜色/内部结构）\", \"detail\": \"展示拿铁小方冻干外观\", \"form\": \"特写\", \"confidence\": 0.99, \"reason\": \"画面特写展示宠物冻干的形态颜色外观，属于产品本体展示\", \"prompt_tokens\": 2478, \"completion_tokens\": 722, \"total_tokens\": 3200}"
+            }
+          ]
+        }
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.organizer",
+      "function": "_write_run_report",
+      "calls": 1,
+      "input": {
+        "path": "<output>/outputs/整理日志_20260916_160435.md",
+        "summary": {
+          "status": "成功",
+          "started_at": "2026-09-16 16:04:35",
+          "ended_at": "2026-09-16 16:04:50",
+          "duration": "15秒",
+          "source_folder": "<input>",
+          "output_root": "<output>",
+          "classification_root": "<output>",
+          "count": 1,
+          "todo_count": 1,
+          "copied_count": 1,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "pending_count": 0,
+          "request_count": 1,
+          "request_success_count": 1,
+          "request_failed_count": 0,
+          "request_timeout_count": 0,
+          "auto_retry": "否",
+          "prompt_tokens": "<redacted:int>",
+          "completion_tokens": "<redacted:int>",
+          "total_tokens": "<redacted:int>",
+          "provider": "volcengine",
+          "model": "ep-20260408111308-zhqkv",
+          "template_name": "宝迪路拿铁小方宠物冻干素材分类草案",
+          "template_product_name": "宠物零食兔血冻干「拿铁小方」",
+          "max_workers": 4,
+          "frame_count": 8,
+          "classification_mode": "稳准模式",
+          "review_only": "否",
+          "manifest": "<output>/outputs/分类清单.csv",
+          "<truncated>": 5
+        }
+      },
+      "output": null
+    }
+  ],
+  "note": ""
+}

@@ -1,0 +1,80 @@
+name: Build Windows and macOS installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "codex/**"
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            python_arch: x64
+          - arch: arm64
+            runner: macos-15
+            python_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          architecture: ${{ matrix.python_arch }}
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install --upgrade pip
+          python -m pip install -r mac-classifier-engine/requirements.txt
+      - name: Build native classifier engine
+        run: |
+          pyinstaller --noconfirm --clean --onefile --console \
+            --name "素材分类引擎" \
+            --paths mac-classifier-engine/src \
+            --add-data "mac-classifier-engine/src:src" \
+            --copy-metadata imageio \
+            --copy-metadata imageio-ffmpeg \
+            --copy-metadata requests \
+            --copy-metadata Pillow \
+            --copy-metadata numpy \
+            mac-classifier-engine/engine_entry.py
+          mkdir -p "bundled-classifier/bin/darwin-${{ matrix.arch }}"
+          cp "dist/素材分类引擎" "bundled-classifier/bin/darwin-${{ matrix.arch }}/素材分类引擎"
+          chmod +x "bundled-classifier/bin/darwin-${{ matrix.arch }}/素材分类引擎"
+      - name: Smoke-test native classifier engine
+        run: |
+          "bundled-classifier/bin/darwin-${{ matrix.arch }}/素材分类引擎" --self-test
+      - name: Bundle native FFmpeg
+        run: |
+          mkdir -p "bundled-tools/darwin-${{ matrix.arch }}"
+          python -c 'import imageio_ffmpeg, shutil; shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(), "bundled-tools/darwin-${{ matrix.arch }}/ffmpeg")'
+          chmod +x "bundled-tools/darwin-${{ matrix.arch }}/ffmpeg"
+      - name: Build web app and DMG
+        run: |
+          npm run desktop:icon
+          npm run build
+          npx electron-builder --mac dmg --${{ matrix.arch }} --publish never
+      - name: Publish DMG as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="combined-v0.1.0-${{ matrix.arch }}-20260819"
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --target "$GITHUB_SHA" \
+              --title "AI媒体库 v0.1.0 macOS ${{ matrix.arch }}" \
+              --notes "Current combined desktop app installer for macOS ${{ matrix.arch }}."
+          gh release upload "$tag" release/*.dmg --clobber

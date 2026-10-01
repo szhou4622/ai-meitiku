@@ -1,0 +1,44 @@
+{
+  "appId": "com.meixiaoqian.ai-media-library.device-diagnostic",
+  "productName": "AI媒体库设备核验工具",
+  "artifactName": "AI媒体库设备核验工具-${version}-${os}-${arch}.${ext}",
+  "asar": true,
+  "directories": {
+    "app": "build/device-diagnostic-app",
+    "output": "release/device-diagnostic"
+  },
+  "extraMetadata": {
+    "name": "ai-media-device-diagnostic",
+    "main": "electron/device-diagnostic-main.mjs",
+    "description": "AI媒体库设备冲突安全核验工具",
+    "dependencies": {}
+  },
+  "files": ["**/*", "!node_modules{,/**/*}"],
+  "electronFuses": {
+    "runAsNode": false,
+    "enableCookieEncryption": true,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableEmbeddedAsarIntegrityValidation": true,
+    "onlyLoadAppFromAsar": true,
+    "grantFileProtocolExtraPrivileges": false
+  },
+  "mac": {
+    "category": "public.app-category.utilities",
+    "icon": "../../build/icon.icns",
+    "minimumSystemVersion": "11.0",
+    "hardenedRuntime": true,
+    "target": ["dmg"]
+  },
+  "win": {
+    "icon": "../../build/icon.png",
+    "target": [{ "target": "nsis", "arch": ["x64"] }]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "AI媒体库设备核验工具"
+  }
+}

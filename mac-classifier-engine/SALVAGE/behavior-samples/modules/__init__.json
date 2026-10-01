@@ -1,0 +1,16 @@
+{
+  "module": "xiaoguan_classifier.__init__",
+  "bytecode_sha256": "4a11901cac144a5cffe815e98e890b3dca3c3e0caa8f644e1fc5a6102a3e703e",
+  "observed_in_classification_run": true,
+  "sample_count": 1,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier",
+      "function": "<module>",
+      "calls": 1,
+      "input": {},
+      "output": null
+    }
+  ],
+  "note": ""
+}

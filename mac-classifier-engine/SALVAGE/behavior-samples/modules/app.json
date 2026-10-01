@@ -1,0 +1,8 @@
+{
+  "module": "xiaoguan_classifier.app",
+  "bytecode_sha256": "88e6dfcc97e4ed53468bc591858c59758c7649e4660469c90bd9363e63848659",
+  "observed_in_classification_run": false,
+  "sample_count": 0,
+  "samples": [],
+  "note": "This module was not invoked by the classify command; see interface-map.md and disasm for its static contract."
+}

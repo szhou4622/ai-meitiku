@@ -1,0 +1,3677 @@
+module: xiaoguan_classifier.license_client
+bytecode: src/xiaoguan_classifier/license_client.pyc
+sha256: 363eeb15af8cadaf4fab69e223b19adc7b77ec144d2840a30d689702397589fe
+python: 3.12.14
+source_filename: xiaoguan_classifier\license_client.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 ('Server-backed activation and update checks for the material classifier.')
+              4 STORE_NAME               0 (__doc__)
+
+  3           6 LOAD_CONST               1 (0)
+              8 LOAD_CONST               2 (('annotations',))
+             10 IMPORT_NAME              1 (__future__)
+             12 IMPORT_FROM              2 (annotations)
+             14 STORE_NAME               2 (annotations)
+             16 POP_TOP
+
+  5          18 LOAD_CONST               1 (0)
+             20 LOAD_CONST               3 (None)
+             22 IMPORT_NAME              3 (base64)
+             24 STORE_NAME               3 (base64)
+
+  6          26 LOAD_CONST               1 (0)
+             28 LOAD_CONST               3 (None)
+             30 IMPORT_NAME              4 (ctypes)
+             32 STORE_NAME               4 (ctypes)
+
+  7          34 LOAD_CONST               1 (0)
+             36 LOAD_CONST               3 (None)
+             38 IMPORT_NAME              5 (hashlib)
+             40 STORE_NAME               5 (hashlib)
+
+  8          42 LOAD_CONST               1 (0)
+             44 LOAD_CONST               3 (None)
+             46 IMPORT_NAME              6 (json)
+             48 STORE_NAME               6 (json)
+
+  9          50 LOAD_CONST               1 (0)
+             52 LOAD_CONST               3 (None)
+             54 IMPORT_NAME              7 (os)
+             56 STORE_NAME               7 (os)
+
+ 10          58 LOAD_CONST               1 (0)
+             60 LOAD_CONST               3 (None)
+             62 IMPORT_NAME              8 (platform)
+             64 STORE_NAME               8 (platform)
+
+ 11          66 LOAD_CONST               1 (0)
+             68 LOAD_CONST               3 (None)
+             70 IMPORT_NAME              9 (re)
+             72 STORE_NAME               9 (re)
+
+ 12          74 LOAD_CONST               1 (0)
+             76 LOAD_CONST               3 (None)
+             78 IMPORT_NAME             10 (subprocess)
+             80 STORE_NAME              10 (subprocess)
+
+ 13          82 LOAD_CONST               1 (0)
+             84 LOAD_CONST               3 (None)
+             86 IMPORT_NAME             11 (sys)
+             88 STORE_NAME              11 (sys)
+
+ 14          90 LOAD_CONST               1 (0)
+             92 LOAD_CONST               3 (None)
+             94 IMPORT_NAME             12 (threading)
+             96 STORE_NAME              12 (threading)
+
+ 15          98 LOAD_CONST               1 (0)
+            100 LOAD_CONST               3 (None)
+            102 IMPORT_NAME             13 (time)
+            104 STORE_NAME              13 (time)
+
+ 16         106 LOAD_CONST               1 (0)
+            108 LOAD_CONST               3 (None)
+            110 IMPORT_NAME             14 (urllib.error)
+            112 STORE_NAME              15 (urllib)
+
+ 17         114 LOAD_CONST               1 (0)
+            116 LOAD_CONST               3 (None)
+            118 IMPORT_NAME             16 (urllib.request)
+            120 STORE_NAME              15 (urllib)
+
+ 18         122 LOAD_CONST               1 (0)
+            124 LOAD_CONST               3 (None)
+            126 IMPORT_NAME             17 (uuid)
+            128 STORE_NAME              17 (uuid)
+
+ 19         130 LOAD_CONST               1 (0)
+            132 LOAD_CONST               3 (None)
+            134 IMPORT_NAME             18 (webbrowser)
+            136 STORE_NAME              18 (webbrowser)
+
+ 20         138 LOAD_CONST               1 (0)
+            140 LOAD_CONST               4 (('wintypes',))
+            142 IMPORT_NAME              4 (ctypes)
+            144 IMPORT_FROM             19 (wintypes)
+            146 STORE_NAME              19 (wintypes)
+            148 POP_TOP
+
+ 21         150 LOAD_CONST               1 (0)
+            152 LOAD_CONST               5 (('datetime', 'timezone'))
+            154 IMPORT_NAME             20 (datetime)
+            156 IMPORT_FROM             20 (datetime)
+            158 STORE_NAME              20 (datetime)
+            160 IMPORT_FROM             21 (timezone)
+            162 STORE_NAME              21 (timezone)
+            164 POP_TOP
+
+ 22         166 LOAD_CONST               1 (0)
+            168 LOAD_CONST               6 (('Path',))
+            170 IMPORT_NAME             22 (pathlib)
+            172 IMPORT_FROM             23 (Path)
+            174 STORE_NAME              23 (Path)
+            176 POP_TOP
+
+ 23         178 LOAD_CONST               1 (0)
+            180 LOAD_CONST               7 (('END', 'LEFT', 'RIGHT', 'X', 'Button', 'Entry', 'Frame', 'Label', 'StringVar', 'Tk', 'messagebox'))
+            182 IMPORT_NAME             24 (tkinter)
+            184 IMPORT_FROM             25 (END)
+            186 STORE_NAME              25 (END)
+            188 IMPORT_FROM             26 (LEFT)
+            190 STORE_NAME              26 (LEFT)
+            192 IMPORT_FROM             27 (RIGHT)
+            194 STORE_NAME              27 (RIGHT)
+            196 IMPORT_FROM             28 (X)
+            198 STORE_NAME              28 (X)
+            200 IMPORT_FROM             29 (Button)
+            202 STORE_NAME              29 (Button)
+            204 IMPORT_FROM             30 (Entry)
+            206 STORE_NAME              30 (Entry)
+            208 IMPORT_FROM             31 (Frame)
+            210 STORE_NAME              31 (Frame)
+            212 IMPORT_FROM             32 (Label)
+            214 STORE_NAME              32 (Label)
+            216 IMPORT_FROM             33 (StringVar)
+            218 STORE_NAME              33 (StringVar)
+            220 IMPORT_FROM             34 (Tk)
+            222 STORE_NAME              34 (Tk)
+            224 IMPORT_FROM             35 (messagebox)
+            226 STORE_NAME              35 (messagebox)
+            228 POP_TOP
+
+ 26         230 LOAD_CONST               8 ('DadaoMaterialClassifier')
+            232 STORE_NAME              36 (APP_NAME)
+
+ 27         234 LOAD_CONST               9 ('素材分类工作台')
+            236 STORE_NAME              37 (DISPLAY_NAME)
+
+ 28         238 LOAD_CONST              10 ('0.1.0')
+            240 STORE_NAME              38 (SOFTWARE_VERSION)
+
+ 29         242 LOAD_CONST              11 ('https://license.dadaozixun.com/api/license/activate')
+            244 STORE_NAME              39 (ACTIVATE_URL)
+
+ 30         246 LOAD_CONST              12 ('https://update.dadaozixun.com/api/update/latest?app_name=')
+            248 LOAD_NAME               36 (APP_NAME)
+            250 FORMAT_VALUE             0
+            252 BUILD_STRING             2
+            254 STORE_NAME              40 (UPDATE_URL)
+
+ 31         256 LOAD_CONST              13 (12)
+            258 STORE_NAME              41 (REQUEST_TIMEOUT_SECONDS)
+
+ 32         260 LOAD_CONST              14 (6)
+            262 STORE_NAME              42 (UPDATE_TIMEOUT_SECONDS)
+
+ 33         264 LOAD_CONST              15 (259200)
+            266 STORE_NAME              43 (OFFLINE_GRACE_SECONDS)
+
+ 34         268 LOAD_CONST              16 (300)
+            270 STORE_NAME              44 (TIME_ROLLBACK_TOLERANCE_SECONDS)
+
+ 37         272 PUSH_NULL
+            274 LOAD_BUILD_CLASS
+            276 LOAD_CONST              17 (<code object LicenseError at <address>, file "xiaoguan_classifier\license_client.py", line 37>)
+            278 MAKE_FUNCTION            0
+            280 LOAD_CONST              18 ('LicenseError')
+            282 LOAD_NAME               45 (RuntimeError)
+            284 CALL                     3
+            292 STORE_NAME              46 (LicenseError)
+
+ 41         294 PUSH_NULL
+            296 LOAD_BUILD_CLASS
+            298 LOAD_CONST              19 (<code object ConnectivityError at <address>, file "xiaoguan_classifier\license_client.py", line 41>)
+            300 MAKE_FUNCTION            0
+            302 LOAD_CONST              20 ('ConnectivityError')
+            304 LOAD_NAME               46 (LicenseError)
+            306 CALL                     3
+            314 STORE_NAME              47 (ConnectivityError)
+
+ 45         316 PUSH_NULL
+            318 LOAD_BUILD_CLASS
+            320 LOAD_CONST              21 (<code object ServerRejectedError at <address>, file "xiaoguan_classifier\license_client.py", line 45>)
+            322 MAKE_FUNCTION            0
+            324 LOAD_CONST              22 ('ServerRejectedError')
+            326 LOAD_NAME               46 (LicenseError)
+            328 CALL                     3
+            336 STORE_NAME              48 (ServerRejectedError)
+
+ 49         338 PUSH_NULL
+            340 LOAD_BUILD_CLASS
+            342 LOAD_CONST              23 (<code object DATA_BLOB at <address>, file "xiaoguan_classifier\license_client.py", line 49>)
+            344 MAKE_FUNCTION            0
+            346 LOAD_CONST              24 ('DATA_BLOB')
+            348 LOAD_NAME                4 (ctypes)
+            350 LOAD_ATTR               98 (Structure)
+            370 CALL                     3
+            378 STORE_NAME              50 (DATA_BLOB)
+
+ 53         380 LOAD_CONST              55 (('return', 'str'))
+            382 LOAD_CONST              25 (<code object _utc_now at <address>, file "xiaoguan_classifier\license_client.py", line 53>)
+            384 MAKE_FUNCTION            4 (annotations)
+            386 STORE_NAME              51 (_utc_now)
+
+ 57         388 LOAD_CONST              56 (('value', 'object', 'return', 'float | None'))
+            390 LOAD_CONST              26 (<code object _parse_time at <address>, file "xiaoguan_classifier\license_client.py", line 57>)
+            392 MAKE_FUNCTION            4 (annotations)
+            394 STORE_NAME              52 (_parse_time)
+
+ 77         396 LOAD_CONST              57 (('source', 'object', 'keys', 'str', 'return', 'str'))
+            398 LOAD_CONST              27 (<code object _first_text at <address>, file "xiaoguan_classifier\license_client.py", line 77>)
+            400 MAKE_FUNCTION            4 (annotations)
+            402 STORE_NAME              53 (_first_text)
+
+ 87         404 LOAD_CONST              58 (('value', 'object', 'return', 'bool'))
+            406 LOAD_CONST              28 (<code object _as_bool at <address>, file "xiaoguan_classifier\license_client.py", line 87>)
+            408 MAKE_FUNCTION            4 (annotations)
+            410 STORE_NAME              54 (_as_bool)
+
+ 93         412 LOAD_CONST              59 (('result', 'object', 'return', 'dict[str, object]'))
+            414 LOAD_CONST              29 (<code object _license_payload at <address>, file "xiaoguan_classifier\license_client.py", line 93>)
+            416 MAKE_FUNCTION            4 (annotations)
+            418 STORE_NAME              55 (_license_payload)
+
+103         420 LOAD_CONST              60 ((0,))
+            422 LOAD_CONST              61 (('result', 'object', 'status', 'int', 'return', 'str'))
+            424 LOAD_CONST              30 (<code object _server_message at <address>, file "xiaoguan_classifier\license_client.py", line 103>)
+            426 MAKE_FUNCTION            5 (defaults, annotations)
+            428 STORE_NAME              56 (_server_message)
+
+108         430 LOAD_CONST              55 (('return', 'str'))
+            432 LOAD_CONST              31 (<code object _machine_source at <address>, file "xiaoguan_classifier\license_client.py", line 108>)
+            434 MAKE_FUNCTION            4 (annotations)
+            436 STORE_NAME              57 (_machine_source)
+
+124         438 LOAD_CONST              55 (('return', 'str'))
+            440 LOAD_CONST              32 (<code object machine_code at <address>, file "xiaoguan_classifier\license_client.py", line 124>)
+            442 MAKE_FUNCTION            4 (annotations)
+            444 STORE_NAME              58 (machine_code)
+
+130         446 LOAD_CONST              62 (('return', 'Path'))
+            448 LOAD_CONST              33 (<code object _state_directory at <address>, file "xiaoguan_classifier\license_client.py", line 130>)
+            450 MAKE_FUNCTION            4 (annotations)
+            452 STORE_NAME              59 (_state_directory)
+
+138         454 LOAD_CONST              62 (('return', 'Path'))
+            456 LOAD_CONST              34 (<code object license_path at <address>, file "xiaoguan_classifier\license_client.py", line 138>)
+            458 MAKE_FUNCTION            4 (annotations)
+            460 STORE_NAME              60 (license_path)
+
+142         462 LOAD_CONST              63 (('data', 'bytes', 'return', 'tuple[DATA_BLOB, object]'))
+            464 LOAD_CONST              35 (<code object _blob at <address>, file "xiaoguan_classifier\license_client.py", line 142>)
+            466 MAKE_FUNCTION            4 (annotations)
+            468 STORE_NAME              61 (_blob)
+
+147         470 LOAD_CONST              64 (('data', 'bytes', 'return', 'bytes'))
+            472 LOAD_CONST              36 (<code object _protect at <address>, file "xiaoguan_classifier\license_client.py", line 147>)
+            474 MAKE_FUNCTION            4 (annotations)
+            476 STORE_NAME              62 (_protect)
+
+172         478 LOAD_CONST              64 (('data', 'bytes', 'return', 'bytes'))
+            480 LOAD_CONST              37 (<code object _unprotect at <address>, file "xiaoguan_classifier\license_client.py", line 172>)
+            482 MAKE_FUNCTION            4 (annotations)
+            484 STORE_NAME              63 (_unprotect)
+
+197         486 LOAD_CONST              65 (('return', 'dict[str, object] | None'))
+            488 LOAD_CONST              38 (<code object _load_state at <address>, file "xiaoguan_classifier\license_client.py", line 197>)
+            490 MAKE_FUNCTION            4 (annotations)
+            492 STORE_NAME              64 (_load_state)
+
+213         494 LOAD_CONST              66 (('state', 'dict[str, object]', 'return', 'None'))
+            496 LOAD_CONST              39 (<code object _save_state at <address>, file "xiaoguan_classifier\license_client.py", line 213>)
+            498 MAKE_FUNCTION            4 (annotations)
+            500 STORE_NAME              65 (_save_state)
+
+224         502 LOAD_CONST              67 (('state', 'dict[str, object] | None', 'return', 'str'))
+            504 LOAD_CONST              40 (<code object _validate_local at <address>, file "xiaoguan_classifier\license_client.py", line 224>)
+            506 MAKE_FUNCTION            4 (annotations)
+            508 STORE_NAME              66 (_validate_local)
+
+246         510 LOAD_CONST              68 (('state', 'dict[str, object]', 'return', 'bool'))
+            512 LOAD_CONST              41 (<code object _can_use_offline at <address>, file "xiaoguan_classifier\license_client.py", line 246>)
+            514 MAKE_FUNCTION            4 (annotations)
+            516 STORE_NAME              67 (_can_use_offline)
+
+253         518 LOAD_CONST              69 (('activation_code', 'str', 'return', 'tuple[int, dict[str, object]]'))
+            520 LOAD_CONST              42 (<code object _request_activation at <address>, file "xiaoguan_classifier\license_client.py", line 253>)
+            522 MAKE_FUNCTION            4 (annotations)
+            524 STORE_NAME              68 (_request_activation)
+
+288         526 LOAD_CONST              70 (('message', 'str', 'license_data', 'dict[str, object]', 'return', 'str'))
+            528 LOAD_CONST              43 (<code object _explicit_rejection at <address>, file "xiaoguan_classifier\license_client.py", line 288>)
+            530 MAKE_FUNCTION            4 (annotations)
+            532 STORE_NAME              69 (_explicit_rejection)
+
+308         534 NOP
+
+309         536 NOP
+
+308         538 NOP
+
+310         540 NOP
+
+308         542 NOP
+
+311         544 NOP
+
+308         546 NOP
+
+312         548 NOP
+
+308         550 LOAD_CONST              71 (('activation_code', 'str', 'result', 'dict[str, object]', 'previous', 'dict[str, object] | None', 'return', 'dict[str, object]'))
+            552 LOAD_CONST              44 (<code object _state_from_response at <address>, file "xiaoguan_classifier\license_client.py", line 308>)
+            554 MAKE_FUNCTION            4 (annotations)
+            556 STORE_NAME              70 (_state_from_response)
+
+349         558 LOAD_CONST              72 ((None,))
+            560 LOAD_CONST              73 (('activation_code', 'str', 'previous', 'dict[str, object] | None', 'return', 'dict[str, object]'))
+            562 LOAD_CONST              45 (<code object activate_online at <address>, file "xiaoguan_classifier\license_client.py", line 349>)
+            564 MAKE_FUNCTION            5 (defaults, annotations)
+            566 STORE_NAME              71 (activate_online)
+
+384         568 LOAD_CONST              74 (('state', 'dict[str, object]', 'return', 'str'))
+            570 LOAD_CONST              46 (<code object _summary at <address>, file "xiaoguan_classifier\license_client.py", line 384>)
+            572 MAKE_FUNCTION            4 (annotations)
+            574 STORE_NAME              72 (_summary)
+
+394         576 LOAD_CONST              62 (('return', 'Path'))
+            578 LOAD_CONST              47 (<code object _icon_path at <address>, file "xiaoguan_classifier\license_client.py", line 394>)
+            580 MAKE_FUNCTION            4 (annotations)
+            582 STORE_NAME              73 (_icon_path)
+
+398         584 LOAD_CONST              75 (('reason', 'str', 'previous', 'dict[str, object] | None', 'return', 'bool'))
+            586 LOAD_CONST              48 (<code object _activation_window at <address>, file "xiaoguan_classifier\license_client.py", line 398>)
+            588 MAKE_FUNCTION            4 (annotations)
+            590 STORE_NAME              74 (_activation_window)
+
+472         592 LOAD_CONST              76 (('return', 'bool'))
+            594 LOAD_CONST              49 (<code object ensure_activated at <address>, file "xiaoguan_classifier\license_client.py", line 472>)
+            596 MAKE_FUNCTION            4 (annotations)
+            598 STORE_NAME              75 (ensure_activated)
+
+493         600 LOAD_CONST              77 (('value', 'object', 'return', 'list[int]'))
+            602 LOAD_CONST              50 (<code object _version_parts at <address>, file "xiaoguan_classifier\license_client.py", line 493>)
+            604 MAKE_FUNCTION            4 (annotations)
+            606 STORE_NAME              76 (_version_parts)
+
+498         608 LOAD_CONST              78 (('left', 'object', 'right', 'object', 'return', 'bool'))
+            610 LOAD_CONST              51 (<code object _newer_version at <address>, file "xiaoguan_classifier\license_client.py", line 498>)
+            612 MAKE_FUNCTION            4 (annotations)
+            614 STORE_NAME              77 (_newer_version)
+
+507         616 LOAD_CONST              79 (('return', 'dict[str, object]'))
+            618 LOAD_CONST              52 (<code object _check_update at <address>, file "xiaoguan_classifier\license_client.py", line 507>)
+            620 MAKE_FUNCTION            4 (annotations)
+            622 STORE_NAME              78 (_check_update)
+
+530         624 LOAD_CONST              80 (('root', 'object', 'return', 'None'))
+            626 LOAD_CONST              53 (<code object schedule_update_check at <address>, file "xiaoguan_classifier\license_client.py", line 530>)
+            628 MAKE_FUNCTION            4 (annotations)
+            630 STORE_NAME              79 (schedule_update_check)
+
+565         632 BUILD_LIST               0
+            634 LOAD_CONST              54 (('APP_NAME', 'SOFTWARE_VERSION', 'activate_online', 'ensure_activated', 'license_path', 'machine_code', 'schedule_update_check'))
+            636 LIST_EXTEND              1
+            638 STORE_NAME              80 (__all__)
+            640 RETURN_CONST             3 (None)
+
+Disassembly of <code object LicenseError at <address>, file "xiaoguan_classifier\license_client.py", line 37>:
+ 37           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('LicenseError')
+              8 STORE_NAME               2 (__qualname__)
+
+ 38          10 RETURN_CONST             1 (None)
+
+Disassembly of <code object ConnectivityError at <address>, file "xiaoguan_classifier\license_client.py", line 41>:
+ 41           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('ConnectivityError')
+              8 STORE_NAME               2 (__qualname__)
+
+ 42          10 RETURN_CONST             1 (None)
+
+Disassembly of <code object ServerRejectedError at <address>, file "xiaoguan_classifier\license_client.py", line 45>:
+ 45           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('ServerRejectedError')
+              8 STORE_NAME               2 (__qualname__)
+
+ 46          10 RETURN_CONST             1 (None)
+
+Disassembly of <code object DATA_BLOB at <address>, file "xiaoguan_classifier\license_client.py", line 49>:
+ 49           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('DATA_BLOB')
+              8 STORE_NAME               2 (__qualname__)
+
+ 50          10 LOAD_CONST               1 ('cbData')
+             12 LOAD_NAME                3 (wintypes)
+             14 LOAD_ATTR                8 (DWORD)
+             34 BUILD_TUPLE              2
+             36 LOAD_CONST               2 ('pbData')
+             38 PUSH_NULL
+             40 LOAD_NAME                5 (ctypes)
+             42 LOAD_ATTR               12 (POINTER)
+             62 LOAD_NAME                5 (ctypes)
+             64 LOAD_ATTR               14 (c_byte)
+             84 CALL                     1
+             92 BUILD_TUPLE              2
+             94 BUILD_LIST               2
+             96 STORE_NAME               8 (_fields_)
+             98 RETURN_CONST             3 (None)
+
+Disassembly of <code object _utc_now at <address>, file "xiaoguan_classifier\license_client.py", line 53>:
+ 53           0 RESUME                   0
+
+ 54           2 LOAD_GLOBAL              1 (NULL + datetime)
+             12 LOAD_ATTR                2 (now)
+             32 LOAD_GLOBAL              4 (timezone)
+             42 LOAD_ATTR                6 (utc)
+             62 CALL                     1
+             70 LOAD_ATTR                9 (NULL|self + isoformat)
+             90 CALL                     0
+             98 LOAD_ATTR               11 (NULL|self + replace)
+            118 LOAD_CONST               1 ('+00:00')
+            120 LOAD_CONST               2 ('Z')
+            122 CALL                     2
+            130 RETURN_VALUE
+
+Disassembly of <code object _parse_time at <address>, file "xiaoguan_classifier\license_client.py", line 57>:
+ 57           0 RESUME                   0
+
+ 58           2 LOAD_FAST                0 (value)
+              4 POP_JUMP_IF_NONE         5 (to 16)
+              6 LOAD_FAST                0 (value)
+              8 LOAD_CONST               1 ('')
+             10 COMPARE_OP              40 (==)
+             14 POP_JUMP_IF_FALSE        1 (to 18)
+
+ 59     >>   16 RETURN_CONST             0 (None)
+
+ 60     >>   18 LOAD_GLOBAL              1 (NULL + isinstance)
+             28 LOAD_FAST                0 (value)
+             30 LOAD_GLOBAL              2 (int)
+             40 LOAD_GLOBAL              4 (float)
+             50 BUILD_TUPLE              2
+             52 CALL                     2
+             60 POP_JUMP_IF_FALSE       23 (to 108)
+
+ 61          62 LOAD_GLOBAL              5 (NULL + float)
+             72 LOAD_FAST                0 (value)
+             74 CALL                     1
+             82 STORE_FAST               1 (number)
+
+ 62          84 LOAD_FAST                1 (number)
+             86 LOAD_CONST               2 (10000000000)
+             88 COMPARE_OP              68 (>)
+             92 POP_JUMP_IF_FALSE        5 (to 104)
+             94 LOAD_FAST                1 (number)
+             96 LOAD_CONST               3 (1000)
+             98 BINARY_OP               11 (/)
+            102 RETURN_VALUE
+        >>  104 LOAD_FAST                1 (number)
+            106 RETURN_VALUE
+
+ 63     >>  108 LOAD_GLOBAL              7 (NULL + str)
+            118 LOAD_FAST                0 (value)
+            120 CALL                     1
+            128 LOAD_ATTR                9 (NULL|self + strip)
+            148 CALL                     0
+            156 STORE_FAST               2 (text)
+
+ 64         158 LOAD_FAST                2 (text)
+            160 POP_JUMP_IF_TRUE         1 (to 164)
+
+ 65         162 RETURN_CONST             0 (None)
+
+ 66     >>  164 LOAD_FAST                2 (text)
+            166 LOAD_ATTR               11 (NULL|self + isdigit)
+            186 CALL                     0
+            194 POP_JUMP_IF_FALSE       20 (to 236)
+
+ 67         196 LOAD_GLOBAL             13 (NULL + _parse_time)
+            206 LOAD_GLOBAL              3 (NULL + int)
+            216 LOAD_FAST                2 (text)
+            218 CALL                     1
+            226 CALL                     1
+            234 RETURN_VALUE
+
+ 68     >>  236 NOP
+
+ 69         238 LOAD_GLOBAL             15 (NULL + datetime)
+            248 LOAD_ATTR               16 (fromisoformat)
+            268 LOAD_FAST                2 (text)
+            270 LOAD_ATTR               19 (NULL|self + replace)
+            290 LOAD_CONST               4 ('Z')
+            292 LOAD_CONST               5 ('+00:00')
+            294 CALL                     2
+            302 CALL                     1
+            310 STORE_FAST               3 (parsed)
+
+ 70         312 LOAD_FAST                3 (parsed)
+            314 LOAD_ATTR               20 (tzinfo)
+            334 POP_JUMP_IF_NOT_NONE    32 (to 400)
+
+ 71         336 LOAD_FAST                3 (parsed)
+            338 LOAD_ATTR               19 (NULL|self + replace)
+            358 LOAD_GLOBAL             22 (timezone)
+            368 LOAD_ATTR               24 (utc)
+            388 KW_NAMES                 6 (('tzinfo',))
+            390 CALL                     1
+            398 STORE_FAST               3 (parsed)
+
+ 72     >>  400 LOAD_FAST                3 (parsed)
+            402 LOAD_ATTR               27 (NULL|self + timestamp)
+            422 CALL                     0
+            430 RETURN_VALUE
+        >>  432 PUSH_EXC_INFO
+
+ 73         434 LOAD_GLOBAL             28 (ValueError)
+            444 CHECK_EXC_MATCH
+            446 POP_JUMP_IF_FALSE        3 (to 454)
+            448 POP_TOP
+
+ 74         450 POP_EXCEPT
+            452 RETURN_CONST             0 (None)
+
+ 73     >>  454 RERAISE                  0
+        >>  456 COPY                     3
+            458 POP_EXCEPT
+            460 RERAISE                  1
+ExceptionTable:
+  238 to 428 -> 432 [0]
+  432 to 448 -> 456 [1] lasti
+  454 to 454 -> 456 [1] lasti
+
+Disassembly of <code object _first_text at <address>, file "xiaoguan_classifier\license_client.py", line 77>:
+ 77           0 RESUME                   0
+
+ 78           2 LOAD_GLOBAL              1 (NULL + isinstance)
+             12 LOAD_FAST                0 (source)
+             14 LOAD_GLOBAL              2 (dict)
+             24 CALL                     2
+             32 POP_JUMP_IF_TRUE         1 (to 36)
+
+ 79          34 RETURN_CONST             1 ('')
+
+ 80     >>   36 LOAD_FAST                1 (keys)
+             38 GET_ITER
+        >>   40 FOR_ITER                74 (to 192)
+             44 STORE_FAST               2 (key)
+
+ 81          46 LOAD_FAST                0 (source)
+             48 LOAD_ATTR                5 (NULL|self + get)
+             68 LOAD_FAST                2 (key)
+             70 CALL                     1
+             78 STORE_FAST               3 (value)
+
+ 82          80 LOAD_FAST                3 (value)
+             82 POP_JUMP_IF_NOT_NONE     1 (to 86)
+             84 JUMP_BACKWARD           23 (to 40)
+        >>   86 LOAD_GLOBAL              7 (NULL + str)
+             96 LOAD_FAST                3 (value)
+             98 CALL                     1
+            106 LOAD_ATTR                9 (NULL|self + strip)
+            126 CALL                     0
+            134 POP_JUMP_IF_TRUE         1 (to 138)
+            136 JUMP_BACKWARD           49 (to 40)
+
+ 83     >>  138 LOAD_GLOBAL              7 (NULL + str)
+            148 LOAD_FAST                3 (value)
+            150 CALL                     1
+            158 LOAD_ATTR                9 (NULL|self + strip)
+            178 CALL                     0
+            186 SWAP                     2
+            188 POP_TOP
+            190 RETURN_VALUE
+
+ 80     >>  192 END_FOR
+
+ 84         194 RETURN_CONST             1 ('')
+
+Disassembly of <code object _as_bool at <address>, file "xiaoguan_classifier\license_client.py", line 87>:
+ 87           0 RESUME                   0
+
+ 88           2 LOAD_GLOBAL              1 (NULL + isinstance)
+             12 LOAD_FAST                0 (value)
+             14 LOAD_GLOBAL              2 (bool)
+             24 CALL                     2
+             32 POP_JUMP_IF_FALSE        2 (to 38)
+
+ 89          34 LOAD_FAST                0 (value)
+             36 RETURN_VALUE
+
+ 90     >>   38 LOAD_GLOBAL              5 (NULL + str)
+             48 LOAD_FAST                0 (value)
+             50 COPY                     1
+             52 POP_JUMP_IF_TRUE         2 (to 58)
+             54 POP_TOP
+             56 LOAD_CONST               1 ('')
+        >>   58 CALL                     1
+             66 LOAD_ATTR                7 (NULL|self + strip)
+             86 CALL                     0
+             94 LOAD_ATTR                9 (NULL|self + lower)
+            114 CALL                     0
+            122 LOAD_CONST               2 (frozenset({'是', '无限', 'true', '启用', 'on', '1', 'yes'}))
+            124 CONTAINS_OP              0
+            126 RETURN_VALUE
+
+Disassembly of <code object _license_payload at <address>, file "xiaoguan_classifier\license_client.py", line 93>:
+ 93           0 RESUME                   0
+
+ 94           2 LOAD_GLOBAL              1 (NULL + isinstance)
+             12 LOAD_FAST                0 (result)
+             14 LOAD_GLOBAL              2 (dict)
+             24 CALL                     2
+             32 POP_JUMP_IF_TRUE         2 (to 38)
+
+ 95          34 BUILD_MAP                0
+             36 RETURN_VALUE
+
+ 96     >>   38 LOAD_CONST               1 (('license', 'data', 'result'))
+             40 GET_ITER
+        >>   42 FOR_ITER                39 (to 124)
+             46 STORE_FAST               1 (key)
+
+ 97          48 LOAD_FAST                0 (result)
+             50 LOAD_ATTR                5 (NULL|self + get)
+             70 LOAD_FAST                1 (key)
+             72 CALL                     1
+             80 STORE_FAST               2 (value)
+
+ 98          82 LOAD_GLOBAL              1 (NULL + isinstance)
+             92 LOAD_FAST                2 (value)
+             94 LOAD_GLOBAL              2 (dict)
+            104 CALL                     2
+            112 POP_JUMP_IF_TRUE         1 (to 116)
+            114 JUMP_BACKWARD           37 (to 42)
+
+ 99     >>  116 LOAD_FAST                2 (value)
+            118 SWAP                     2
+            120 POP_TOP
+            122 RETURN_VALUE
+
+ 96     >>  124 END_FOR
+
+100         126 LOAD_FAST                0 (result)
+            128 RETURN_VALUE
+
+Disassembly of <code object _server_message at <address>, file "xiaoguan_classifier\license_client.py", line 103>:
+103           0 RESUME                   0
+
+104           2 LOAD_GLOBAL              1 (NULL + _first_text)
+             12 LOAD_FAST                0 (result)
+             14 LOAD_CONST               1 ('error')
+             16 LOAD_CONST               2 ('message')
+             18 LOAD_CONST               3 ('detail')
+             20 LOAD_CONST               4 ('msg')
+             22 CALL                     5
+             30 STORE_FAST               2 (text)
+
+105          32 LOAD_FAST                2 (text)
+             34 COPY                     1
+             36 POP_JUMP_IF_TRUE        10 (to 58)
+             38 POP_TOP
+             40 LOAD_FAST                1 (status)
+             42 POP_JUMP_IF_FALSE        6 (to 56)
+             44 LOAD_CONST               5 ('服务器拒绝授权（HTTP ')
+             46 LOAD_FAST                1 (status)
+             48 FORMAT_VALUE             0
+             50 LOAD_CONST               6 ('）。')
+             52 BUILD_STRING             3
+             54 RETURN_VALUE
+        >>   56 LOAD_CONST               7 ('服务器拒绝授权。')
+        >>   58 RETURN_VALUE
+
+Disassembly of <code object _machine_source at <address>, file "xiaoguan_classifier\license_client.py", line 108>:
+108           0 RESUME                   0
+
+109           2 LOAD_GLOBAL              0 (os)
+             12 LOAD_ATTR                2 (name)
+             32 LOAD_CONST               1 ('nt')
+             34 COMPARE_OP              40 (==)
+             38 POP_JUMP_IF_FALSE      129 (to 298)
+
+110          40 NOP
+
+111          42 LOAD_GLOBAL              5 (NULL + subprocess)
+             52 LOAD_ATTR                6 (check_output)
+
+112          72 BUILD_LIST               0
+             74 LOAD_CONST               2 (('reg.exe', 'query', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'))
+             76 LIST_EXTEND              1
+
+113          78 LOAD_GLOBAL              4 (subprocess)
+             88 LOAD_ATTR                8 (DEVNULL)
+
+114         108 LOAD_CONST               3 (5)
+
+111         110 KW_NAMES                 4 (('stderr', 'timeout'))
+            112 CALL                     3
+
+115         120 LOAD_ATTR               11 (NULL|self + decode)
+            140 LOAD_CONST               5 ('mbcs')
+            142 LOAD_CONST               6 ('ignore')
+            144 KW_NAMES                 7 (('errors',))
+            146 CALL                     2
+
+111         154 STORE_FAST               0 (output)
+
+116         156 LOAD_GLOBAL             13 (NULL + re)
+            166 LOAD_ATTR               14 (search)
+            186 LOAD_CONST               8 ('MachineGuid\\s+REG_\\w+\\s+([^\\r\\n]+)')
+            188 LOAD_FAST                0 (output)
+            190 LOAD_GLOBAL             12 (re)
+            200 LOAD_ATTR               16 (IGNORECASE)
+            220 CALL                     3
+            228 STORE_FAST               1 (match)
+
+117         230 LOAD_FAST                1 (match)
+            232 POP_JUMP_IF_FALSE       31 (to 296)
+
+118         234 LOAD_FAST                1 (match)
+            236 LOAD_ATTR               19 (NULL|self + group)
+            256 LOAD_CONST               9 (1)
+            258 CALL                     1
+            266 LOAD_ATTR               21 (NULL|self + strip)
+            286 CALL                     0
+            294 RETURN_VALUE
+
+117     >>  296 NOP
+
+121     >>  298 LOAD_GLOBAL             25 (NULL + platform)
+            308 LOAD_ATTR               26 (node)
+            328 CALL                     0
+            336 FORMAT_VALUE             0
+            338 LOAD_CONST              10 ('|')
+            340 LOAD_GLOBAL             29 (NULL + uuid)
+            350 LOAD_ATTR               30 (getnode)
+            370 CALL                     0
+            378 LOAD_CONST              11 ('012X')
+            380 FORMAT_VALUE             4 (with format)
+            382 LOAD_CONST              10 ('|')
+            384 LOAD_GLOBAL             25 (NULL + platform)
+            394 LOAD_ATTR               32 (machine)
+            414 CALL                     0
+            422 FORMAT_VALUE             0
+            424 BUILD_STRING             5
+            426 RETURN_VALUE
+        >>  428 PUSH_EXC_INFO
+
+119         430 LOAD_GLOBAL             22 (Exception)
+            440 CHECK_EXC_MATCH
+            442 POP_JUMP_IF_FALSE        3 (to 450)
+            444 POP_TOP
+
+120         446 POP_EXCEPT
+            448 JUMP_BACKWARD           76 (to 298)
+
+119     >>  450 RERAISE                  0
+        >>  452 COPY                     3
+            454 POP_EXCEPT
+            456 RERAISE                  1
+ExceptionTable:
+  42 to 292 -> 428 [0]
+  428 to 444 -> 452 [1] lasti
+  450 to 450 -> 452 [1] lasti
+
+Disassembly of <code object machine_code at <address>, file "xiaoguan_classifier\license_client.py", line 124>:
+              0 MAKE_CELL                1 (digest)
+
+124           2 RESUME                   0
+
+125           4 LOAD_GLOBAL              0 (APP_NAME)
+             14 FORMAT_VALUE             0
+             16 LOAD_CONST               1 ('|')
+             18 LOAD_GLOBAL              2 (sys)
+             28 LOAD_ATTR                4 (platform)
+             48 FORMAT_VALUE             0
+             50 LOAD_CONST               1 ('|')
+             52 LOAD_GLOBAL              7 (NULL + _machine_source)
+             62 CALL                     0
+             70 FORMAT_VALUE             0
+             72 BUILD_STRING             5
+             74 STORE_FAST               0 (raw)
+
+126          76 LOAD_GLOBAL              9 (NULL + hashlib)
+             86 LOAD_ATTR               10 (sha256)
+            106 LOAD_FAST                0 (raw)
+            108 LOAD_ATTR               13 (NULL|self + encode)
+            128 LOAD_CONST               2 ('utf-8')
+            130 CALL                     1
+            138 CALL                     1
+            146 LOAD_ATTR               15 (NULL|self + hexdigest)
+            166 CALL                     0
+            174 LOAD_ATTR               17 (NULL|self + upper)
+            194 CALL                     0
+            202 LOAD_CONST               0 (None)
+            204 LOAD_CONST               3 (20)
+            206 BINARY_SLICE
+            208 STORE_DEREF              1 (digest)
+
+127         210 LOAD_CONST               4 ('-')
+            212 LOAD_ATTR               19 (NULL|self + join)
+            232 LOAD_CLOSURE             1 (digest)
+            234 BUILD_TUPLE              1
+            236 LOAD_CONST               5 (<code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 127>)
+            238 MAKE_FUNCTION            8 (closure)
+            240 LOAD_GLOBAL             21 (NULL + range)
+            250 LOAD_CONST               6 (0)
+            252 LOAD_GLOBAL             23 (NULL + len)
+            262 LOAD_DEREF               1 (digest)
+            264 CALL                     1
+            272 LOAD_CONST               7 (4)
+            274 CALL                     3
+            282 GET_ITER
+            284 CALL                     0
+            292 CALL                     1
+            300 RETURN_VALUE
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 127>:
+              0 COPY_FREE_VARS           1
+
+127           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                12 (to 38)
+             14 STORE_FAST               1 (index)
+             16 LOAD_DEREF               2 (digest)
+             18 LOAD_FAST                1 (index)
+             20 LOAD_FAST                1 (index)
+             22 LOAD_CONST               0 (4)
+             24 BINARY_OP                0 (+)
+             28 BINARY_SLICE
+             30 YIELD_VALUE              1
+             32 RESUME                   1
+             34 POP_TOP
+             36 JUMP_BACKWARD           14 (to 10)
+        >>   38 END_FOR
+             40 RETURN_CONST             1 (None)
+        >>   42 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             44 RERAISE                  1
+ExceptionTable:
+  6 to 40 -> 42 [0] lasti
+
+Disassembly of <code object _state_directory at <address>, file "xiaoguan_classifier\license_client.py", line 130>:
+130           0 RESUME                   0
+
+131           2 LOAD_GLOBAL              0 (os)
+             12 LOAD_ATTR                2 (name)
+             32 LOAD_CONST               1 ('nt')
+             34 COMPARE_OP              40 (==)
+             38 POP_JUMP_IF_FALSE       77 (to 194)
+
+132          40 LOAD_GLOBAL              5 (NULL + Path)
+             50 LOAD_GLOBAL              0 (os)
+             60 LOAD_ATTR                6 (environ)
+             80 LOAD_ATTR                9 (NULL|self + get)
+            100 LOAD_CONST               2 ('LOCALAPPDATA')
+            102 CALL                     1
+            110 COPY                     1
+            112 POP_JUMP_IF_TRUE        26 (to 166)
+            114 POP_TOP
+            116 LOAD_GLOBAL              5 (NULL + Path)
+            126 LOAD_ATTR               10 (home)
+            146 CALL                     0
+            154 LOAD_CONST               3 ('AppData')
+            156 BINARY_OP               11 (/)
+            160 LOAD_CONST               4 ('Local')
+            162 BINARY_OP               11 (/)
+        >>  166 CALL                     1
+            174 STORE_FAST               0 (root)
+
+135         176 LOAD_FAST                0 (root)
+            178 LOAD_GLOBAL             12 (APP_NAME)
+            188 BINARY_OP               11 (/)
+            192 RETURN_VALUE
+
+134     >>  194 LOAD_GLOBAL              5 (NULL + Path)
+            204 LOAD_ATTR               10 (home)
+            224 CALL                     0
+            232 LOAD_CONST               5 ('.local')
+            234 BINARY_OP               11 (/)
+            238 LOAD_CONST               6 ('share')
+            240 BINARY_OP               11 (/)
+            244 STORE_FAST               0 (root)
+
+135         246 LOAD_FAST                0 (root)
+            248 LOAD_GLOBAL             12 (APP_NAME)
+            258 BINARY_OP               11 (/)
+            262 RETURN_VALUE
+
+Disassembly of <code object license_path at <address>, file "xiaoguan_classifier\license_client.py", line 138>:
+138           0 RESUME                   0
+
+139           2 LOAD_GLOBAL              1 (NULL + _state_directory)
+             12 CALL                     0
+             20 LOAD_CONST               1 ('license.dat')
+             22 BINARY_OP               11 (/)
+             26 RETURN_VALUE
+
+Disassembly of <code object _blob at <address>, file "xiaoguan_classifier\license_client.py", line 142>:
+142           0 RESUME                   0
+
+143           2 LOAD_GLOBAL              1 (NULL + ctypes)
+             12 LOAD_ATTR                2 (create_string_buffer)
+             32 LOAD_FAST                0 (data)
+             34 CALL                     1
+             42 STORE_FAST               1 (buffer)
+
+144          44 LOAD_GLOBAL              5 (NULL + DATA_BLOB)
+             54 LOAD_GLOBAL              7 (NULL + len)
+             64 LOAD_FAST                0 (data)
+             66 CALL                     1
+             74 LOAD_GLOBAL              1 (NULL + ctypes)
+             84 LOAD_ATTR                8 (cast)
+            104 LOAD_FAST                1 (buffer)
+            106 LOAD_GLOBAL              1 (NULL + ctypes)
+            116 LOAD_ATTR               10 (POINTER)
+            136 LOAD_GLOBAL              0 (ctypes)
+            146 LOAD_ATTR               12 (c_byte)
+            166 CALL                     1
+            174 CALL                     2
+            182 CALL                     2
+            190 LOAD_FAST                1 (buffer)
+            192 BUILD_TUPLE              2
+            194 RETURN_VALUE
+
+Disassembly of <code object _protect at <address>, file "xiaoguan_classifier\license_client.py", line 147>:
+147           0 RESUME                   0
+
+148           2 LOAD_GLOBAL              0 (os)
+             12 LOAD_ATTR                2 (name)
+             32 LOAD_CONST               1 ('nt')
+             34 COMPARE_OP              55 (!=)
+             38 POP_JUMP_IF_FALSE       11 (to 62)
+
+149          40 LOAD_GLOBAL              5 (NULL + LicenseError)
+             50 LOAD_CONST               2 ('当前系统不支持 Windows DPAPI 安全存储。')
+             52 CALL                     1
+             60 RAISE_VARARGS            1
+
+150     >>   62 LOAD_GLOBAL              6 (ctypes)
+             72 LOAD_ATTR                8 (windll)
+             92 LOAD_ATTR               10 (crypt32)
+            112 STORE_FAST               1 (crypt32)
+
+151         114 LOAD_GLOBAL              6 (ctypes)
+            124 LOAD_ATTR                8 (windll)
+            144 LOAD_ATTR               12 (kernel32)
+            164 STORE_FAST               2 (kernel32)
+
+152         166 LOAD_GLOBAL             15 (NULL + _blob)
+            176 LOAD_FAST                0 (data)
+            178 CALL                     1
+            186 UNPACK_SEQUENCE          2
+            190 STORE_FAST               3 (input_blob)
+            192 STORE_FAST               4 (input_buffer)
+
+153         194 LOAD_GLOBAL             15 (NULL + _blob)
+            204 LOAD_GLOBAL             16 (APP_NAME)
+            214 LOAD_ATTR               19 (NULL|self + encode)
+            234 LOAD_CONST               3 ('utf-8')
+            236 CALL                     1
+            244 CALL                     1
+            252 UNPACK_SEQUENCE          2
+            256 STORE_FAST               5 (entropy_blob)
+            258 STORE_FAST               6 (entropy_buffer)
+
+154         260 LOAD_GLOBAL             21 (NULL + DATA_BLOB)
+            270 CALL                     0
+            278 STORE_FAST               7 (output_blob)
+
+155         280 LOAD_FAST                1 (crypt32)
+            282 LOAD_ATTR               23 (NULL|self + CryptProtectData)
+
+156         302 LOAD_GLOBAL              7 (NULL + ctypes)
+            312 LOAD_ATTR               24 (byref)
+            332 LOAD_FAST                3 (input_blob)
+            334 CALL                     1
+
+157         342 LOAD_GLOBAL             26 (DISPLAY_NAME)
+
+158         352 LOAD_GLOBAL              7 (NULL + ctypes)
+            362 LOAD_ATTR               24 (byref)
+            382 LOAD_FAST                5 (entropy_blob)
+            384 CALL                     1
+
+159         392 LOAD_CONST               0 (None)
+
+160         394 LOAD_CONST               0 (None)
+
+161         396 LOAD_CONST               4 (1)
+
+162         398 LOAD_GLOBAL              7 (NULL + ctypes)
+            408 LOAD_ATTR               24 (byref)
+            428 LOAD_FAST                7 (output_blob)
+            430 CALL                     1
+
+155         438 CALL                     7
+            446 POP_JUMP_IF_TRUE        11 (to 470)
+
+164         448 LOAD_GLOBAL              5 (NULL + LicenseError)
+            458 LOAD_CONST               5 ('系统无法加密保存授权状态。')
+            460 CALL                     1
+            468 RAISE_VARARGS            1
+
+165     >>  470 NOP
+
+166         472 LOAD_GLOBAL              7 (NULL + ctypes)
+            482 LOAD_ATTR               28 (string_at)
+            502 LOAD_FAST                7 (output_blob)
+            504 LOAD_ATTR               30 (pbData)
+            524 LOAD_FAST                7 (output_blob)
+            526 LOAD_ATTR               32 (cbData)
+            546 CALL                     2
+
+168         554 LOAD_FAST                2 (kernel32)
+            556 LOAD_ATTR               35 (NULL|self + LocalFree)
+            576 LOAD_FAST                7 (output_blob)
+            578 LOAD_ATTR               30 (pbData)
+            598 CALL                     1
+            606 POP_TOP
+
+169         608 DELETE_FAST              4 (input_buffer)
+            610 DELETE_FAST              6 (entropy_buffer)
+            612 RETURN_VALUE
+        >>  614 PUSH_EXC_INFO
+
+168         616 LOAD_FAST                2 (kernel32)
+            618 LOAD_ATTR               35 (NULL|self + LocalFree)
+            638 LOAD_FAST                7 (output_blob)
+            640 LOAD_ATTR               30 (pbData)
+            660 CALL                     1
+            668 POP_TOP
+
+169         670 DELETE_FAST              4 (input_buffer)
+            672 DELETE_FAST              6 (entropy_buffer)
+            674 RERAISE                  0
+        >>  676 COPY                     3
+            678 POP_EXCEPT
+            680 RERAISE                  1
+ExceptionTable:
+  472 to 552 -> 614 [0]
+  614 to 674 -> 676 [1] lasti
+
+Disassembly of <code object _unprotect at <address>, file "xiaoguan_classifier\license_client.py", line 172>:
+172           0 RESUME                   0
+
+173           2 LOAD_GLOBAL              0 (os)
+             12 LOAD_ATTR                2 (name)
+             32 LOAD_CONST               1 ('nt')
+             34 COMPARE_OP              55 (!=)
+             38 POP_JUMP_IF_FALSE       11 (to 62)
+
+174          40 LOAD_GLOBAL              5 (NULL + LicenseError)
+             50 LOAD_CONST               2 ('当前系统不支持 Windows DPAPI 安全存储。')
+             52 CALL                     1
+             60 RAISE_VARARGS            1
+
+175     >>   62 LOAD_GLOBAL              6 (ctypes)
+             72 LOAD_ATTR                8 (windll)
+             92 LOAD_ATTR               10 (crypt32)
+            112 STORE_FAST               1 (crypt32)
+
+176         114 LOAD_GLOBAL              6 (ctypes)
+            124 LOAD_ATTR                8 (windll)
+            144 LOAD_ATTR               12 (kernel32)
+            164 STORE_FAST               2 (kernel32)
+
+177         166 LOAD_GLOBAL             15 (NULL + _blob)
+            176 LOAD_FAST                0 (data)
+            178 CALL                     1
+            186 UNPACK_SEQUENCE          2
+            190 STORE_FAST               3 (input_blob)
+            192 STORE_FAST               4 (input_buffer)
+
+178         194 LOAD_GLOBAL             15 (NULL + _blob)
+            204 LOAD_GLOBAL             16 (APP_NAME)
+            214 LOAD_ATTR               19 (NULL|self + encode)
+            234 LOAD_CONST               3 ('utf-8')
+            236 CALL                     1
+            244 CALL                     1
+            252 UNPACK_SEQUENCE          2
+            256 STORE_FAST               5 (entropy_blob)
+            258 STORE_FAST               6 (entropy_buffer)
+
+179         260 LOAD_GLOBAL             21 (NULL + DATA_BLOB)
+            270 CALL                     0
+            278 STORE_FAST               7 (output_blob)
+
+180         280 LOAD_FAST                1 (crypt32)
+            282 LOAD_ATTR               23 (NULL|self + CryptUnprotectData)
+
+181         302 LOAD_GLOBAL              7 (NULL + ctypes)
+            312 LOAD_ATTR               24 (byref)
+            332 LOAD_FAST                3 (input_blob)
+            334 CALL                     1
+
+182         342 LOAD_CONST               0 (None)
+
+183         344 LOAD_GLOBAL              7 (NULL + ctypes)
+            354 LOAD_ATTR               24 (byref)
+            374 LOAD_FAST                5 (entropy_blob)
+            376 CALL                     1
+
+184         384 LOAD_CONST               0 (None)
+
+185         386 LOAD_CONST               0 (None)
+
+186         388 LOAD_CONST               4 (1)
+
+187         390 LOAD_GLOBAL              7 (NULL + ctypes)
+            400 LOAD_ATTR               24 (byref)
+            420 LOAD_FAST                7 (output_blob)
+            422 CALL                     1
+
+180         430 CALL                     7
+            438 POP_JUMP_IF_TRUE        11 (to 462)
+
+189         440 LOAD_GLOBAL              5 (NULL + LicenseError)
+            450 LOAD_CONST               5 ('本地授权文件无法解密，请重新激活。')
+            452 CALL                     1
+            460 RAISE_VARARGS            1
+
+190     >>  462 NOP
+
+191         464 LOAD_GLOBAL              7 (NULL + ctypes)
+            474 LOAD_ATTR               26 (string_at)
+            494 LOAD_FAST                7 (output_blob)
+            496 LOAD_ATTR               28 (pbData)
+            516 LOAD_FAST                7 (output_blob)
+            518 LOAD_ATTR               30 (cbData)
+            538 CALL                     2
+
+193         546 LOAD_FAST                2 (kernel32)
+            548 LOAD_ATTR               33 (NULL|self + LocalFree)
+            568 LOAD_FAST                7 (output_blob)
+            570 LOAD_ATTR               28 (pbData)
+            590 CALL                     1
+            598 POP_TOP
+
+194         600 DELETE_FAST              4 (input_buffer)
+            602 DELETE_FAST              6 (entropy_buffer)
+            604 RETURN_VALUE
+        >>  606 PUSH_EXC_INFO
+
+193         608 LOAD_FAST                2 (kernel32)
+            610 LOAD_ATTR               33 (NULL|self + LocalFree)
+            630 LOAD_FAST                7 (output_blob)
+            632 LOAD_ATTR               28 (pbData)
+            652 CALL                     1
+            660 POP_TOP
+
+194         662 DELETE_FAST              4 (input_buffer)
+            664 DELETE_FAST              6 (entropy_buffer)
+            666 RERAISE                  0
+        >>  668 COPY                     3
+            670 POP_EXCEPT
+            672 RERAISE                  1
+ExceptionTable:
+  464 to 544 -> 606 [0]
+  606 to 666 -> 668 [1] lasti
+
+Disassembly of <code object _load_state at <address>, file "xiaoguan_classifier\license_client.py", line 197>:
+197           0 RESUME                   0
+
+198           2 LOAD_GLOBAL              1 (NULL + license_path)
+             12 CALL                     0
+             20 STORE_FAST               0 (path)
+
+199          22 LOAD_FAST                0 (path)
+             24 LOAD_ATTR                3 (NULL|self + is_file)
+             44 CALL                     0
+             52 POP_JUMP_IF_TRUE         1 (to 56)
+
+200          54 RETURN_CONST             0 (None)
+
+201     >>   56 NOP
+
+202          58 LOAD_GLOBAL              5 (NULL + base64)
+             68 LOAD_ATTR                6 (b64decode)
+             88 LOAD_FAST                0 (path)
+             90 LOAD_ATTR                9 (NULL|self + read_bytes)
+            110 CALL                     0
+            118 LOAD_CONST               1 (True)
+            120 KW_NAMES                 2 (('validate',))
+            122 CALL                     2
+            130 STORE_FAST               1 (encrypted)
+
+203         132 LOAD_GLOBAL             11 (NULL + json)
+            142 LOAD_ATTR               12 (loads)
+            162 LOAD_GLOBAL             15 (NULL + _unprotect)
+            172 LOAD_FAST                1 (encrypted)
+            174 CALL                     1
+            182 LOAD_ATTR               17 (NULL|self + decode)
+            202 LOAD_CONST               3 ('utf-8')
+            204 CALL                     1
+            212 CALL                     1
+            220 STORE_FAST               2 (state)
+
+204         222 LOAD_GLOBAL             19 (NULL + isinstance)
+            232 LOAD_FAST                2 (state)
+            234 LOAD_GLOBAL             20 (dict)
+            244 CALL                     2
+            252 POP_JUMP_IF_FALSE       24 (to 302)
+            254 LOAD_FAST                2 (state)
+            256 LOAD_ATTR               23 (NULL|self + get)
+            276 LOAD_CONST               4 ('app_name')
+            278 CALL                     1
+            286 LOAD_GLOBAL             24 (APP_NAME)
+            296 COMPARE_OP              55 (!=)
+            300 POP_JUMP_IF_FALSE        1 (to 304)
+
+205     >>  302 RETURN_CONST             0 (None)
+
+206     >>  304 LOAD_FAST                2 (state)
+            306 RETURN_VALUE
+        >>  308 PUSH_EXC_INFO
+
+207         310 LOAD_GLOBAL             26 (LicenseError)
+            320 CHECK_EXC_MATCH
+            322 POP_JUMP_IF_FALSE        2 (to 328)
+            324 POP_TOP
+
+208         326 RAISE_VARARGS            0
+
+209     >>  328 LOAD_GLOBAL             28 (Exception)
+            338 CHECK_EXC_MATCH
+            340 POP_JUMP_IF_FALSE       20 (to 382)
+            342 STORE_FAST               3 (exc)
+
+210         344 LOAD_GLOBAL             27 (NULL + LicenseError)
+            354 LOAD_CONST               5 ('本地授权文件损坏：')
+            356 LOAD_FAST                3 (exc)
+            358 FORMAT_VALUE             0
+            360 BUILD_STRING             2
+            362 CALL                     1
+            370 LOAD_FAST                3 (exc)
+            372 RAISE_VARARGS            2
+        >>  374 LOAD_CONST               0 (None)
+            376 STORE_FAST               3 (exc)
+            378 DELETE_FAST              3 (exc)
+            380 RERAISE                  1
+
+209     >>  382 RERAISE                  0
+        >>  384 COPY                     3
+            386 POP_EXCEPT
+            388 RERAISE                  1
+ExceptionTable:
+  58 to 300 -> 308 [0]
+  304 to 304 -> 308 [0]
+  308 to 342 -> 384 [1] lasti
+  344 to 372 -> 374 [1] lasti
+  374 to 382 -> 384 [1] lasti
+
+Disassembly of <code object _save_state at <address>, file "xiaoguan_classifier\license_client.py", line 213>:
+213           0 RESUME                   0
+
+214           2 LOAD_GLOBAL              1 (NULL + _state_directory)
+             12 CALL                     0
+             20 STORE_FAST               1 (directory)
+
+215          22 LOAD_FAST                1 (directory)
+             24 LOAD_ATTR                3 (NULL|self + mkdir)
+             44 LOAD_CONST               1 (True)
+             46 LOAD_CONST               1 (True)
+             48 KW_NAMES                 2 (('parents', 'exist_ok'))
+             50 CALL                     2
+             58 POP_TOP
+
+216          60 LOAD_GLOBAL              5 (NULL + dict)
+             70 LOAD_FAST                0 (state)
+             72 CALL                     1
+             80 STORE_FAST               2 (clean)
+
+217          82 LOAD_FAST                2 (clean)
+             84 LOAD_ATTR                7 (NULL|self + update)
+            104 LOAD_GLOBAL              8 (APP_NAME)
+            114 LOAD_CONST               3 (1)
+            116 LOAD_CONST               4 (('app_name', 'state_version'))
+            118 BUILD_CONST_KEY_MAP      2
+            120 CALL                     1
+            128 POP_TOP
+
+218         130 LOAD_GLOBAL             11 (NULL + _protect)
+            140 LOAD_GLOBAL             13 (NULL + json)
+            150 LOAD_ATTR               14 (dumps)
+            170 LOAD_FAST                2 (clean)
+            172 LOAD_CONST               5 (False)
+            174 LOAD_CONST               6 ((',', ':'))
+            176 KW_NAMES                 7 (('ensure_ascii', 'separators'))
+            178 CALL                     3
+            186 LOAD_ATTR               17 (NULL|self + encode)
+            206 LOAD_CONST               8 ('utf-8')
+            208 CALL                     1
+            216 CALL                     1
+            224 STORE_FAST               3 (encrypted)
+
+219         226 LOAD_GLOBAL             19 (NULL + license_path)
+            236 CALL                     0
+            244 LOAD_ATTR               21 (NULL|self + with_suffix)
+            264 LOAD_CONST               9 ('.tmp')
+            266 CALL                     1
+            274 STORE_FAST               4 (temporary)
+
+220         276 LOAD_FAST                4 (temporary)
+            278 LOAD_ATTR               23 (NULL|self + write_bytes)
+            298 LOAD_GLOBAL             25 (NULL + base64)
+            308 LOAD_ATTR               26 (b64encode)
+            328 LOAD_FAST                3 (encrypted)
+            330 CALL                     1
+            338 CALL                     1
+            346 POP_TOP
+
+221         348 LOAD_GLOBAL             29 (NULL + os)
+            358 LOAD_ATTR               30 (replace)
+            378 LOAD_FAST                4 (temporary)
+            380 LOAD_GLOBAL             19 (NULL + license_path)
+            390 CALL                     0
+            398 CALL                     2
+            406 POP_TOP
+            408 RETURN_CONST             0 (None)
+
+Disassembly of <code object _validate_local at <address>, file "xiaoguan_classifier\license_client.py", line 224>:
+224           0 RESUME                   0
+
+225           2 LOAD_FAST                0 (state)
+              4 POP_JUMP_IF_FALSE       26 (to 58)
+              6 LOAD_GLOBAL              1 (NULL + _as_bool)
+             16 LOAD_FAST                0 (state)
+             18 LOAD_ATTR                3 (NULL|self + get)
+             38 LOAD_CONST               1 ('activated')
+             40 CALL                     1
+             48 CALL                     1
+             56 POP_JUMP_IF_TRUE         1 (to 60)
+
+226     >>   58 RETURN_CONST             2 ('请输入激活码后继续使用。')
+
+227     >>   60 LOAD_GLOBAL              5 (NULL + str)
+             70 LOAD_FAST                0 (state)
+             72 LOAD_ATTR                3 (NULL|self + get)
+             92 LOAD_CONST               3 ('machine_code')
+             94 CALL                     1
+            102 COPY                     1
+            104 POP_JUMP_IF_TRUE         2 (to 110)
+            106 POP_TOP
+            108 LOAD_CONST               4 ('')
+        >>  110 CALL                     1
+            118 LOAD_ATTR                7 (NULL|self + upper)
+            138 CALL                     0
+            146 LOAD_GLOBAL              9 (NULL + machine_code)
+            156 CALL                     0
+            164 LOAD_ATTR                7 (NULL|self + upper)
+            184 CALL                     0
+            192 COMPARE_OP              55 (!=)
+            196 POP_JUMP_IF_FALSE        1 (to 200)
+
+228         198 RETURN_CONST             5 ('本地授权与当前电脑机器码不匹配，请重新激活。')
+
+229     >>  200 LOAD_GLOBAL              5 (NULL + str)
+            210 LOAD_FAST                0 (state)
+            212 LOAD_ATTR                3 (NULL|self + get)
+            232 LOAD_CONST               6 ('status')
+            234 CALL                     1
+            242 COPY                     1
+            244 POP_JUMP_IF_TRUE         2 (to 250)
+            246 POP_TOP
+            248 LOAD_CONST               4 ('')
+        >>  250 CALL                     1
+            258 LOAD_ATTR               11 (NULL|self + strip)
+            278 CALL                     0
+            286 LOAD_ATTR               13 (NULL|self + lower)
+            306 CALL                     0
+            314 STORE_FAST               1 (status)
+
+230         316 LOAD_FAST                1 (status)
+            318 LOAD_CONST               7 (frozenset({'inactive', '已禁用', 'revoked', 'disabled', 'blocked', '已撤销'}))
+            320 CONTAINS_OP              0
+            322 POP_JUMP_IF_FALSE        1 (to 326)
+
+231         324 RETURN_CONST             8 ('授权已被禁用。')
+
+232     >>  326 LOAD_GLOBAL              1 (NULL + _as_bool)
+            336 LOAD_FAST                0 (state)
+            338 LOAD_ATTR                3 (NULL|self + get)
+            358 LOAD_CONST               9 ('unlimited')
+            360 CALL                     1
+            368 CALL                     1
+            376 POP_JUMP_IF_TRUE        70 (to 518)
+            378 LOAD_FAST                0 (state)
+            380 LOAD_ATTR                3 (NULL|self + get)
+            400 LOAD_CONST              10 ('expires_at')
+            402 CALL                     1
+            410 POP_JUMP_IF_FALSE       53 (to 518)
+
+233         412 LOAD_GLOBAL             15 (NULL + _parse_time)
+            422 LOAD_FAST                0 (state)
+            424 LOAD_ATTR                3 (NULL|self + get)
+            444 LOAD_CONST              10 ('expires_at')
+            446 CALL                     1
+            454 CALL                     1
+            462 STORE_FAST               2 (expiry)
+
+234         464 LOAD_FAST                2 (expiry)
+            466 POP_JUMP_IF_NOT_NONE     1 (to 470)
+
+235         468 RETURN_CONST            11 ('服务器返回的授权到期时间格式无效。')
+
+236     >>  470 LOAD_GLOBAL             17 (NULL + time)
+            480 LOAD_ATTR               16 (time)
+            500 CALL                     0
+            508 LOAD_FAST                2 (expiry)
+            510 COMPARE_OP              92 (>=)
+            514 POP_JUMP_IF_FALSE        1 (to 518)
+
+237         516 RETURN_CONST            12 ('授权已过期，请使用新的激活码。')
+
+238     >>  518 LOAD_GLOBAL             15 (NULL + _parse_time)
+            528 LOAD_FAST                0 (state)
+            530 LOAD_ATTR                3 (NULL|self + get)
+            550 LOAD_CONST              13 ('last_seen_utc')
+            552 CALL                     1
+            560 CALL                     1
+            568 STORE_FAST               3 (last_seen)
+
+239         570 LOAD_FAST                3 (last_seen)
+            572 POP_JUMP_IF_FALSE       31 (to 636)
+            574 LOAD_GLOBAL             17 (NULL + time)
+            584 LOAD_ATTR               16 (time)
+            604 CALL                     0
+            612 LOAD_FAST                3 (last_seen)
+            614 LOAD_GLOBAL             18 (TIME_ROLLBACK_TOLERANCE_SECONDS)
+            624 BINARY_OP               10 (-)
+            628 COMPARE_OP               2 (<)
+            632 POP_JUMP_IF_FALSE        1 (to 636)
+
+240         634 RETURN_CONST            14 ('检测到系统时间异常，请联网校准时间后重新启动。')
+
+241     >>  636 LOAD_GLOBAL              5 (NULL + str)
+            646 LOAD_FAST                0 (state)
+            648 LOAD_ATTR                3 (NULL|self + get)
+            668 LOAD_CONST              15 ('activation_credential')
+            670 CALL                     1
+            678 COPY                     1
+            680 POP_JUMP_IF_TRUE         2 (to 686)
+            682 POP_TOP
+            684 LOAD_CONST               4 ('')
+        >>  686 CALL                     1
+            694 POP_JUMP_IF_TRUE         1 (to 698)
+
+242         696 RETURN_CONST            16 ('缺少在线复验凭据，请重新输入激活码。')
+
+243     >>  698 RETURN_CONST             4 ('')
+
+Disassembly of <code object _can_use_offline at <address>, file "xiaoguan_classifier\license_client.py", line 246>:
+246           0 RESUME                   0
+
+247           2 LOAD_GLOBAL              1 (NULL + _parse_time)
+             12 LOAD_FAST                0 (state)
+             14 LOAD_ATTR                3 (NULL|self + get)
+             34 LOAD_CONST               1 ('last_online_check_utc')
+             36 CALL                     1
+             44 CALL                     1
+             52 STORE_FAST               1 (last_online)
+
+248          54 LOAD_FAST                1 (last_online)
+             56 POP_JUMP_IF_NOT_NONE     1 (to 60)
+
+249          58 RETURN_CONST             2 (False)
+
+250     >>   60 LOAD_CONST               3 (0)
+             62 LOAD_GLOBAL              5 (NULL + time)
+             72 LOAD_ATTR                4 (time)
+             92 CALL                     0
+            100 LOAD_FAST                1 (last_online)
+            102 BINARY_OP               10 (-)
+            106 SWAP                     2
+            108 COPY                     2
+            110 COMPARE_OP              26 (<=)
+            114 COPY                     1
+            116 POP_JUMP_IF_FALSE        9 (to 136)
+            118 POP_TOP
+            120 LOAD_GLOBAL              6 (OFFLINE_GRACE_SECONDS)
+            130 COMPARE_OP              26 (<=)
+            134 RETURN_VALUE
+        >>  136 SWAP                     2
+            138 POP_TOP
+            140 RETURN_VALUE
+
+Disassembly of <code object _request_activation at <address>, file "xiaoguan_classifier\license_client.py", line 253>:
+253           0 RESUME                   0
+
+254           2 LOAD_GLOBAL              1 (NULL + json)
+             12 LOAD_ATTR                2 (dumps)
+
+256          32 LOAD_GLOBAL              4 (APP_NAME)
+
+257          42 LOAD_FAST                0 (activation_code)
+
+258          44 LOAD_FAST                0 (activation_code)
+
+259          46 LOAD_GLOBAL              7 (NULL + machine_code)
+             56 CALL                     0
+
+260          64 LOAD_GLOBAL              8 (SOFTWARE_VERSION)
+
+261          74 LOAD_GLOBAL              8 (SOFTWARE_VERSION)
+
+262          84 LOAD_GLOBAL             10 (sys)
+             94 LOAD_ATTR               12 (platform)
+
+255         114 LOAD_CONST               1 (('app_name', 'activation_code', 'code', 'machine_code', 'software_version', 'client_version', 'platform'))
+            116 BUILD_CONST_KEY_MAP      7
+
+264         118 LOAD_CONST               2 (False)
+
+254         120 KW_NAMES                 3 (('ensure_ascii',))
+            122 CALL                     2
+
+265         130 LOAD_ATTR               15 (NULL|self + encode)
+            150 LOAD_CONST               4 ('utf-8')
+            152 CALL                     1
+
+254         160 STORE_FAST               1 (body)
+
+266         162 LOAD_GLOBAL             16 (urllib)
+            172 LOAD_ATTR               18 (request)
+            192 LOAD_ATTR               21 (NULL|self + Request)
+
+267         212 LOAD_GLOBAL             22 (ACTIVATE_URL)
+
+268         222 LOAD_FAST                1 (body)
+
+269         224 LOAD_CONST               5 ('POST')
+
+270         226 LOAD_CONST               6 ('application/json; charset=utf-8')
+            228 LOAD_CONST               7 ('application/json')
+            230 LOAD_CONST               8 (('Content-Type', 'Accept'))
+            232 BUILD_CONST_KEY_MAP      2
+
+266         234 KW_NAMES                 9 (('data', 'method', 'headers'))
+            236 CALL                     4
+            244 STORE_FAST               2 (request)
+
+272         246 NOP
+
+273         248 LOAD_GLOBAL             16 (urllib)
+            258 LOAD_ATTR               18 (request)
+            278 LOAD_ATTR               25 (NULL|self + urlopen)
+            298 LOAD_FAST                2 (request)
+            300 LOAD_GLOBAL             26 (REQUEST_TIMEOUT_SECONDS)
+            310 KW_NAMES                10 (('timeout',))
+            312 CALL                     2
+            320 BEFORE_WITH
+            322 STORE_FAST               3 (response)
+
+274         324 LOAD_GLOBAL             29 (NULL + int)
+            334 LOAD_FAST                3 (response)
+            336 LOAD_ATTR               30 (status)
+            356 CALL                     1
+            364 STORE_FAST               4 (status)
+
+275         366 LOAD_FAST                3 (response)
+            368 LOAD_ATTR               33 (NULL|self + read)
+            388 CALL                     0
+            396 LOAD_ATTR               35 (NULL|self + decode)
+            416 LOAD_CONST               4 ('utf-8')
+            418 LOAD_CONST              11 ('replace')
+            420 KW_NAMES                12 (('errors',))
+            422 CALL                     2
+            430 STORE_FAST               5 (raw)
+
+273         432 LOAD_CONST               0 (None)
+            434 LOAD_CONST               0 (None)
+            436 LOAD_CONST               0 (None)
+            438 CALL                     2
+            446 POP_TOP
+
+281     >>  448 NOP
+
+282         450 LOAD_GLOBAL              1 (NULL + json)
+            460 LOAD_ATTR               52 (loads)
+            480 LOAD_FAST_CHECK          5 (raw)
+            482 COPY                     1
+            484 POP_JUMP_IF_TRUE         2 (to 490)
+            486 POP_TOP
+            488 LOAD_CONST              15 ('{}')
+        >>  490 CALL                     1
+            498 STORE_FAST               7 (parsed)
+
+285         500 LOAD_FAST_CHECK          4 (status)
+            502 LOAD_GLOBAL             59 (NULL + isinstance)
+            512 LOAD_FAST                7 (parsed)
+            514 LOAD_GLOBAL             60 (dict)
+            524 CALL                     2
+            532 POP_JUMP_IF_FALSE        3 (to 540)
+            534 LOAD_FAST                7 (parsed)
+            536 BUILD_TUPLE              2
+            538 RETURN_VALUE
+        >>  540 BUILD_MAP                0
+            542 BUILD_TUPLE              2
+            544 RETURN_VALUE
+
+273     >>  546 PUSH_EXC_INFO
+            548 WITH_EXCEPT_START
+            550 POP_JUMP_IF_TRUE         1 (to 554)
+            552 RERAISE                  2
+        >>  554 POP_TOP
+            556 POP_EXCEPT
+            558 POP_TOP
+            560 POP_TOP
+            562 JUMP_BACKWARD           58 (to 448)
+        >>  564 COPY                     3
+            566 POP_EXCEPT
+            568 RERAISE                  1
+        >>  570 PUSH_EXC_INFO
+
+276         572 LOAD_GLOBAL             16 (urllib)
+            582 LOAD_ATTR               36 (error)
+            602 LOAD_ATTR               38 (HTTPError)
+            622 CHECK_EXC_MATCH
+            624 POP_JUMP_IF_FALSE       64 (to 754)
+            626 STORE_FAST               6 (exc)
+
+277         628 LOAD_GLOBAL             29 (NULL + int)
+            638 LOAD_FAST                6 (exc)
+            640 LOAD_ATTR               40 (code)
+            660 CALL                     1
+            668 STORE_FAST               4 (status)
+
+278         670 LOAD_FAST                6 (exc)
+            672 LOAD_ATTR               33 (NULL|self + read)
+            692 CALL                     0
+            700 LOAD_ATTR               35 (NULL|self + decode)
+            720 LOAD_CONST               4 ('utf-8')
+            722 LOAD_CONST              11 ('replace')
+            724 KW_NAMES                12 (('errors',))
+            726 CALL                     2
+            734 STORE_FAST               5 (raw)
+            736 POP_EXCEPT
+            738 LOAD_CONST               0 (None)
+            740 STORE_FAST               6 (exc)
+            742 DELETE_FAST              6 (exc)
+            744 JUMP_BACKWARD          149 (to 448)
+        >>  746 LOAD_CONST               0 (None)
+            748 STORE_FAST               6 (exc)
+            750 DELETE_FAST              6 (exc)
+            752 RERAISE                  1
+
+279     >>  754 LOAD_GLOBAL             16 (urllib)
+            764 LOAD_ATTR               36 (error)
+            784 LOAD_ATTR               42 (URLError)
+            804 LOAD_GLOBAL             44 (TimeoutError)
+            814 LOAD_GLOBAL             46 (OSError)
+            824 BUILD_TUPLE              3
+            826 CHECK_EXC_MATCH
+            828 POP_JUMP_IF_FALSE       31 (to 892)
+            830 STORE_FAST               6 (exc)
+
+280         832 LOAD_GLOBAL             49 (NULL + ConnectivityError)
+            842 LOAD_CONST              13 ('连接授权服务器失败：')
+            844 LOAD_GLOBAL             51 (NULL + getattr)
+            854 LOAD_FAST                6 (exc)
+            856 LOAD_CONST              14 ('reason')
+            858 LOAD_FAST                6 (exc)
+            860 CALL                     3
+            868 FORMAT_VALUE             0
+            870 BUILD_STRING             2
+            872 CALL                     1
+            880 LOAD_FAST                6 (exc)
+            882 RAISE_VARARGS            2
+        >>  884 LOAD_CONST               0 (None)
+            886 STORE_FAST               6 (exc)
+            888 DELETE_FAST              6 (exc)
+            890 RERAISE                  1
+
+279     >>  892 RERAISE                  0
+        >>  894 COPY                     3
+            896 POP_EXCEPT
+            898 RERAISE                  1
+        >>  900 PUSH_EXC_INFO
+
+283         902 LOAD_GLOBAL              0 (json)
+            912 LOAD_ATTR               54 (JSONDecodeError)
+            932 CHECK_EXC_MATCH
+            934 POP_JUMP_IF_FALSE       17 (to 970)
+            936 STORE_FAST               6 (exc)
+
+284         938 LOAD_GLOBAL             57 (NULL + LicenseError)
+            948 LOAD_CONST              16 ('授权服务器返回了无法识别的数据。')
+            950 CALL                     1
+            958 LOAD_FAST                6 (exc)
+            960 RAISE_VARARGS            2
+        >>  962 LOAD_CONST               0 (None)
+            964 STORE_FAST               6 (exc)
+            966 DELETE_FAST              6 (exc)
+            968 RERAISE                  1
+
+283     >>  970 RERAISE                  0
+        >>  972 COPY                     3
+            974 POP_EXCEPT
+            976 RERAISE                  1
+ExceptionTable:
+  248 to 320 -> 570 [0]
+  322 to 430 -> 546 [1] lasti
+  432 to 446 -> 570 [0]
+  450 to 498 -> 900 [0]
+  546 to 554 -> 564 [3] lasti
+  556 to 568 -> 570 [0]
+  570 to 626 -> 894 [1] lasti
+  628 to 734 -> 746 [1] lasti
+  746 to 830 -> 894 [1] lasti
+  832 to 882 -> 884 [1] lasti
+  884 to 892 -> 894 [1] lasti
+  900 to 936 -> 972 [1] lasti
+  938 to 960 -> 962 [1] lasti
+  962 to 970 -> 972 [1] lasti
+
+Disassembly of <code object _explicit_rejection at <address>, file "xiaoguan_classifier\license_client.py", line 288>:
+              0 MAKE_CELL                6 (combined)
+
+288           2 RESUME                   0
+
+289           4 LOAD_FAST                0 (message)
+              6 FORMAT_VALUE             0
+              8 LOAD_CONST               1 (' ')
+             10 LOAD_GLOBAL              1 (NULL + _first_text)
+             20 LOAD_FAST                1 (license_data)
+             22 LOAD_CONST               2 ('status')
+             24 LOAD_CONST               3 ('state')
+             26 LOAD_CONST               4 ('reason')
+             28 CALL                     4
+             36 FORMAT_VALUE             0
+             38 BUILD_STRING             3
+             40 LOAD_ATTR                3 (NULL|self + lower)
+             60 CALL                     0
+             68 STORE_DEREF              6 (combined)
+
+290          70 LOAD_CONST               5 (((('机器码不匹配', '设备不匹配', 'machine mismatch', 'different machine'), '激活码已绑定其他电脑，机器码不匹配。'), (('已禁用', '禁用', 'disabled', 'revoked', 'blocked'), '激活码已被禁用。'), (('已过期', '过期', 'expired'), '激活码已过期。')))
+             72 STORE_FAST               2 (rules)
+
+295          74 LOAD_FAST                2 (rules)
+             76 GET_ITER
+        >>   78 FOR_ITER                29 (to 140)
+             82 UNPACK_SEQUENCE          2
+             86 STORE_FAST               3 (keywords)
+             88 STORE_FAST               4 (result)
+
+296          90 LOAD_GLOBAL              5 (NULL + any)
+            100 LOAD_CLOSURE             6 (combined)
+            102 BUILD_TUPLE              1
+            104 LOAD_CONST               6 (<code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 296>)
+            106 MAKE_FUNCTION            8 (closure)
+            108 LOAD_FAST                3 (keywords)
+            110 GET_ITER
+            112 CALL                     0
+            120 CALL                     1
+            128 POP_JUMP_IF_TRUE         1 (to 132)
+            130 JUMP_BACKWARD           27 (to 78)
+
+297     >>  132 LOAD_FAST                4 (result)
+            134 SWAP                     2
+            136 POP_TOP
+            138 RETURN_VALUE
+
+295     >>  140 END_FOR
+
+298         142 LOAD_GLOBAL              1 (NULL + _first_text)
+            152 LOAD_FAST                1 (license_data)
+            154 LOAD_CONST               2 ('status')
+            156 LOAD_CONST               3 ('state')
+            158 CALL                     3
+            166 LOAD_ATTR                3 (NULL|self + lower)
+            186 CALL                     0
+            194 STORE_FAST               5 (status)
+
+299         196 LOAD_FAST                5 (status)
+            198 LOAD_CONST               7 (frozenset({'revoked', 'blocked', 'disabled', 'expired'}))
+            200 CONTAINS_OP              0
+            202 POP_JUMP_IF_FALSE        5 (to 214)
+
+300         204 LOAD_CONST               8 ('授权状态异常：')
+            206 LOAD_FAST                5 (status)
+            208 FORMAT_VALUE             0
+            210 BUILD_STRING             2
+            212 RETURN_VALUE
+
+301     >>  214 LOAD_CONST               9 ('active')
+            216 LOAD_FAST                1 (license_data)
+            218 CONTAINS_OP              0
+            220 POP_JUMP_IF_FALSE       27 (to 276)
+            222 LOAD_GLOBAL              7 (NULL + _as_bool)
+            232 LOAD_FAST                1 (license_data)
+            234 LOAD_ATTR                9 (NULL|self + get)
+            254 LOAD_CONST               9 ('active')
+            256 CALL                     1
+            264 CALL                     1
+            272 POP_JUMP_IF_TRUE         1 (to 276)
+
+302         274 RETURN_CONST            10 ('授权已被服务器停用。')
+
+303     >>  276 LOAD_CONST              11 ('is_active')
+            278 LOAD_FAST                1 (license_data)
+            280 CONTAINS_OP              0
+            282 POP_JUMP_IF_FALSE       27 (to 338)
+            284 LOAD_GLOBAL              7 (NULL + _as_bool)
+            294 LOAD_FAST                1 (license_data)
+            296 LOAD_ATTR                9 (NULL|self + get)
+            316 LOAD_CONST              11 ('is_active')
+            318 CALL                     1
+            326 CALL                     1
+            334 POP_JUMP_IF_TRUE         1 (to 338)
+
+304         336 RETURN_CONST            10 ('授权已被服务器停用。')
+
+305     >>  338 RETURN_CONST            12 ('')
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 296>:
+              0 COPY_FREE_VARS           1
+
+296           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                 8 (to 30)
+             14 STORE_FAST               1 (keyword)
+             16 LOAD_FAST                1 (keyword)
+             18 LOAD_DEREF               2 (combined)
+             20 CONTAINS_OP              0
+             22 YIELD_VALUE              1
+             24 RESUME                   1
+             26 POP_TOP
+             28 JUMP_BACKWARD           10 (to 10)
+        >>   30 END_FOR
+             32 RETURN_CONST             0 (None)
+        >>   34 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             36 RERAISE                  1
+ExceptionTable:
+  6 to 32 -> 34 [0] lasti
+
+Disassembly of <code object _state_from_response at <address>, file "xiaoguan_classifier\license_client.py", line 308>:
+308           0 RESUME                   0
+
+313           2 LOAD_GLOBAL              1 (NULL + _license_payload)
+             12 LOAD_FAST                1 (result)
+             14 CALL                     1
+             22 STORE_FAST               3 (license_data)
+
+314          24 LOAD_GLOBAL              3 (NULL + machine_code)
+             34 CALL                     0
+             42 STORE_FAST               4 (current_machine)
+
+315          44 LOAD_GLOBAL              5 (NULL + _first_text)
+             54 LOAD_FAST                3 (license_data)
+             56 LOAD_CONST               1 ('bound_machine_code')
+             58 LOAD_CONST               2 ('machine_code')
+             60 LOAD_CONST               3 ('device_code')
+             62 CALL                     4
+             70 STORE_FAST               5 (returned_machine)
+
+316          72 LOAD_FAST                5 (returned_machine)
+             74 POP_JUMP_IF_FALSE       44 (to 164)
+             76 LOAD_FAST                5 (returned_machine)
+             78 LOAD_ATTR                7 (NULL|self + upper)
+             98 CALL                     0
+            106 LOAD_FAST                4 (current_machine)
+            108 LOAD_ATTR                7 (NULL|self + upper)
+            128 CALL                     0
+            136 COMPARE_OP              55 (!=)
+            140 POP_JUMP_IF_FALSE       11 (to 164)
+
+317         142 LOAD_GLOBAL              9 (NULL + ServerRejectedError)
+            152 LOAD_CONST               4 ('服务器返回的授权机器码与当前电脑不匹配。')
+            154 CALL                     1
+            162 RAISE_VARARGS            1
+
+318     >>  164 LOAD_GLOBAL             11 (NULL + _explicit_rejection)
+            174 LOAD_GLOBAL             13 (NULL + _server_message)
+            184 LOAD_FAST                1 (result)
+            186 CALL                     1
+            194 LOAD_FAST                3 (license_data)
+            196 CALL                     2
+            204 STORE_FAST               6 (rejection)
+
+319         206 LOAD_FAST                6 (rejection)
+            208 POP_JUMP_IF_FALSE       11 (to 232)
+
+320         210 LOAD_GLOBAL              9 (NULL + ServerRejectedError)
+            220 LOAD_FAST                6 (rejection)
+            222 CALL                     1
+            230 RAISE_VARARGS            1
+
+321     >>  232 LOAD_GLOBAL             15 (NULL + _utc_now)
+            242 CALL                     0
+            250 STORE_FAST               7 (now)
+
+322         252 LOAD_GLOBAL             17 (NULL + dict)
+            262 LOAD_FAST                2 (previous)
+            264 COPY                     1
+            266 POP_JUMP_IF_TRUE         2 (to 272)
+            268 POP_TOP
+            270 BUILD_MAP                0
+        >>  272 CALL                     1
+            280 STORE_FAST               8 (state)
+
+323         282 LOAD_FAST                8 (state)
+            284 LOAD_ATTR               19 (NULL|self + update)
+
+324         304 BUILD_MAP                0
+
+325         306 LOAD_CONST               5 ('app_name')
+            308 LOAD_GLOBAL             20 (APP_NAME)
+
+324         318 MAP_ADD                  1
+
+326         320 LOAD_CONST               6 ('activated')
+            322 LOAD_CONST               7 (True)
+
+324         324 MAP_ADD                  1
+
+327         326 LOAD_CONST               2 ('machine_code')
+            328 LOAD_FAST                4 (current_machine)
+
+324         330 MAP_ADD                  1
+
+328         332 LOAD_CONST               8 ('activation_credential')
+            334 LOAD_FAST                0 (activation_code)
+
+324         336 MAP_ADD                  1
+
+329         338 LOAD_CONST               9 ('software_version')
+            340 LOAD_GLOBAL             22 (SOFTWARE_VERSION)
+
+324         350 MAP_ADD                  1
+
+330         352 LOAD_CONST              10 ('activated_at_utc')
+            354 LOAD_FAST                8 (state)
+            356 LOAD_ATTR               25 (NULL|self + get)
+            376 LOAD_CONST              10 ('activated_at_utc')
+            378 CALL                     1
+            386 COPY                     1
+            388 POP_JUMP_IF_TRUE         2 (to 394)
+            390 POP_TOP
+            392 LOAD_FAST                7 (now)
+
+324     >>  394 MAP_ADD                  1
+
+331         396 LOAD_CONST              11 ('issued_at')
+            398 LOAD_GLOBAL              5 (NULL + _first_text)
+            408 LOAD_FAST                3 (license_data)
+            410 LOAD_CONST              11 ('issued_at')
+            412 LOAD_CONST              12 ('activated_at')
+            414 LOAD_CONST              13 ('start_at')
+            416 CALL                     4
+            424 COPY                     1
+            426 POP_JUMP_IF_TRUE        18 (to 464)
+            428 POP_TOP
+            430 LOAD_FAST                8 (state)
+            432 LOAD_ATTR               25 (NULL|self + get)
+            452 LOAD_CONST              11 ('issued_at')
+            454 LOAD_CONST              14 ('')
+            456 CALL                     2
+
+324     >>  464 MAP_ADD                  1
+
+332         466 LOAD_CONST              15 ('expires_at')
+            468 LOAD_GLOBAL              5 (NULL + _first_text)
+            478 LOAD_FAST                3 (license_data)
+            480 LOAD_CONST              15 ('expires_at')
+            482 LOAD_CONST              16 ('expire_at')
+            484 LOAD_CONST              17 ('expired_at')
+            486 LOAD_CONST              18 ('end_at')
+            488 CALL                     5
+            496 COPY                     1
+            498 POP_JUMP_IF_TRUE        18 (to 536)
+            500 POP_TOP
+            502 LOAD_FAST                8 (state)
+            504 LOAD_ATTR               25 (NULL|self + get)
+            524 LOAD_CONST              15 ('expires_at')
+            526 LOAD_CONST              14 ('')
+            528 CALL                     2
+
+324     >>  536 MAP_ADD                  1
+
+333         538 LOAD_CONST              19 ('unlimited')
+            540 LOAD_GLOBAL             27 (NULL + _as_bool)
+            550 LOAD_FAST                3 (license_data)
+            552 LOAD_ATTR               25 (NULL|self + get)
+            572 LOAD_CONST              19 ('unlimited')
+            574 CALL                     1
+            582 CALL                     1
+            590 COPY                     1
+            592 POP_JUMP_IF_TRUE        54 (to 702)
+            594 POP_TOP
+            596 LOAD_GLOBAL             27 (NULL + _as_bool)
+            606 LOAD_FAST                3 (license_data)
+            608 LOAD_ATTR               25 (NULL|self + get)
+            628 LOAD_CONST              20 ('is_unlimited')
+            630 CALL                     1
+            638 CALL                     1
+            646 COPY                     1
+            648 POP_JUMP_IF_TRUE        26 (to 702)
+            650 POP_TOP
+            652 LOAD_GLOBAL             27 (NULL + _as_bool)
+            662 LOAD_FAST                8 (state)
+            664 LOAD_ATTR               25 (NULL|self + get)
+            684 LOAD_CONST              19 ('unlimited')
+            686 CALL                     1
+            694 CALL                     1
+
+324     >>  702 MAP_ADD                  1
+
+334         704 LOAD_CONST              21 ('license_type')
+            706 LOAD_GLOBAL              5 (NULL + _first_text)
+            716 LOAD_FAST                3 (license_data)
+            718 LOAD_CONST              21 ('license_type')
+            720 LOAD_CONST              22 ('type')
+            722 LOAD_CONST              23 ('code_type')
+            724 LOAD_CONST              24 ('plan_type')
+            726 CALL                     5
+            734 COPY                     1
+            736 POP_JUMP_IF_TRUE        18 (to 774)
+            738 POP_TOP
+            740 LOAD_FAST                8 (state)
+            742 LOAD_ATTR               25 (NULL|self + get)
+            762 LOAD_CONST              21 ('license_type')
+            764 LOAD_CONST              14 ('')
+            766 CALL                     2
+
+324     >>  774 MAP_ADD                  1
+
+335         776 LOAD_CONST              25 ('credits')
+            778 LOAD_GLOBAL             29 (NULL + int)
+            788 LOAD_FAST                3 (license_data)
+            790 LOAD_ATTR               25 (NULL|self + get)
+            810 LOAD_CONST              25 ('credits')
+            812 CALL                     1
+            820 COPY                     1
+            822 POP_JUMP_IF_TRUE        40 (to 904)
+            824 POP_TOP
+            826 LOAD_FAST                3 (license_data)
+            828 LOAD_ATTR               25 (NULL|self + get)
+            848 LOAD_CONST              26 ('points')
+            850 CALL                     1
+            858 COPY                     1
+            860 POP_JUMP_IF_TRUE        21 (to 904)
+            862 POP_TOP
+            864 LOAD_FAST                8 (state)
+            866 LOAD_ATTR               25 (NULL|self + get)
+            886 LOAD_CONST              25 ('credits')
+            888 CALL                     1
+            896 COPY                     1
+            898 POP_JUMP_IF_TRUE         2 (to 904)
+            900 POP_TOP
+            902 LOAD_CONST              27 (0)
+        >>  904 CALL                     1
+
+324         912 MAP_ADD                  1
+
+336         914 LOAD_CONST              28 ('code_id')
+            916 LOAD_GLOBAL              5 (NULL + _first_text)
+            926 LOAD_FAST                3 (license_data)
+            928 LOAD_CONST              28 ('code_id')
+            930 LOAD_CONST              29 ('license_id')
+            932 LOAD_CONST              30 ('id')
+            934 CALL                     4
+            942 COPY                     1
+            944 POP_JUMP_IF_TRUE        18 (to 982)
+            946 POP_TOP
+            948 LOAD_FAST                8 (state)
+            950 LOAD_ATTR               25 (NULL|self + get)
+            970 LOAD_CONST              28 ('code_id')
+            972 LOAD_CONST              14 ('')
+            974 CALL                     2
+
+324     >>  982 MAP_ADD                  1
+
+337         984 LOAD_CONST              31 ('status')
+            986 LOAD_GLOBAL              5 (NULL + _first_text)
+            996 LOAD_FAST                3 (license_data)
+            998 LOAD_CONST              31 ('status')
+           1000 LOAD_CONST              32 ('state')
+           1002 CALL                     3
+           1010 COPY                     1
+           1012 POP_JUMP_IF_TRUE         2 (to 1018)
+           1014 POP_TOP
+           1016 LOAD_CONST              33 ('active')
+
+324     >> 1018 MAP_ADD                  1
+
+338        1020 LOAD_CONST              34 ('last_online_check_utc')
+           1022 LOAD_FAST                7 (now)
+
+324        1024 MAP_ADD                  1
+
+339        1026 LOAD_CONST              35 ('last_seen_utc')
+           1028 LOAD_FAST                7 (now)
+
+324        1030 MAP_ADD                  1
+
+340        1032 LOAD_CONST              36 ('last_server_message')
+           1034 LOAD_GLOBAL             13 (NULL + _server_message)
+           1044 LOAD_FAST                1 (result)
+           1046 CALL                     1
+
+324        1054 MAP_ADD                  1
+
+323        1056 CALL                     1
+           1064 POP_TOP
+
+343        1066 LOAD_GLOBAL             31 (NULL + _validate_local)
+           1076 LOAD_FAST                8 (state)
+           1078 CALL                     1
+           1086 STORE_FAST               9 (local_error)
+
+344        1088 LOAD_FAST                9 (local_error)
+           1090 POP_JUMP_IF_FALSE       11 (to 1114)
+
+345        1092 LOAD_GLOBAL              9 (NULL + ServerRejectedError)
+           1102 LOAD_FAST                9 (local_error)
+           1104 CALL                     1
+           1112 RAISE_VARARGS            1
+
+346     >> 1114 LOAD_FAST                8 (state)
+           1116 RETURN_VALUE
+
+Disassembly of <code object activate_online at <address>, file "xiaoguan_classifier\license_client.py", line 349>:
+              0 MAKE_CELL               14 (message)
+
+349           2 RESUME                   0
+
+350           4 LOAD_GLOBAL              1 (NULL + str)
+             14 LOAD_FAST                0 (activation_code)
+             16 COPY                     1
+             18 POP_JUMP_IF_TRUE         2 (to 24)
+             20 POP_TOP
+             22 LOAD_CONST               1 ('')
+        >>   24 CALL                     1
+             32 LOAD_ATTR                3 (NULL|self + strip)
+             52 CALL                     0
+             60 STORE_FAST               2 (code)
+
+351          62 LOAD_FAST                2 (code)
+             64 POP_JUMP_IF_TRUE        11 (to 88)
+
+352          66 LOAD_GLOBAL              5 (NULL + LicenseError)
+             76 LOAD_CONST               2 ('请输入激活码。')
+             78 CALL                     1
+             86 RAISE_VARARGS            1
+
+353     >>   88 LOAD_GLOBAL              7 (NULL + _request_activation)
+             98 LOAD_FAST                2 (code)
+            100 CALL                     1
+            108 UNPACK_SEQUENCE          2
+            112 STORE_FAST               3 (status)
+            114 STORE_FAST               4 (result)
+
+354         116 LOAD_GLOBAL              9 (NULL + _as_bool)
+            126 LOAD_FAST                4 (result)
+            128 LOAD_ATTR               11 (NULL|self + get)
+            148 LOAD_CONST               3 ('ok')
+            150 CALL                     1
+            158 CALL                     1
+            166 COPY                     1
+            168 POP_JUMP_IF_TRUE        26 (to 222)
+            170 POP_TOP
+            172 LOAD_GLOBAL              9 (NULL + _as_bool)
+            182 LOAD_FAST                4 (result)
+            184 LOAD_ATTR               11 (NULL|self + get)
+            204 LOAD_CONST               4 ('success')
+            206 CALL                     1
+            214 CALL                     1
+        >>  222 STORE_FAST               5 (ok)
+
+355         224 LOAD_CONST               5 (200)
+            226 LOAD_FAST                3 (status)
+            228 SWAP                     2
+            230 COPY                     2
+            232 COMPARE_OP              26 (<=)
+            236 POP_JUMP_IF_FALSE        5 (to 248)
+            238 LOAD_CONST               6 (300)
+            240 COMPARE_OP               2 (<)
+            244 POP_JUMP_IF_FALSE       31 (to 308)
+            246 JUMP_FORWARD             2 (to 252)
+        >>  248 POP_TOP
+            250 JUMP_FORWARD            28 (to 308)
+        >>  252 LOAD_FAST                5 (ok)
+            254 POP_JUMP_IF_FALSE       26 (to 308)
+
+356         256 LOAD_GLOBAL             13 (NULL + _state_from_response)
+            266 LOAD_FAST                2 (code)
+            268 LOAD_FAST                4 (result)
+            270 LOAD_FAST                1 (previous)
+            272 CALL                     3
+            280 STORE_FAST               6 (state)
+
+357         282 LOAD_GLOBAL             15 (NULL + _save_state)
+            292 LOAD_FAST                6 (state)
+            294 CALL                     1
+            302 POP_TOP
+
+358         304 LOAD_FAST                6 (state)
+            306 RETURN_VALUE
+
+360     >>  308 LOAD_GLOBAL             17 (NULL + _license_payload)
+            318 LOAD_FAST                4 (result)
+            320 CALL                     1
+            328 STORE_FAST               7 (license_data)
+
+361         330 LOAD_GLOBAL             19 (NULL + _server_message)
+            340 LOAD_FAST                4 (result)
+            342 LOAD_FAST                3 (status)
+            344 CALL                     2
+            352 STORE_DEREF             14 (message)
+
+362         354 LOAD_GLOBAL             21 (NULL + _explicit_rejection)
+            364 LOAD_DEREF              14 (message)
+            366 LOAD_FAST                7 (license_data)
+            368 CALL                     2
+            376 STORE_FAST               8 (rejection)
+
+363         378 LOAD_FAST                8 (rejection)
+            380 POP_JUMP_IF_FALSE       11 (to 404)
+
+364         382 LOAD_GLOBAL             23 (NULL + ServerRejectedError)
+            392 LOAD_FAST                8 (rejection)
+            394 CALL                     1
+            402 RAISE_VARARGS            1
+
+366     >>  404 LOAD_GLOBAL             25 (NULL + any)
+            414 LOAD_CLOSURE            14 (message)
+            416 BUILD_TUPLE              1
+            418 LOAD_CONST               7 (<code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 366>)
+            420 MAKE_FUNCTION            8 (closure)
+            422 LOAD_CONST               8 (('已使用', '已经使用', 'already used', 'used'))
+            424 GET_ITER
+            426 CALL                     0
+            434 CALL                     1
+            442 STORE_FAST               9 (used)
+
+367         444 LOAD_GLOBAL             27 (NULL + _first_text)
+            454 LOAD_FAST                7 (license_data)
+            456 LOAD_CONST               9 ('bound_machine_code')
+            458 LOAD_CONST              10 ('machine_code')
+            460 LOAD_CONST              11 ('device_code')
+            462 CALL                     4
+            470 STORE_FAST              10 (returned_machine)
+
+368         472 LOAD_GLOBAL             29 (NULL + bool)
+
+369         482 LOAD_FAST                1 (previous)
+            484 COPY                     1
+            486 POP_JUMP_IF_FALSE      132 (to 752)
+            488 POP_TOP
+
+370         490 LOAD_GLOBAL              9 (NULL + _as_bool)
+            500 LOAD_FAST                1 (previous)
+            502 LOAD_ATTR               11 (NULL|self + get)
+            522 LOAD_CONST              12 ('activated')
+            524 CALL                     1
+            532 CALL                     1
+
+369         540 COPY                     1
+            542 POP_JUMP_IF_FALSE      104 (to 752)
+            544 POP_TOP
+
+371         546 LOAD_GLOBAL              1 (NULL + str)
+            556 LOAD_FAST                1 (previous)
+            558 LOAD_ATTR               11 (NULL|self + get)
+            578 LOAD_CONST              13 ('activation_credential')
+            580 CALL                     1
+            588 COPY                     1
+            590 POP_JUMP_IF_TRUE         2 (to 596)
+            592 POP_TOP
+            594 LOAD_CONST               1 ('')
+        >>  596 CALL                     1
+            604 LOAD_FAST                2 (code)
+            606 COMPARE_OP              40 (==)
+
+369         610 COPY                     1
+            612 POP_JUMP_IF_FALSE       69 (to 752)
+            614 POP_TOP
+
+372         616 LOAD_GLOBAL              1 (NULL + str)
+            626 LOAD_FAST                1 (previous)
+            628 LOAD_ATTR               11 (NULL|self + get)
+            648 LOAD_CONST              10 ('machine_code')
+            650 CALL                     1
+            658 COPY                     1
+            660 POP_JUMP_IF_TRUE         2 (to 666)
+            662 POP_TOP
+            664 LOAD_CONST               1 ('')
+        >>  666 CALL                     1
+            674 LOAD_ATTR               31 (NULL|self + upper)
+            694 CALL                     0
+            702 LOAD_GLOBAL             33 (NULL + machine_code)
+            712 CALL                     0
+            720 LOAD_ATTR               31 (NULL|self + upper)
+            740 CALL                     0
+            748 COMPARE_OP              40 (==)
+
+368     >>  752 CALL                     1
+            760 STORE_FAST              11 (same_cached_code)
+
+374         762 LOAD_GLOBAL             29 (NULL + bool)
+            772 LOAD_FAST               10 (returned_machine)
+            774 COPY                     1
+            776 POP_JUMP_IF_FALSE       41 (to 860)
+            778 POP_TOP
+            780 LOAD_FAST               10 (returned_machine)
+            782 LOAD_ATTR               31 (NULL|self + upper)
+            802 CALL                     0
+            810 LOAD_GLOBAL             33 (NULL + machine_code)
+            820 CALL                     0
+            828 LOAD_ATTR               31 (NULL|self + upper)
+            848 CALL                     0
+            856 COMPARE_OP              40 (==)
+        >>  860 CALL                     1
+            868 STORE_FAST              12 (same_server_machine)
+
+375         870 LOAD_FAST                3 (status)
+            872 LOAD_CONST              14 (400)
+            874 COMPARE_OP              40 (==)
+            878 COPY                     1
+            880 POP_JUMP_IF_FALSE       26 (to 934)
+            882 POP_TOP
+            884 LOAD_DEREF              14 (message)
+            886 LOAD_ATTR                3 (NULL|self + strip)
+            906 CALL                     0
+            914 UNARY_NOT
+            916 COPY                     1
+            918 POP_JUMP_IF_FALSE        7 (to 934)
+            920 POP_TOP
+            922 LOAD_FAST                7 (license_data)
+            924 UNARY_NOT
+            926 COPY                     1
+            928 POP_JUMP_IF_FALSE        2 (to 934)
+            930 POP_TOP
+            932 LOAD_FAST               11 (same_cached_code)
+        >>  934 STORE_FAST              13 (empty_same_machine_recheck)
+
+376         936 LOAD_FAST                9 (used)
+            938 POP_JUMP_IF_FALSE        4 (to 948)
+            940 LOAD_FAST               11 (same_cached_code)
+            942 POP_JUMP_IF_TRUE         4 (to 952)
+            944 LOAD_FAST               12 (same_server_machine)
+            946 POP_JUMP_IF_TRUE         2 (to 952)
+        >>  948 LOAD_FAST               13 (empty_same_machine_recheck)
+            950 POP_JUMP_IF_FALSE       35 (to 1022)
+
+377     >>  952 LOAD_GLOBAL             13 (NULL + _state_from_response)
+            962 LOAD_FAST                2 (code)
+            964 LOAD_FAST                4 (result)
+            966 LOAD_FAST                1 (previous)
+            968 CALL                     3
+            976 STORE_FAST               6 (state)
+
+378         978 LOAD_DEREF              14 (message)
+            980 COPY                     1
+            982 POP_JUMP_IF_TRUE         2 (to 988)
+            984 POP_TOP
+            986 LOAD_CONST              15 ('服务器返回空 400，按本机已缓存授权复验通过。')
+        >>  988 LOAD_FAST                6 (state)
+            990 LOAD_CONST              16 ('last_server_message')
+            992 STORE_SUBSCR
+
+379         996 LOAD_GLOBAL             15 (NULL + _save_state)
+           1006 LOAD_FAST                6 (state)
+           1008 CALL                     1
+           1016 POP_TOP
+
+380        1018 LOAD_FAST                6 (state)
+           1020 RETURN_VALUE
+
+381     >> 1022 LOAD_GLOBAL             23 (NULL + ServerRejectedError)
+           1032 LOAD_DEREF              14 (message)
+           1034 CALL                     1
+           1042 RAISE_VARARGS            1
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\license_client.py", line 366>:
+              0 COPY_FREE_VARS           1
+
+366           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                22 (to 58)
+             14 STORE_FAST               1 (keyword)
+             16 LOAD_FAST                1 (keyword)
+             18 LOAD_DEREF               2 (message)
+             20 LOAD_ATTR                1 (NULL|self + lower)
+             40 CALL                     0
+             48 CONTAINS_OP              0
+             50 YIELD_VALUE              1
+             52 RESUME                   1
+             54 POP_TOP
+             56 JUMP_BACKWARD           24 (to 10)
+        >>   58 END_FOR
+             60 RETURN_CONST             0 (None)
+        >>   62 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             64 RERAISE                  1
+ExceptionTable:
+  6 to 60 -> 62 [0] lasti
+
+Disassembly of <code object _summary at <address>, file "xiaoguan_classifier\license_client.py", line 384>:
+384           0 RESUME                   0
+
+385           2 LOAD_GLOBAL              1 (NULL + _as_bool)
+             12 LOAD_FAST                0 (state)
+             14 LOAD_ATTR                3 (NULL|self + get)
+             34 LOAD_CONST               1 ('unlimited')
+             36 CALL                     1
+             44 CALL                     1
+             52 POP_JUMP_IF_FALSE        1 (to 56)
+
+386          54 RETURN_CONST             2 ('无限授权已生效。')
+
+387     >>   56 LOAD_FAST                0 (state)
+             58 LOAD_ATTR                3 (NULL|self + get)
+             78 LOAD_CONST               3 ('expires_at')
+             80 CALL                     1
+             88 POP_JUMP_IF_FALSE        8 (to 106)
+
+388          90 LOAD_CONST               4 ('授权有效，到期时间：')
+             92 LOAD_FAST                0 (state)
+             94 LOAD_CONST               3 ('expires_at')
+             96 BINARY_SUBSCR
+            100 FORMAT_VALUE             0
+            102 BUILD_STRING             2
+            104 RETURN_VALUE
+
+389     >>  106 LOAD_GLOBAL              5 (NULL + int)
+            116 LOAD_FAST                0 (state)
+            118 LOAD_ATTR                3 (NULL|self + get)
+            138 LOAD_CONST               5 ('credits')
+            140 CALL                     1
+            148 COPY                     1
+            150 POP_JUMP_IF_TRUE         2 (to 156)
+            152 POP_TOP
+            154 LOAD_CONST               6 (0)
+        >>  156 CALL                     1
+            164 LOAD_CONST               6 (0)
+            166 COMPARE_OP              68 (>)
+            170 POP_JUMP_IF_FALSE        8 (to 188)
+
+390         172 LOAD_CONST               7 ('积分授权已生效，服务器返回积分：')
+            174 LOAD_FAST                0 (state)
+            176 LOAD_CONST               5 ('credits')
+            178 BINARY_SUBSCR
+            182 FORMAT_VALUE             0
+            184 BUILD_STRING             2
+            186 RETURN_VALUE
+
+391     >>  188 RETURN_CONST             8 ('授权已生效。')
+
+Disassembly of <code object _icon_path at <address>, file "xiaoguan_classifier\license_client.py", line 394>:
+394           0 RESUME                   0
+
+395           2 LOAD_GLOBAL              1 (NULL + Path)
+             12 LOAD_GLOBAL              2 (sys)
+             22 LOAD_ATTR                4 (executable)
+             42 CALL                     1
+             50 LOAD_ATTR                7 (NULL|self + resolve)
+             70 CALL                     0
+             78 LOAD_ATTR                8 (parent)
+             98 LOAD_CONST               1 ('icons')
+            100 BINARY_OP               11 (/)
+            104 LOAD_CONST               2 ('素材分类工作台.ico')
+            106 BINARY_OP               11 (/)
+            110 RETURN_VALUE
+
+Disassembly of <code object _activation_window at <address>, file "xiaoguan_classifier\license_client.py", line 398>:
+              0 MAKE_CELL                1 (previous)
+              2 MAKE_CELL               10 (activate_button)
+              4 MAKE_CELL               11 (code_entry)
+              6 MAKE_CELL               12 (code_var)
+              8 MAKE_CELL               13 (result)
+             10 MAKE_CELL               14 (status_var)
+             12 MAKE_CELL               15 (window)
+
+398          14 RESUME                   0
+
+399          16 LOAD_GLOBAL              1 (NULL + Tk)
+             26 CALL                     0
+             34 STORE_DEREF             15 (window)
+
+400          36 LOAD_DEREF              15 (window)
+             38 LOAD_ATTR                3 (NULL|self + title)
+             58 LOAD_GLOBAL              4 (DISPLAY_NAME)
+             68 FORMAT_VALUE             0
+             70 LOAD_CONST               1 (' - 服务器激活')
+             72 BUILD_STRING             2
+             74 CALL                     1
+             82 POP_TOP
+
+401          84 LOAD_DEREF              15 (window)
+             86 LOAD_ATTR                7 (NULL|self + geometry)
+            106 LOAD_CONST               2 ('540x360')
+            108 CALL                     1
+            116 POP_TOP
+
+402         118 LOAD_DEREF              15 (window)
+            120 LOAD_ATTR                9 (NULL|self + resizable)
+            140 LOAD_CONST               3 (False)
+            142 LOAD_CONST               3 (False)
+            144 CALL                     2
+            152 POP_TOP
+
+403         154 LOAD_DEREF              15 (window)
+            156 LOAD_ATTR               11 (NULL|self + configure)
+            176 LOAD_CONST               4 ('#f4f6fa')
+            178 KW_NAMES                 5 (('bg',))
+            180 CALL                     1
+            188 POP_TOP
+
+404         190 NOP
+
+405         192 LOAD_GLOBAL             13 (NULL + _icon_path)
+            202 CALL                     0
+            210 STORE_FAST               2 (icon)
+
+406         212 LOAD_FAST                2 (icon)
+            214 LOAD_ATTR               15 (NULL|self + is_file)
+            234 CALL                     0
+            242 POP_JUMP_IF_FALSE       53 (to 350)
+
+407         244 LOAD_DEREF              15 (window)
+            246 LOAD_ATTR               17 (NULL|self + iconbitmap)
+            266 LOAD_GLOBAL             19 (NULL + str)
+            276 LOAD_FAST                2 (icon)
+            278 CALL                     1
+            286 CALL                     1
+            294 POP_TOP
+
+408         296 LOAD_DEREF              15 (window)
+            298 LOAD_ATTR               17 (NULL|self + iconbitmap)
+            318 LOAD_GLOBAL             19 (NULL + str)
+            328 LOAD_FAST                2 (icon)
+            330 CALL                     1
+            338 KW_NAMES                 6 (('default',))
+            340 CALL                     1
+            348 POP_TOP
+
+412     >>  350 LOAD_CONST               7 ('allowed')
+            352 LOAD_CONST               3 (False)
+            354 BUILD_MAP                1
+            356 STORE_DEREF             13 (result)
+
+413         358 LOAD_GLOBAL             23 (NULL + StringVar)
+            368 CALL                     0
+            376 STORE_DEREF             12 (code_var)
+
+414         378 LOAD_GLOBAL             23 (NULL + StringVar)
+            388 LOAD_FAST                0 (reason)
+            390 KW_NAMES                 8 (('value',))
+            392 CALL                     1
+            400 STORE_DEREF             14 (status_var)
+
+416         402 LOAD_GLOBAL             25 (NULL + Frame)
+            412 LOAD_DEREF              15 (window)
+            414 LOAD_CONST               4 ('#f4f6fa')
+            416 LOAD_CONST               9 (28)
+            418 LOAD_CONST              10 (24)
+            420 KW_NAMES                11 (('bg', 'padx', 'pady'))
+            422 CALL                     4
+            430 STORE_FAST               3 (body)
+
+417         432 LOAD_FAST                3 (body)
+            434 LOAD_ATTR               27 (NULL|self + pack)
+            454 LOAD_CONST              12 ('both')
+            456 LOAD_CONST              13 (True)
+            458 KW_NAMES                14 (('fill', 'expand'))
+            460 CALL                     2
+            468 POP_TOP
+
+418         470 LOAD_GLOBAL             29 (NULL + Label)
+            480 LOAD_FAST                3 (body)
+            482 LOAD_CONST              15 ('服务器激活码授权')
+            484 LOAD_CONST               4 ('#f4f6fa')
+            486 LOAD_CONST              16 ('#111827')
+            488 LOAD_CONST              17 (('Microsoft YaHei UI', 16, 'bold'))
+            490 KW_NAMES                18 (('text', 'bg', 'fg', 'font'))
+            492 CALL                     5
+            500 LOAD_ATTR               27 (NULL|self + pack)
+            520 LOAD_CONST              19 ('w')
+            522 KW_NAMES                20 (('anchor',))
+            524 CALL                     1
+            532 POP_TOP
+
+419         534 LOAD_GLOBAL             29 (NULL + Label)
+            544 LOAD_FAST                3 (body)
+            546 LOAD_CONST              21 ('产品：')
+            548 LOAD_GLOBAL             30 (APP_NAME)
+            558 FORMAT_VALUE             0
+            560 LOAD_CONST              22 ('    版本：')
+            562 LOAD_GLOBAL             32 (SOFTWARE_VERSION)
+            572 FORMAT_VALUE             0
+            574 BUILD_STRING             4
+            576 LOAD_CONST               4 ('#f4f6fa')
+            578 LOAD_CONST              23 ('#6b7280')
+            580 LOAD_CONST              24 (('Microsoft YaHei UI', 9))
+            582 KW_NAMES                18 (('text', 'bg', 'fg', 'font'))
+            584 CALL                     5
+            592 LOAD_ATTR               27 (NULL|self + pack)
+            612 LOAD_CONST              19 ('w')
+            614 LOAD_CONST              25 ((5, 16))
+            616 KW_NAMES                26 (('anchor', 'pady'))
+            618 CALL                     2
+            626 POP_TOP
+
+420         628 LOAD_GLOBAL             29 (NULL + Label)
+            638 LOAD_FAST                3 (body)
+            640 LOAD_CONST              27 ('激活码')
+            642 LOAD_CONST               4 ('#f4f6fa')
+            644 LOAD_CONST              28 ('#374151')
+            646 LOAD_CONST              29 (('Microsoft YaHei UI', 10))
+            648 KW_NAMES                18 (('text', 'bg', 'fg', 'font'))
+            650 CALL                     5
+            658 LOAD_ATTR               27 (NULL|self + pack)
+            678 LOAD_CONST              19 ('w')
+            680 KW_NAMES                20 (('anchor',))
+            682 CALL                     1
+            690 POP_TOP
+
+421         692 LOAD_GLOBAL             35 (NULL + Entry)
+            702 LOAD_FAST                3 (body)
+            704 LOAD_DEREF              12 (code_var)
+            706 LOAD_CONST              30 (('Consolas', 11))
+            708 LOAD_CONST              31 ('solid')
+            710 LOAD_CONST              32 (1)
+            712 KW_NAMES                33 (('textvariable', 'font', 'relief', 'bd'))
+            714 CALL                     5
+            722 STORE_DEREF             11 (code_entry)
+
+422         724 LOAD_DEREF              11 (code_entry)
+            726 LOAD_ATTR               27 (NULL|self + pack)
+            746 LOAD_GLOBAL             36 (X)
+            756 LOAD_CONST              34 (8)
+            758 LOAD_CONST              35 ((6, 13))
+            760 KW_NAMES                36 (('fill', 'ipady', 'pady'))
+            762 CALL                     3
+            770 POP_TOP
+
+423         772 LOAD_GLOBAL             29 (NULL + Label)
+            782 LOAD_FAST                3 (body)
+            784 LOAD_CONST              37 ('本机机器码')
+            786 LOAD_CONST               4 ('#f4f6fa')
+            788 LOAD_CONST              28 ('#374151')
+            790 LOAD_CONST              29 (('Microsoft YaHei UI', 10))
+            792 KW_NAMES                18 (('text', 'bg', 'fg', 'font'))
+            794 CALL                     5
+            802 LOAD_ATTR               27 (NULL|self + pack)
+            822 LOAD_CONST              19 ('w')
+            824 KW_NAMES                20 (('anchor',))
+            826 CALL                     1
+            834 POP_TOP
+
+424         836 LOAD_GLOBAL             25 (NULL + Frame)
+            846 LOAD_FAST                3 (body)
+            848 LOAD_CONST               4 ('#f4f6fa')
+            850 KW_NAMES                 5 (('bg',))
+            852 CALL                     2
+            860 STORE_FAST               4 (machine_frame)
+
+425         862 LOAD_FAST                4 (machine_frame)
+            864 LOAD_ATTR               27 (NULL|self + pack)
+            884 LOAD_GLOBAL             36 (X)
+            894 LOAD_CONST              35 ((6, 13))
+            896 KW_NAMES                38 (('fill', 'pady'))
+            898 CALL                     2
+            906 POP_TOP
+
+426         908 LOAD_GLOBAL             35 (NULL + Entry)
+            918 LOAD_FAST                4 (machine_frame)
+            920 LOAD_CONST              39 (('Consolas', 10))
+            922 LOAD_CONST              31 ('solid')
+            924 LOAD_CONST              32 (1)
+            926 KW_NAMES                40 (('font', 'relief', 'bd'))
+            928 CALL                     4
+            936 STORE_FAST               5 (machine_entry)
+
+427         938 LOAD_FAST                5 (machine_entry)
+            940 LOAD_ATTR               39 (NULL|self + insert)
+            960 LOAD_CONST              41 (0)
+            962 LOAD_GLOBAL             41 (NULL + machine_code)
+            972 CALL                     0
+            980 CALL                     2
+            988 POP_TOP
+
+428         990 LOAD_FAST                5 (machine_entry)
+            992 LOAD_ATTR               11 (NULL|self + configure)
+           1012 LOAD_CONST              42 ('readonly')
+           1014 KW_NAMES                43 (('state',))
+           1016 CALL                     1
+           1024 POP_TOP
+
+429        1026 LOAD_FAST                5 (machine_entry)
+           1028 LOAD_ATTR               27 (NULL|self + pack)
+           1048 LOAD_GLOBAL             42 (LEFT)
+           1058 LOAD_GLOBAL             36 (X)
+           1068 LOAD_CONST              13 (True)
+           1070 LOAD_CONST              44 (7)
+           1072 KW_NAMES                45 (('side', 'fill', 'expand', 'ipady'))
+           1074 CALL                     4
+           1082 POP_TOP
+
+431        1084 LOAD_CONST              73 (('return', 'None'))
+           1086 LOAD_CLOSURE            14 (status_var)
+           1088 LOAD_CLOSURE            15 (window)
+           1090 BUILD_TUPLE              2
+           1092 LOAD_CONST              46 (<code object copy_machine at <address>, file "xiaoguan_classifier\license_client.py", line 431>)
+           1094 MAKE_FUNCTION           12 (annotations, closure)
+           1096 STORE_FAST               6 (copy_machine)
+
+436        1098 LOAD_GLOBAL             45 (NULL + Button)
+           1108 LOAD_FAST                4 (machine_frame)
+           1110 LOAD_CONST              47 ('复制')
+           1112 LOAD_FAST                6 (copy_machine)
+           1114 LOAD_CONST              48 ('#eef3f9')
+           1116 LOAD_CONST              16 ('#111827')
+           1118 LOAD_CONST              49 ('flat')
+           1120 LOAD_CONST              50 (18)
+           1122 LOAD_CONST              44 (7)
+           1124 KW_NAMES                51 (('text', 'command', 'bg', 'fg', 'relief', 'padx', 'pady'))
+           1126 CALL                     8
+           1134 LOAD_ATTR               27 (NULL|self + pack)
+           1154 LOAD_GLOBAL             46 (RIGHT)
+           1164 LOAD_CONST              52 ((8, 0))
+           1166 KW_NAMES                53 (('side', 'padx'))
+           1168 CALL                     2
+           1176 POP_TOP
+
+437        1178 LOAD_GLOBAL             29 (NULL + Label)
+           1188 LOAD_FAST                3 (body)
+           1190 LOAD_DEREF              14 (status_var)
+           1192 LOAD_CONST               4 ('#f4f6fa')
+           1194 LOAD_CONST              54 ('#b42318')
+           1196 LOAD_CONST              55 (480)
+           1198 LOAD_CONST              56 ('left')
+           1200 LOAD_CONST              24 (('Microsoft YaHei UI', 9))
+           1202 KW_NAMES                57 (('textvariable', 'bg', 'fg', 'wraplength', 'justify', 'font'))
+           1204 CALL                     7
+           1212 LOAD_ATTR               27 (NULL|self + pack)
+           1232 LOAD_CONST              19 ('w')
+           1234 KW_NAMES                20 (('anchor',))
+           1236 CALL                     1
+           1244 POP_TOP
+
+438        1246 LOAD_GLOBAL             25 (NULL + Frame)
+           1256 LOAD_FAST                3 (body)
+           1258 LOAD_CONST               4 ('#f4f6fa')
+           1260 KW_NAMES                 5 (('bg',))
+           1262 CALL                     2
+           1270 STORE_FAST               7 (button_row)
+
+439        1272 LOAD_FAST                7 (button_row)
+           1274 LOAD_ATTR               27 (NULL|self + pack)
+           1294 LOAD_GLOBAL             36 (X)
+           1304 LOAD_CONST              58 ((18, 0))
+           1306 KW_NAMES                38 (('fill', 'pady'))
+           1308 CALL                     2
+           1316 POP_TOP
+
+441        1318 LOAD_CONST              73 (('return', 'None'))
+           1320 LOAD_CLOSURE            13 (result)
+           1322 LOAD_CLOSURE            15 (window)
+           1324 BUILD_TUPLE              2
+           1326 LOAD_CONST              59 (<code object close at <address>, file "xiaoguan_classifier\license_client.py", line 441>)
+           1328 MAKE_FUNCTION           12 (annotations, closure)
+           1330 STORE_FAST               8 (close)
+
+445        1332 LOAD_CONST              73 (('return', 'None'))
+           1334 LOAD_CLOSURE            10 (activate_button)
+           1336 LOAD_CLOSURE            11 (code_entry)
+           1338 LOAD_CLOSURE            12 (code_var)
+           1340 LOAD_CLOSURE             1 (previous)
+           1342 LOAD_CLOSURE            13 (result)
+           1344 LOAD_CLOSURE            14 (status_var)
+           1346 LOAD_CLOSURE            15 (window)
+           1348 BUILD_TUPLE              7
+           1350 LOAD_CONST              60 (<code object submit at <address>, file "xiaoguan_classifier\license_client.py", line 445>)
+           1352 MAKE_FUNCTION           12 (annotations, closure)
+           1354 STORE_FAST               9 (submit)
+
+463        1356 LOAD_GLOBAL             45 (NULL + Button)
+           1366 LOAD_FAST                7 (button_row)
+           1368 LOAD_CONST              61 ('退出软件')
+           1370 LOAD_FAST                8 (close)
+           1372 LOAD_CONST              48 ('#eef3f9')
+           1374 LOAD_CONST              16 ('#111827')
+           1376 LOAD_CONST              49 ('flat')
+           1378 LOAD_CONST              10 (24)
+           1380 LOAD_CONST              62 (9)
+           1382 KW_NAMES                51 (('text', 'command', 'bg', 'fg', 'relief', 'padx', 'pady'))
+           1384 CALL                     8
+           1392 LOAD_ATTR               27 (NULL|self + pack)
+           1412 LOAD_GLOBAL             46 (RIGHT)
+           1422 KW_NAMES                63 (('side',))
+           1424 CALL                     1
+           1432 POP_TOP
+
+464        1434 LOAD_GLOBAL             45 (NULL + Button)
+           1444 LOAD_FAST                7 (button_row)
+           1446 LOAD_CONST              64 ('立即激活')
+           1448 LOAD_FAST                9 (submit)
+           1450 LOAD_CONST              65 ('#1f4fd8')
+           1452 LOAD_CONST              66 ('white')
+           1454 LOAD_CONST              67 ('#173ca5')
+           1456 LOAD_CONST              66 ('white')
+           1458 LOAD_CONST              49 ('flat')
+           1460 LOAD_CONST              68 (30)
+           1462 LOAD_CONST              62 (9)
+           1464 KW_NAMES                69 (('text', 'command', 'bg', 'fg', 'activebackground', 'activeforeground', 'relief', 'padx', 'pady'))
+           1466 CALL                    10
+           1474 STORE_DEREF             10 (activate_button)
+
+465        1476 LOAD_DEREF              10 (activate_button)
+           1478 LOAD_ATTR               27 (NULL|self + pack)
+           1498 LOAD_GLOBAL             46 (RIGHT)
+           1508 LOAD_CONST              70 ((0, 10))
+           1510 KW_NAMES                53 (('side', 'padx'))
+           1512 CALL                     2
+           1520 POP_TOP
+
+466        1522 LOAD_DEREF              15 (window)
+           1524 LOAD_ATTR               49 (NULL|self + protocol)
+           1544 LOAD_CONST              71 ('WM_DELETE_WINDOW')
+           1546 LOAD_FAST                8 (close)
+           1548 CALL                     2
+           1556 POP_TOP
+
+467        1558 LOAD_DEREF              15 (window)
+           1560 LOAD_ATTR               51 (NULL|self + after)
+           1580 LOAD_CONST              72 (150)
+           1582 LOAD_DEREF              11 (code_entry)
+           1584 LOAD_ATTR               52 (focus_set)
+           1604 CALL                     2
+           1612 POP_TOP
+
+468        1614 LOAD_DEREF              15 (window)
+           1616 LOAD_ATTR               55 (NULL|self + mainloop)
+           1636 CALL                     0
+           1644 POP_TOP
+
+469        1646 LOAD_GLOBAL             57 (NULL + bool)
+           1656 LOAD_DEREF              13 (result)
+           1658 LOAD_CONST               7 ('allowed')
+           1660 BINARY_SUBSCR
+           1664 CALL                     1
+           1672 RETURN_VALUE
+        >> 1674 PUSH_EXC_INFO
+
+409        1676 LOAD_GLOBAL             20 (Exception)
+           1686 CHECK_EXC_MATCH
+           1688 POP_JUMP_IF_FALSE        4 (to 1698)
+           1690 POP_TOP
+
+410        1692 POP_EXCEPT
+           1694 EXTENDED_ARG             2
+           1696 JUMP_BACKWARD          674 (to 350)
+
+409     >> 1698 RERAISE                  0
+        >> 1700 COPY                     3
+           1702 POP_EXCEPT
+           1704 RERAISE                  1
+ExceptionTable:
+  192 to 348 -> 1674 [0]
+  1674 to 1690 -> 1700 [1] lasti
+  1698 to 1698 -> 1700 [1] lasti
+
+Disassembly of <code object copy_machine at <address>, file "xiaoguan_classifier\license_client.py", line 431>:
+              0 COPY_FREE_VARS           2
+
+431           2 RESUME                   0
+
+432           4 LOAD_DEREF               1 (window)
+              6 LOAD_ATTR                1 (NULL|self + clipboard_clear)
+             26 CALL                     0
+             34 POP_TOP
+
+433          36 LOAD_DEREF               1 (window)
+             38 LOAD_ATTR                3 (NULL|self + clipboard_append)
+             58 LOAD_GLOBAL              5 (NULL + machine_code)
+             68 CALL                     0
+             76 CALL                     1
+             84 POP_TOP
+
+434          86 LOAD_DEREF               0 (status_var)
+             88 LOAD_ATTR                7 (NULL|self + set)
+            108 LOAD_CONST               1 ('机器码已复制。')
+            110 CALL                     1
+            118 POP_TOP
+            120 RETURN_CONST             0 (None)
+
+Disassembly of <code object close at <address>, file "xiaoguan_classifier\license_client.py", line 441>:
+              0 COPY_FREE_VARS           2
+
+441           2 RESUME                   0
+
+442           4 LOAD_CONST               1 (False)
+              6 LOAD_DEREF               0 (result)
+              8 LOAD_CONST               2 ('allowed')
+             10 STORE_SUBSCR
+
+443          14 LOAD_DEREF               1 (window)
+             16 LOAD_ATTR                1 (NULL|self + destroy)
+             36 CALL                     0
+             44 POP_TOP
+             46 RETURN_CONST             0 (None)
+
+Disassembly of <code object submit at <address>, file "xiaoguan_classifier\license_client.py", line 445>:
+              0 COPY_FREE_VARS           7
+
+445           2 RESUME                   0
+
+446           4 LOAD_DEREF               5 (code_var)
+              6 LOAD_ATTR                1 (NULL|self + get)
+             26 CALL                     0
+             34 LOAD_ATTR                3 (NULL|self + strip)
+             54 CALL                     0
+             62 STORE_FAST               0 (code)
+
+447          64 LOAD_FAST                0 (code)
+             66 POP_JUMP_IF_TRUE        34 (to 136)
+
+448          68 LOAD_DEREF               8 (status_var)
+             70 LOAD_ATTR                5 (NULL|self + set)
+             90 LOAD_CONST               1 ('请输入激活码。')
+             92 CALL                     1
+            100 POP_TOP
+
+449         102 LOAD_DEREF               4 (code_entry)
+            104 LOAD_ATTR                7 (NULL|self + focus_set)
+            124 CALL                     0
+            132 POP_TOP
+
+450         134 RETURN_CONST             0 (None)
+
+451     >>  136 LOAD_DEREF               3 (activate_button)
+            138 LOAD_ATTR                9 (NULL|self + configure)
+            158 LOAD_CONST               2 ('disabled')
+            160 LOAD_CONST               3 ('正在连接服务器…')
+            162 KW_NAMES                 4 (('state', 'text'))
+            164 CALL                     2
+            172 POP_TOP
+
+452         174 LOAD_DEREF               9 (window)
+            176 LOAD_ATTR               11 (NULL|self + update_idletasks)
+            196 CALL                     0
+            204 POP_TOP
+
+453         206 NOP
+
+454         208 LOAD_GLOBAL             13 (NULL + activate_online)
+            218 LOAD_FAST                0 (code)
+            220 LOAD_DEREF               6 (previous)
+            222 CALL                     2
+            230 STORE_FAST               1 (state)
+
+459         232 LOAD_CONST               7 (True)
+            234 LOAD_DEREF               7 (result)
+            236 LOAD_CONST               8 ('allowed')
+            238 STORE_SUBSCR
+
+460         242 LOAD_GLOBAL             19 (NULL + messagebox)
+            252 LOAD_ATTR               20 (showinfo)
+            272 LOAD_CONST               9 ('激活成功')
+            274 LOAD_GLOBAL             23 (NULL + _summary)
+            284 LOAD_FAST                1 (state)
+            286 CALL                     1
+            294 LOAD_DEREF               9 (window)
+            296 KW_NAMES                10 (('parent',))
+            298 CALL                     3
+            306 POP_TOP
+
+461         308 LOAD_DEREF               9 (window)
+            310 LOAD_ATTR               25 (NULL|self + destroy)
+            330 CALL                     0
+            338 POP_TOP
+            340 RETURN_CONST             0 (None)
+        >>  342 PUSH_EXC_INFO
+
+455         344 LOAD_GLOBAL             14 (LicenseError)
+            354 CHECK_EXC_MATCH
+            356 POP_JUMP_IF_FALSE       55 (to 468)
+            358 STORE_FAST               2 (exc)
+
+456         360 LOAD_DEREF               8 (status_var)
+            362 LOAD_ATTR                5 (NULL|self + set)
+            382 LOAD_GLOBAL             17 (NULL + str)
+            392 LOAD_FAST                2 (exc)
+            394 CALL                     1
+            402 CALL                     1
+            410 POP_TOP
+
+457         412 LOAD_DEREF               3 (activate_button)
+            414 LOAD_ATTR                9 (NULL|self + configure)
+            434 LOAD_CONST               5 ('normal')
+            436 LOAD_CONST               6 ('立即激活')
+            438 KW_NAMES                 4 (('state', 'text'))
+            440 CALL                     2
+            448 POP_TOP
+
+458         450 POP_EXCEPT
+            452 LOAD_CONST               0 (None)
+            454 STORE_FAST               2 (exc)
+            456 DELETE_FAST              2 (exc)
+            458 RETURN_CONST             0 (None)
+        >>  460 LOAD_CONST               0 (None)
+            462 STORE_FAST               2 (exc)
+            464 DELETE_FAST              2 (exc)
+            466 RERAISE                  1
+
+455     >>  468 RERAISE                  0
+        >>  470 COPY                     3
+            472 POP_EXCEPT
+            474 RERAISE                  1
+ExceptionTable:
+  208 to 230 -> 342 [0]
+  342 to 358 -> 470 [1] lasti
+  360 to 448 -> 460 [1] lasti
+  460 to 468 -> 470 [1] lasti
+
+Disassembly of <code object ensure_activated at <address>, file "xiaoguan_classifier\license_client.py", line 472>:
+472           0 RESUME                   0
+
+473           2 LOAD_CONST               0 (None)
+              4 STORE_FAST               0 (previous)
+
+474           6 NOP
+
+475           8 LOAD_GLOBAL              1 (NULL + _load_state)
+             18 CALL                     0
+             26 STORE_FAST               0 (previous)
+
+478          28 LOAD_GLOBAL              9 (NULL + _validate_local)
+             38 LOAD_FAST                0 (previous)
+             40 CALL                     1
+             48 STORE_FAST               2 (local_error)
+
+479          50 LOAD_FAST                2 (local_error)
+             52 POP_JUMP_IF_FALSE       12 (to 78)
+
+480          54 LOAD_GLOBAL              5 (NULL + _activation_window)
+             64 LOAD_FAST                2 (local_error)
+             66 LOAD_FAST                0 (previous)
+             68 CALL                     2
+             76 RETURN_VALUE
+
+488     >>   78 LOAD_GLOBAL             11 (NULL + _utc_now)
+             88 CALL                     0
+             96 LOAD_FAST                0 (previous)
+             98 LOAD_CONST               1 ('last_seen_utc')
+            100 STORE_SUBSCR
+
+489         104 LOAD_GLOBAL             13 (NULL + _save_state)
+            114 LOAD_FAST                0 (previous)
+            116 CALL                     1
+            124 POP_TOP
+
+490         126 RETURN_CONST             2 (True)
+        >>  128 PUSH_EXC_INFO
+
+476         130 LOAD_GLOBAL              2 (LicenseError)
+            140 CHECK_EXC_MATCH
+            142 POP_JUMP_IF_FALSE       31 (to 206)
+            144 STORE_FAST               1 (exc)
+
+477         146 LOAD_GLOBAL              5 (NULL + _activation_window)
+            156 LOAD_GLOBAL              7 (NULL + str)
+            166 LOAD_FAST                1 (exc)
+            168 CALL                     1
+            176 LOAD_CONST               0 (None)
+            178 CALL                     2
+            186 SWAP                     2
+            188 POP_EXCEPT
+            190 LOAD_CONST               0 (None)
+            192 STORE_FAST               1 (exc)
+            194 DELETE_FAST              1 (exc)
+            196 RETURN_VALUE
+        >>  198 LOAD_CONST               0 (None)
+            200 STORE_FAST               1 (exc)
+            202 DELETE_FAST              1 (exc)
+            204 RERAISE                  1
+
+476     >>  206 RERAISE                  0
+        >>  208 COPY                     3
+            210 POP_EXCEPT
+            212 RERAISE                  1
+ExceptionTable:
+  8 to 26 -> 128 [0]
+  128 to 144 -> 208 [1] lasti
+  146 to 184 -> 198 [1] lasti
+  186 to 186 -> 208 [1] lasti
+  198 to 206 -> 208 [1] lasti
+
+Disassembly of <code object _version_parts at <address>, file "xiaoguan_classifier\license_client.py", line 493>:
+493           0 RESUME                   0
+
+494           2 LOAD_GLOBAL              1 (NULL + re)
+             12 LOAD_ATTR                2 (match)
+             32 LOAD_CONST               1 ('^\\s*v?(\\d+(?:\\.\\d+)*)')
+             34 LOAD_GLOBAL              5 (NULL + str)
+             44 LOAD_FAST                0 (value)
+             46 COPY                     1
+             48 POP_JUMP_IF_TRUE         2 (to 54)
+             50 POP_TOP
+             52 LOAD_CONST               2 ('')
+        >>   54 CALL                     1
+             62 LOAD_GLOBAL              0 (re)
+             72 LOAD_ATTR                6 (IGNORECASE)
+             92 CALL                     3
+            100 STORE_FAST               1 (match)
+
+495         102 LOAD_FAST                1 (match)
+            104 POP_JUMP_IF_FALSE       55 (to 216)
+            106 LOAD_FAST                1 (match)
+            108 LOAD_ATTR                9 (NULL|self + group)
+            128 LOAD_CONST               3 (1)
+            130 CALL                     1
+            138 LOAD_ATTR               11 (NULL|self + split)
+            158 LOAD_CONST               4 ('.')
+            160 CALL                     1
+            168 GET_ITER
+            170 LOAD_FAST_AND_CLEAR      2 (item)
+            172 SWAP                     2
+            174 BUILD_LIST               0
+            176 SWAP                     2
+        >>  178 FOR_ITER                13 (to 208)
+            182 STORE_FAST               2 (item)
+            184 LOAD_GLOBAL             13 (NULL + int)
+            194 LOAD_FAST                2 (item)
+            196 CALL                     1
+            204 LIST_APPEND              2
+            206 JUMP_BACKWARD           15 (to 178)
+        >>  208 END_FOR
+            210 SWAP                     2
+            212 STORE_FAST               2 (item)
+            214 RETURN_VALUE
+        >>  216 LOAD_CONST               5 (0)
+            218 BUILD_LIST               1
+            220 RETURN_VALUE
+        >>  222 SWAP                     2
+            224 POP_TOP
+            226 SWAP                     2
+            228 STORE_FAST               2 (item)
+            230 RERAISE                  0
+ExceptionTable:
+  174 to 208 -> 222 [2]
+
+Disassembly of <code object _newer_version at <address>, file "xiaoguan_classifier\license_client.py", line 498>:
+498           0 RESUME                   0
+
+499           2 LOAD_GLOBAL              1 (NULL + _version_parts)
+             12 LOAD_FAST                0 (left)
+             14 CALL                     1
+             22 STORE_FAST               2 (a)
+
+500          24 LOAD_GLOBAL              1 (NULL + _version_parts)
+             34 LOAD_FAST                1 (right)
+             36 CALL                     1
+             44 STORE_FAST               3 (b)
+
+501          46 LOAD_GLOBAL              3 (NULL + max)
+             56 LOAD_GLOBAL              5 (NULL + len)
+             66 LOAD_FAST                2 (a)
+             68 CALL                     1
+             76 LOAD_GLOBAL              5 (NULL + len)
+             86 LOAD_FAST                3 (b)
+             88 CALL                     1
+             96 CALL                     2
+            104 STORE_FAST               4 (length)
+
+502         106 LOAD_FAST                2 (a)
+            108 LOAD_ATTR                7 (NULL|self + extend)
+            128 LOAD_CONST               1 (0)
+            130 BUILD_LIST               1
+            132 LOAD_FAST                4 (length)
+            134 LOAD_GLOBAL              5 (NULL + len)
+            144 LOAD_FAST                2 (a)
+            146 CALL                     1
+            154 BINARY_OP               10 (-)
+            158 BINARY_OP                5 (*)
+            162 CALL                     1
+            170 POP_TOP
+
+503         172 LOAD_FAST                3 (b)
+            174 LOAD_ATTR                7 (NULL|self + extend)
+            194 LOAD_CONST               1 (0)
+            196 BUILD_LIST               1
+            198 LOAD_FAST                4 (length)
+            200 LOAD_GLOBAL              5 (NULL + len)
+            210 LOAD_FAST                3 (b)
+            212 CALL                     1
+            220 BINARY_OP               10 (-)
+            224 BINARY_OP                5 (*)
+            228 CALL                     1
+            236 POP_TOP
+
+504         238 LOAD_FAST                2 (a)
+            240 LOAD_FAST                3 (b)
+            242 COMPARE_OP              68 (>)
+            246 RETURN_VALUE
+
+Disassembly of <code object _check_update at <address>, file "xiaoguan_classifier\license_client.py", line 507>:
+507           0 RESUME                   0
+
+508           2 LOAD_GLOBAL              0 (urllib)
+             12 LOAD_ATTR                2 (request)
+             32 LOAD_ATTR                5 (NULL|self + Request)
+             52 LOAD_GLOBAL              6 (UPDATE_URL)
+             62 LOAD_CONST               1 ('Accept')
+             64 LOAD_CONST               2 ('application/json')
+             66 BUILD_MAP                1
+             68 KW_NAMES                 3 (('headers',))
+             70 CALL                     2
+             78 STORE_FAST               0 (request)
+
+509          80 NOP
+
+510          82 LOAD_GLOBAL              0 (urllib)
+             92 LOAD_ATTR                2 (request)
+            112 LOAD_ATTR                9 (NULL|self + urlopen)
+            132 LOAD_FAST                0 (request)
+            134 LOAD_GLOBAL             10 (UPDATE_TIMEOUT_SECONDS)
+            144 KW_NAMES                 4 (('timeout',))
+            146 CALL                     2
+            154 BEFORE_WITH
+            156 STORE_FAST               1 (response)
+
+511         158 LOAD_GLOBAL             13 (NULL + int)
+            168 LOAD_FAST                1 (response)
+            170 LOAD_ATTR               14 (status)
+            190 CALL                     1
+            198 LOAD_CONST               5 (200)
+            200 COMPARE_OP              55 (!=)
+            204 POP_JUMP_IF_FALSE       13 (to 232)
+
+512         206 LOAD_CONST               6 ('available')
+            208 LOAD_CONST               7 (False)
+            210 BUILD_MAP                1
+
+510         212 SWAP                     2
+            214 LOAD_CONST               0 (None)
+            216 LOAD_CONST               0 (None)
+            218 LOAD_CONST               0 (None)
+            220 CALL                     2
+            228 POP_TOP
+            230 RETURN_VALUE
+
+513     >>  232 LOAD_GLOBAL             17 (NULL + json)
+            242 LOAD_ATTR               18 (loads)
+            262 LOAD_FAST                1 (response)
+            264 LOAD_ATTR               21 (NULL|self + read)
+            284 CALL                     0
+            292 LOAD_ATTR               23 (NULL|self + decode)
+            312 LOAD_CONST               8 ('utf-8')
+            314 LOAD_CONST               9 ('replace')
+            316 KW_NAMES                10 (('errors',))
+            318 CALL                     2
+            326 COPY                     1
+            328 POP_JUMP_IF_TRUE         2 (to 334)
+            330 POP_TOP
+            332 LOAD_CONST              11 ('{}')
+        >>  334 CALL                     1
+            342 STORE_FAST               2 (root)
+
+510         344 LOAD_CONST               0 (None)
+            346 LOAD_CONST               0 (None)
+            348 LOAD_CONST               0 (None)
+            350 CALL                     2
+            358 POP_TOP
+
+516     >>  360 LOAD_GLOBAL             27 (NULL + isinstance)
+            370 LOAD_FAST_CHECK          2 (root)
+            372 LOAD_GLOBAL             28 (dict)
+            382 CALL                     2
+            390 POP_JUMP_IF_FALSE       48 (to 488)
+            392 LOAD_GLOBAL             27 (NULL + isinstance)
+            402 LOAD_FAST                2 (root)
+            404 LOAD_ATTR               31 (NULL|self + get)
+            424 LOAD_CONST              12 ('data')
+            426 CALL                     1
+            434 LOAD_GLOBAL             28 (dict)
+            444 CALL                     2
+            452 POP_JUMP_IF_FALSE       17 (to 488)
+            454 LOAD_FAST                2 (root)
+            456 LOAD_ATTR               31 (NULL|self + get)
+            476 LOAD_CONST              12 ('data')
+            478 CALL                     1
+            486 JUMP_FORWARD             1 (to 490)
+        >>  488 LOAD_FAST                2 (root)
+        >>  490 STORE_FAST               3 (data)
+
+517         492 LOAD_GLOBAL             27 (NULL + isinstance)
+            502 LOAD_FAST                3 (data)
+            504 LOAD_GLOBAL             28 (dict)
+            514 CALL                     2
+            522 POP_JUMP_IF_TRUE         4 (to 532)
+
+518         524 LOAD_CONST               6 ('available')
+            526 LOAD_CONST               7 (False)
+            528 BUILD_MAP                1
+            530 RETURN_VALUE
+
+519     >>  532 LOAD_GLOBAL             33 (NULL + _first_text)
+            542 LOAD_FAST                3 (data)
+            544 LOAD_CONST              13 ('version')
+            546 LOAD_CONST              14 ('latest_version')
+            548 CALL                     3
+            556 STORE_FAST               4 (latest)
+
+520         558 LOAD_GLOBAL             33 (NULL + _first_text)
+            568 LOAD_FAST                3 (data)
+            570 LOAD_CONST              15 ('download_url')
+            572 LOAD_CONST              16 ('url')
+            574 LOAD_CONST              17 ('installer_url')
+            576 CALL                     4
+            584 STORE_FAST               5 (download_url)
+
+522         586 LOAD_GLOBAL             35 (NULL + bool)
+            596 LOAD_FAST                4 (latest)
+            598 COPY                     1
+            600 POP_JUMP_IF_FALSE       16 (to 634)
+            602 POP_TOP
+            604 LOAD_GLOBAL             37 (NULL + _newer_version)
+            614 LOAD_FAST                4 (latest)
+            616 LOAD_GLOBAL             38 (SOFTWARE_VERSION)
+            626 CALL                     2
+        >>  634 CALL                     1
+
+523         642 LOAD_FAST                4 (latest)
+
+524         644 LOAD_FAST                5 (download_url)
+            646 LOAD_ATTR               41 (NULL|self + lower)
+            666 CALL                     0
+            674 LOAD_ATTR               43 (NULL|self + startswith)
+            694 LOAD_CONST              18 ('https://')
+            696 CALL                     1
+            704 POP_JUMP_IF_FALSE        2 (to 710)
+            706 LOAD_FAST                5 (download_url)
+            708 JUMP_FORWARD             1 (to 712)
+        >>  710 LOAD_CONST              19 ('')
+
+525     >>  712 LOAD_GLOBAL             33 (NULL + _first_text)
+            722 LOAD_FAST                3 (data)
+            724 LOAD_CONST              20 ('release_notes')
+            726 LOAD_CONST              21 ('notes')
+            728 LOAD_CONST              22 ('changelog')
+            730 CALL                     4
+
+526         738 LOAD_GLOBAL             45 (NULL + _as_bool)
+            748 LOAD_FAST                3 (data)
+            750 LOAD_ATTR               31 (NULL|self + get)
+            770 LOAD_CONST              23 ('mandatory')
+            772 CALL                     1
+            780 CALL                     1
+            788 COPY                     1
+            790 POP_JUMP_IF_TRUE        54 (to 900)
+            792 POP_TOP
+            794 LOAD_GLOBAL             45 (NULL + _as_bool)
+            804 LOAD_FAST                3 (data)
+            806 LOAD_ATTR               31 (NULL|self + get)
+            826 LOAD_CONST              24 ('force_update')
+            828 CALL                     1
+            836 CALL                     1
+            844 COPY                     1
+            846 POP_JUMP_IF_TRUE        26 (to 900)
+            848 POP_TOP
+            850 LOAD_GLOBAL             45 (NULL + _as_bool)
+            860 LOAD_FAST                3 (data)
+            862 LOAD_ATTR               31 (NULL|self + get)
+            882 LOAD_CONST              25 ('required')
+            884 CALL                     1
+            892 CALL                     1
+
+521     >>  900 LOAD_CONST              26 (('available', 'latest_version', 'download_url', 'notes', 'mandatory'))
+            902 BUILD_CONST_KEY_MAP      5
+            904 RETURN_VALUE
+
+510     >>  906 PUSH_EXC_INFO
+            908 WITH_EXCEPT_START
+            910 POP_JUMP_IF_TRUE         1 (to 914)
+            912 RERAISE                  2
+        >>  914 POP_TOP
+            916 POP_EXCEPT
+            918 POP_TOP
+            920 POP_TOP
+            922 EXTENDED_ARG             1
+            924 JUMP_BACKWARD          283 (to 360)
+        >>  926 COPY                     3
+            928 POP_EXCEPT
+            930 RERAISE                  1
+        >>  932 PUSH_EXC_INFO
+
+514         934 LOAD_GLOBAL             24 (Exception)
+            944 CHECK_EXC_MATCH
+            946 POP_JUMP_IF_FALSE        7 (to 962)
+            948 POP_TOP
+
+515         950 LOAD_CONST               6 ('available')
+            952 LOAD_CONST               7 (False)
+            954 BUILD_MAP                1
+            956 SWAP                     2
+            958 POP_EXCEPT
+            960 RETURN_VALUE
+
+514     >>  962 RERAISE                  0
+        >>  964 COPY                     3
+            966 POP_EXCEPT
+            968 RERAISE                  1
+ExceptionTable:
+  82 to 154 -> 932 [0]
+  156 to 210 -> 906 [1] lasti
+  212 to 228 -> 932 [0]
+  232 to 342 -> 906 [1] lasti
+  344 to 358 -> 932 [0]
+  906 to 914 -> 926 [3] lasti
+  916 to 930 -> 932 [0]
+  932 to 956 -> 964 [1] lasti
+  962 to 962 -> 964 [1] lasti
+
+Disassembly of <code object schedule_update_check at <address>, file "xiaoguan_classifier\license_client.py", line 530>:
+              0 MAKE_CELL                0 (root)
+              2 MAKE_CELL                2 (poll)
+              4 MAKE_CELL                3 (result)
+
+530           6 RESUME                   0
+
+531           8 LOAD_CONST               1 (False)
+             10 LOAD_CONST               2 ('available')
+             12 LOAD_CONST               1 (False)
+             14 BUILD_MAP                1
+             16 LOAD_CONST               3 (('done', 'update'))
+             18 BUILD_CONST_KEY_MAP      2
+             20 STORE_DEREF              3 (result)
+
+533          22 LOAD_CONST              10 (('return', 'None'))
+             24 LOAD_CLOSURE             3 (result)
+             26 BUILD_TUPLE              1
+             28 LOAD_CONST               4 (<code object worker at <address>, file "xiaoguan_classifier\license_client.py", line 533>)
+             30 MAKE_FUNCTION           12 (annotations, closure)
+             32 STORE_FAST               1 (worker)
+
+537          34 LOAD_CONST              10 (('return', 'None'))
+             36 LOAD_CLOSURE             2 (poll)
+             38 LOAD_CLOSURE             3 (result)
+             40 LOAD_CLOSURE             0 (root)
+             42 BUILD_TUPLE              3
+             44 LOAD_CONST               5 (<code object poll at <address>, file "xiaoguan_classifier\license_client.py", line 537>)
+             46 MAKE_FUNCTION           12 (annotations, closure)
+             48 STORE_DEREF              2 (poll)
+
+561          50 LOAD_GLOBAL              1 (NULL + threading)
+             60 LOAD_ATTR                2 (Thread)
+             80 LOAD_FAST                1 (worker)
+             82 LOAD_CONST               6 ('update-check')
+             84 LOAD_CONST               7 (True)
+             86 KW_NAMES                 8 (('target', 'name', 'daemon'))
+             88 CALL                     3
+             96 LOAD_ATTR                5 (NULL|self + start)
+            116 CALL                     0
+            124 POP_TOP
+
+562         126 LOAD_DEREF               0 (root)
+            128 LOAD_ATTR                7 (NULL|self + after)
+            148 LOAD_CONST               9 (300)
+            150 LOAD_DEREF               2 (poll)
+            152 CALL                     2
+            160 POP_TOP
+            162 RETURN_CONST             0 (None)
+
+Disassembly of <code object worker at <address>, file "xiaoguan_classifier\license_client.py", line 533>:
+              0 COPY_FREE_VARS           1
+
+533           2 RESUME                   0
+
+534           4 LOAD_GLOBAL              1 (NULL + _check_update)
+             14 CALL                     0
+             22 LOAD_DEREF               0 (result)
+             24 LOAD_CONST               1 ('update')
+             26 STORE_SUBSCR
+
+535          30 LOAD_CONST               2 (True)
+             32 LOAD_DEREF               0 (result)
+             34 LOAD_CONST               3 ('done')
+             36 STORE_SUBSCR
+             40 RETURN_CONST             0 (None)
+
+Disassembly of <code object poll at <address>, file "xiaoguan_classifier\license_client.py", line 537>:
+              0 COPY_FREE_VARS           3
+
+537           2 RESUME                   0
+
+538           4 NOP
+
+539           6 LOAD_DEREF               6 (result)
+              8 LOAD_CONST               1 ('done')
+             10 BINARY_SUBSCR
+             14 POP_JUMP_IF_TRUE        19 (to 54)
+
+540          16 LOAD_DEREF               7 (root)
+             18 LOAD_ATTR                1 (NULL|self + after)
+             38 LOAD_CONST               2 (300)
+             40 LOAD_DEREF               5 (poll)
+             42 CALL                     2
+             50 POP_TOP
+
+541          52 RETURN_CONST             0 (None)
+
+542     >>   54 LOAD_DEREF               6 (result)
+             56 LOAD_CONST               3 ('update')
+             58 BINARY_SUBSCR
+             62 STORE_FAST               0 (update)
+
+543          64 LOAD_GLOBAL              3 (NULL + isinstance)
+             74 LOAD_FAST                0 (update)
+             76 LOAD_GLOBAL              4 (dict)
+             86 CALL                     2
+             94 POP_JUMP_IF_FALSE       17 (to 130)
+             96 LOAD_FAST                0 (update)
+             98 LOAD_ATTR                7 (NULL|self + get)
+            118 LOAD_CONST               4 ('available')
+            120 CALL                     1
+            128 POP_JUMP_IF_TRUE         1 (to 132)
+
+544     >>  130 RETURN_CONST             0 (None)
+
+545     >>  132 LOAD_GLOBAL              9 (NULL + str)
+            142 LOAD_FAST                0 (update)
+            144 LOAD_ATTR                7 (NULL|self + get)
+            164 LOAD_CONST               5 ('latest_version')
+            166 CALL                     1
+            174 COPY                     1
+            176 POP_JUMP_IF_TRUE         2 (to 182)
+            178 POP_TOP
+            180 LOAD_CONST               6 ('')
+        >>  182 CALL                     1
+            190 STORE_FAST               1 (latest)
+
+546         192 LOAD_GLOBAL              9 (NULL + str)
+            202 LOAD_FAST                0 (update)
+            204 LOAD_ATTR                7 (NULL|self + get)
+            224 LOAD_CONST               7 ('notes')
+            226 CALL                     1
+            234 COPY                     1
+            236 POP_JUMP_IF_TRUE         2 (to 242)
+            238 POP_TOP
+            240 LOAD_CONST               6 ('')
+        >>  242 CALL                     1
+            250 LOAD_ATTR               11 (NULL|self + strip)
+            270 CALL                     0
+            278 STORE_FAST               2 (notes)
+
+547         280 LOAD_CONST               8 ('发现新版本 ')
+            282 LOAD_FAST                1 (latest)
+            284 FORMAT_VALUE             0
+            286 LOAD_CONST               9 ('，当前版本 ')
+            288 LOAD_GLOBAL             12 (SOFTWARE_VERSION)
+            298 FORMAT_VALUE             0
+            300 LOAD_CONST              10 ('。')
+            302 BUILD_STRING             5
+            304 STORE_FAST               3 (prompt)
+
+548         306 LOAD_FAST                2 (notes)
+            308 POP_JUMP_IF_FALSE       11 (to 332)
+
+549         310 LOAD_FAST                3 (prompt)
+            312 LOAD_CONST              11 ('\n\n')
+            314 LOAD_FAST                2 (notes)
+            316 LOAD_CONST               0 (None)
+            318 LOAD_CONST              12 (800)
+            320 BINARY_SLICE
+            322 FORMAT_VALUE             0
+            324 BUILD_STRING             2
+            326 BINARY_OP               13 (+=)
+            330 STORE_FAST               3 (prompt)
+
+550     >>  332 LOAD_FAST                3 (prompt)
+            334 LOAD_CONST              13 ('\n\n是否打开下载页面？')
+            336 BINARY_OP               13 (+=)
+            340 STORE_FAST               3 (prompt)
+
+551         342 LOAD_GLOBAL             15 (NULL + messagebox)
+            352 LOAD_ATTR               16 (askyesno)
+            372 LOAD_CONST              14 ('发现新版本')
+            374 LOAD_FAST                3 (prompt)
+            376 LOAD_DEREF               7 (root)
+            378 KW_NAMES                15 (('parent',))
+            380 CALL                     3
+            388 POP_JUMP_IF_FALSE       54 (to 498)
+
+552         390 LOAD_GLOBAL              9 (NULL + str)
+            400 LOAD_FAST                0 (update)
+            402 LOAD_ATTR                7 (NULL|self + get)
+            422 LOAD_CONST              16 ('download_url')
+            424 CALL                     1
+            432 COPY                     1
+            434 POP_JUMP_IF_TRUE         2 (to 440)
+            436 POP_TOP
+            438 LOAD_CONST               6 ('')
+        >>  440 CALL                     1
+            448 STORE_FAST               4 (url)
+
+553         450 LOAD_FAST                4 (url)
+            452 POP_JUMP_IF_FALSE       81 (to 616)
+
+554         454 LOAD_GLOBAL             19 (NULL + webbrowser)
+            464 LOAD_ATTR               20 (open)
+            484 LOAD_FAST                4 (url)
+            486 CALL                     1
+            494 POP_TOP
+            496 RETURN_CONST             0 (None)
+
+555     >>  498 LOAD_FAST                0 (update)
+            500 LOAD_ATTR                7 (NULL|self + get)
+            520 LOAD_CONST              17 ('mandatory')
+            522 CALL                     1
+            530 POP_JUMP_IF_FALSE       41 (to 614)
+
+556         532 LOAD_GLOBAL             15 (NULL + messagebox)
+            542 LOAD_ATTR               22 (showwarning)
+            562 LOAD_CONST              18 ('必须更新')
+            564 LOAD_CONST              19 ('该版本为强制更新，请下载安装新版本后继续使用。')
+            566 LOAD_DEREF               7 (root)
+            568 KW_NAMES                15 (('parent',))
+            570 CALL                     3
+            578 POP_TOP
+
+557         580 LOAD_DEREF               7 (root)
+            582 LOAD_ATTR               25 (NULL|self + destroy)
+            602 CALL                     0
+            610 POP_TOP
+            612 RETURN_CONST             0 (None)
+
+555     >>  614 RETURN_CONST             0 (None)
+
+553     >>  616 RETURN_CONST             0 (None)
+        >>  618 PUSH_EXC_INFO
+
+558         620 LOAD_GLOBAL             26 (Exception)
+            630 CHECK_EXC_MATCH
+            632 POP_JUMP_IF_FALSE        3 (to 640)
+            634 POP_TOP
+
+559         636 POP_EXCEPT
+            638 RETURN_CONST             0 (None)
+
+558     >>  640 RERAISE                  0
+        >>  642 COPY                     3
+            644 POP_EXCEPT
+            646 RERAISE                  1
+ExceptionTable:
+  6 to 50 -> 618 [0]
+  54 to 128 -> 618 [0]
+  132 to 494 -> 618 [0]
+  498 to 610 -> 618 [0]
+  618 to 634 -> 642 [1] lasti
+  640 to 640 -> 642 [1] lasti

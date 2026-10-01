@@ -1,0 +1,1479 @@
+module: xiaoguan_classifier.model_client
+bytecode: src/xiaoguan_classifier/model_client.pyc
+sha256: d8d0152221c7aed132ee3961a8f992217266ac1f5da9353a67af071d310066ab
+python: 3.12.14
+source_filename: xiaoguan_classifier\model_client.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (json)
+             20 STORE_NAME               2 (json)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (re)
+             28 STORE_NAME               3 (re)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               2 (None)
+             34 IMPORT_NAME              4 (tempfile)
+             36 STORE_NAME               4 (tempfile)
+
+  6          38 LOAD_CONST               0 (0)
+             40 LOAD_CONST               3 (('replace',))
+             42 IMPORT_NAME              5 (dataclasses)
+             44 IMPORT_FROM              6 (replace)
+             46 STORE_NAME               6 (replace)
+             48 POP_TOP
+
+  7          50 LOAD_CONST               0 (0)
+             52 LOAD_CONST               4 (('datetime',))
+             54 IMPORT_NAME              7 (datetime)
+             56 IMPORT_FROM              7 (datetime)
+             58 STORE_NAME               7 (datetime)
+             60 POP_TOP
+
+  8          62 LOAD_CONST               0 (0)
+             64 LOAD_CONST               5 (('Path',))
+             66 IMPORT_NAME              8 (pathlib)
+             68 IMPORT_FROM              9 (Path)
+             70 STORE_NAME               9 (Path)
+             72 POP_TOP
+
+  9          74 LOAD_CONST               0 (0)
+             76 LOAD_CONST               6 (('Any', 'Callable'))
+             78 IMPORT_NAME             10 (typing)
+             80 IMPORT_FROM             11 (Any)
+             82 STORE_NAME              11 (Any)
+             84 IMPORT_FROM             12 (Callable)
+             86 STORE_NAME              12 (Callable)
+             88 POP_TOP
+
+ 11          90 LOAD_CONST               0 (0)
+             92 LOAD_CONST               2 (None)
+             94 IMPORT_NAME             13 (requests)
+             96 STORE_NAME              13 (requests)
+
+ 12          98 LOAD_CONST               0 (0)
+            100 LOAD_CONST               7 (('Image', 'ImageDraw'))
+            102 IMPORT_NAME             14 (PIL)
+            104 IMPORT_FROM             15 (Image)
+            106 STORE_NAME              15 (Image)
+            108 IMPORT_FROM             16 (ImageDraw)
+            110 STORE_NAME              16 (ImageDraw)
+            112 POP_TOP
+
+ 14         114 LOAD_CONST               8 (1)
+            116 LOAD_CONST               9 (('ProviderConfig', 'load_api_key'))
+            118 IMPORT_NAME             17 (config)
+            120 IMPORT_FROM             18 (ProviderConfig)
+            122 STORE_NAME              18 (ProviderConfig)
+            124 IMPORT_FROM             19 (load_api_key)
+            126 STORE_NAME              19 (load_api_key)
+            128 POP_TOP
+
+ 15         130 LOAD_CONST               8 (1)
+            132 LOAD_CONST              10 (('encode_images_as_data_urls',))
+            134 IMPORT_NAME             20 (media)
+            136 IMPORT_FROM             21 (encode_images_as_data_urls)
+            138 STORE_NAME              21 (encode_images_as_data_urls)
+            140 POP_TOP
+
+ 16         142 LOAD_CONST               8 (1)
+            144 LOAD_CONST              11 (('CLASSIFIER_SYSTEM_PROMPT', 'system_prompt_for_template', 'user_prompt_for_material'))
+            146 IMPORT_NAME             22 (prompt)
+            148 IMPORT_FROM             23 (CLASSIFIER_SYSTEM_PROMPT)
+            150 STORE_NAME              23 (CLASSIFIER_SYSTEM_PROMPT)
+            152 IMPORT_FROM             24 (system_prompt_for_template)
+            154 STORE_NAME              24 (system_prompt_for_template)
+            156 IMPORT_FROM             25 (user_prompt_for_material)
+            158 STORE_NAME              25 (user_prompt_for_material)
+            160 POP_TOP
+
+ 17         162 LOAD_CONST               8 (1)
+            164 LOAD_CONST              12 (('Classification', 'normalize_classification'))
+            166 IMPORT_NAME             26 (taxonomy)
+            168 IMPORT_FROM             27 (Classification)
+            170 STORE_NAME              27 (Classification)
+            172 IMPORT_FROM             28 (normalize_classification)
+            174 STORE_NAME              28 (normalize_classification)
+            176 POP_TOP
+
+ 18         178 LOAD_CONST               8 (1)
+            180 LOAD_CONST              13 (('ClassificationTemplate', 'template_from_dict'))
+            182 IMPORT_NAME             29 (templates)
+            184 IMPORT_FROM             30 (ClassificationTemplate)
+            186 STORE_NAME              30 (ClassificationTemplate)
+            188 IMPORT_FROM             31 (template_from_dict)
+            190 STORE_NAME              31 (template_from_dict)
+            192 POP_TOP
+
+ 21         194 PUSH_NULL
+            196 LOAD_BUILD_CLASS
+            198 LOAD_CONST              14 (<code object ModelClientError at <address>, file "xiaoguan_classifier\model_client.py", line 21>)
+            200 MAKE_FUNCTION            0
+            202 LOAD_CONST              15 ('ModelClientError')
+            204 LOAD_NAME               32 (RuntimeError)
+            206 CALL                     3
+            214 STORE_NAME              33 (ModelClientError)
+
+ 25         216 LOAD_NAME               12 (Callable)
+            218 LOAD_NAME               34 (dict)
+            220 LOAD_NAME               35 (str)
+            222 LOAD_NAME               11 (Any)
+            224 BUILD_TUPLE              2
+            226 BINARY_SUBSCR
+            230 BUILD_LIST               1
+            232 LOAD_CONST               2 (None)
+            234 BUILD_TUPLE              2
+            236 BINARY_SUBSCR
+            240 STORE_NAME              36 (RequestLogger)
+
+ 28         242 LOAD_CONST              27 (('return', 'str'))
+            244 LOAD_CONST              16 (<code object _now_text at <address>, file "xiaoguan_classifier\model_client.py", line 28>)
+            246 MAKE_FUNCTION            4 (annotations)
+            248 STORE_NAME              37 (_now_text)
+
+ 32         250 LOAD_CONST              28 (('exc', 'BaseException | str', 'return', 'str'))
+            252 LOAD_CONST              17 (<code object _failure_type at <address>, file "xiaoguan_classifier\model_client.py", line 32>)
+            254 MAKE_FUNCTION            4 (annotations)
+            256 STORE_NAME              38 (_failure_type)
+
+ 45         258 LOAD_CONST              29 (('text', 'str', 'return', 'dict[str, Any]'))
+            260 LOAD_CONST              18 (<code object _extract_json at <address>, file "xiaoguan_classifier\model_client.py", line 45>)
+            262 MAKE_FUNCTION            4 (annotations)
+            264 STORE_NAME              39 (_extract_json)
+
+ 59         266 LOAD_CONST              30 (('config', 'ProviderConfig', 'headers', 'dict[str, str]', 'payload', 'dict[str, Any]', 'return', 'requests.Response'))
+            268 LOAD_CONST              19 (<code object _post_chat_completion at <address>, file "xiaoguan_classifier\model_client.py", line 59>)
+            270 MAKE_FUNCTION            4 (annotations)
+            272 STORE_NAME              40 (_post_chat_completion)
+
+ 73         274 LOAD_CONST              31 (('data', 'dict[str, Any]', 'return', 'tuple[int, int, int]'))
+            276 LOAD_CONST              20 (<code object _usage_from_response at <address>, file "xiaoguan_classifier\model_client.py", line 73>)
+            278 MAKE_FUNCTION            4 (annotations)
+            280 STORE_NAME              41 (_usage_from_response)
+
+ 85         282 LOAD_CONST              32 (('value', 'Any', 'return', 'int'))
+            284 LOAD_CONST              21 (<code object _safe_usage_int at <address>, file "xiaoguan_classifier\model_client.py", line 85>)
+            286 MAKE_FUNCTION            4 (annotations)
+            288 STORE_NAME              42 (_safe_usage_int)
+
+ 92         290 LOAD_CONST              33 (('config', 'ProviderConfig', 'return', 'int'))
+            292 LOAD_CONST              22 (<code object _limited_classification_tokens at <address>, file "xiaoguan_classifier\model_client.py", line 92>)
+            294 MAKE_FUNCTION            4 (annotations)
+            296 STORE_NAME              43 (_limited_classification_tokens)
+
+100         298 NOP
+
+101         300 NOP
+
+102         302 NOP
+
+103         304 NOP
+
+ 96         306 LOAD_CONST              34 (('', None, None, None))
+
+ 97         308 NOP
+
+ 96         310 NOP
+
+ 98         312 NOP
+
+ 96         314 NOP
+
+ 99         316 NOP
+
+ 96         318 NOP
+
+100         320 NOP
+
+ 96         322 NOP
+
+101         324 NOP
+
+ 96         326 NOP
+
+102         328 NOP
+
+ 96         330 NOP
+
+103         332 NOP
+
+ 96         334 NOP
+
+104         336 NOP
+
+ 96         338 LOAD_CONST              35 (('config', 'ProviderConfig', 'image_paths', 'list[Path]', 'filename', 'str', 'source_hint', 'str', 'template', 'Any | None', 'request_logger', 'RequestLogger | None', 'request_context', 'dict[str, Any] | None', 'return', 'Classification'))
+            340 LOAD_CONST              23 (<code object classify_material at <address>, file "xiaoguan_classifier\model_client.py", line 96>)
+            342 MAKE_FUNCTION            5 (defaults, annotations)
+            344 STORE_NAME              44 (classify_material)
+
+187         346 LOAD_CONST              36 (('config', 'ProviderConfig', 'base_template', 'ClassificationTemplate', 'product_info', 'str', 'return', 'ClassificationTemplate'))
+            348 LOAD_CONST              24 (<code object generate_template_draft at <address>, file "xiaoguan_classifier\model_client.py", line 187>)
+            350 MAKE_FUNCTION            4 (annotations)
+            352 STORE_NAME              45 (generate_template_draft)
+
+251         354 LOAD_CONST              37 (('config', 'ProviderConfig', 'return', 'Classification'))
+            356 LOAD_CONST              25 (<code object test_vision_model_connection at <address>, file "xiaoguan_classifier\model_client.py", line 251>)
+            358 MAKE_FUNCTION            4 (annotations)
+            360 STORE_NAME              46 (test_vision_model_connection)
+
+262         362 LOAD_CONST              38 (('config', 'ProviderConfig', 'return', 'str'))
+            364 LOAD_CONST              26 (<code object test_text_model_connection at <address>, file "xiaoguan_classifier\model_client.py", line 262>)
+            366 MAKE_FUNCTION            4 (annotations)
+            368 STORE_NAME              47 (test_text_model_connection)
+            370 RETURN_CONST             2 (None)
+
+Disassembly of <code object ModelClientError at <address>, file "xiaoguan_classifier\model_client.py", line 21>:
+ 21           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('ModelClientError')
+              8 STORE_NAME               2 (__qualname__)
+
+ 22          10 RETURN_CONST             1 (None)
+
+Disassembly of <code object _now_text at <address>, file "xiaoguan_classifier\model_client.py", line 28>:
+ 28           0 RESUME                   0
+
+ 29           2 LOAD_GLOBAL              1 (NULL + datetime)
+             12 LOAD_ATTR                2 (now)
+             32 CALL                     0
+             40 LOAD_ATTR                5 (NULL|self + strftime)
+             60 LOAD_CONST               1 ('%Y-%m-%d %H:%M:%S')
+             62 CALL                     1
+             70 RETURN_VALUE
+
+Disassembly of <code object _failure_type at <address>, file "xiaoguan_classifier\model_client.py", line 32>:
+ 32           0 RESUME                   0
+
+ 33           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (exc)
+             14 CALL                     1
+             22 STORE_FAST               1 (text)
+
+ 34          24 LOAD_GLOBAL              3 (NULL + isinstance)
+             34 LOAD_FAST                0 (exc)
+             36 LOAD_GLOBAL              4 (requests)
+             46 LOAD_ATTR                6 (Timeout)
+             66 CALL                     2
+             74 POP_JUMP_IF_TRUE        12 (to 100)
+             76 LOAD_CONST               1 ('Read timed out')
+             78 LOAD_FAST                1 (text)
+             80 CONTAINS_OP              0
+             82 POP_JUMP_IF_TRUE         8 (to 100)
+             84 LOAD_CONST               2 ('read timeout')
+             86 LOAD_FAST                1 (text)
+             88 CONTAINS_OP              0
+             90 POP_JUMP_IF_TRUE         4 (to 100)
+             92 LOAD_CONST               3 ('timed out')
+             94 LOAD_FAST                1 (text)
+             96 CONTAINS_OP              0
+             98 POP_JUMP_IF_FALSE        1 (to 102)
+
+ 35     >>  100 RETURN_CONST             4 ('超时')
+
+ 36     >>  102 LOAD_CONST               5 ('AccountOverdueError')
+            104 LOAD_FAST                1 (text)
+            106 CONTAINS_OP              0
+            108 POP_JUMP_IF_TRUE         8 (to 126)
+            110 LOAD_CONST               6 ('overdue')
+            112 LOAD_FAST                1 (text)
+            114 CONTAINS_OP              0
+            116 POP_JUMP_IF_TRUE         4 (to 126)
+            118 LOAD_CONST               7 ('欠费')
+            120 LOAD_FAST                1 (text)
+            122 CONTAINS_OP              0
+            124 POP_JUMP_IF_FALSE        1 (to 128)
+
+ 37     >>  126 RETURN_CONST             7 ('欠费')
+
+ 38     >>  128 LOAD_CONST               8 ('JSON')
+            130 LOAD_FAST                1 (text)
+            132 CONTAINS_OP              0
+            134 POP_JUMP_IF_TRUE         4 (to 144)
+            136 LOAD_CONST               9 ('json')
+            138 LOAD_FAST                1 (text)
+            140 CONTAINS_OP              0
+            142 POP_JUMP_IF_FALSE        1 (to 146)
+
+ 39     >>  144 RETURN_CONST            10 ('JSON解析失败')
+
+ 40     >>  146 LOAD_CONST              11 ('403')
+            148 LOAD_FAST                1 (text)
+            150 CONTAINS_OP              0
+            152 POP_JUMP_IF_TRUE         4 (to 162)
+            154 LOAD_CONST              12 ('401')
+            156 LOAD_FAST                1 (text)
+            158 CONTAINS_OP              0
+            160 POP_JUMP_IF_FALSE        1 (to 164)
+
+ 41     >>  162 RETURN_CONST            13 ('鉴权/权限')
+
+ 42     >>  164 RETURN_CONST            14 ('接口报错')
+
+Disassembly of <code object _extract_json at <address>, file "xiaoguan_classifier\model_client.py", line 45>:
+ 45           0 RESUME                   0
+
+ 46           2 LOAD_FAST                0 (text)
+              4 LOAD_ATTR                1 (NULL|self + strip)
+             24 CALL                     0
+             32 STORE_FAST               0 (text)
+
+ 47          34 LOAD_FAST                0 (text)
+             36 LOAD_ATTR                3 (NULL|self + startswith)
+             56 LOAD_CONST               1 ('```')
+             58 CALL                     1
+             66 POP_JUMP_IF_FALSE       46 (to 160)
+
+ 48          68 LOAD_GLOBAL              5 (NULL + re)
+             78 LOAD_ATTR                6 (sub)
+             98 LOAD_CONST               2 ('^```(?:json)?\\s*')
+            100 LOAD_CONST               3 ('')
+            102 LOAD_FAST                0 (text)
+            104 CALL                     3
+            112 STORE_FAST               0 (text)
+
+ 49         114 LOAD_GLOBAL              5 (NULL + re)
+            124 LOAD_ATTR                6 (sub)
+            144 LOAD_CONST               4 ('\\s*```$')
+            146 LOAD_CONST               3 ('')
+            148 LOAD_FAST                0 (text)
+            150 CALL                     3
+            158 STORE_FAST               0 (text)
+
+ 50     >>  160 NOP
+
+ 51         162 LOAD_GLOBAL              9 (NULL + json)
+            172 LOAD_ATTR               10 (loads)
+            192 LOAD_FAST                0 (text)
+            194 CALL                     1
+            202 RETURN_VALUE
+        >>  204 PUSH_EXC_INFO
+
+ 52         206 LOAD_GLOBAL              8 (json)
+            216 LOAD_ATTR               12 (JSONDecodeError)
+            236 CHECK_EXC_MATCH
+            238 POP_JUMP_IF_FALSE       80 (to 400)
+            240 POP_TOP
+
+ 53         242 LOAD_GLOBAL              5 (NULL + re)
+            252 LOAD_ATTR               14 (search)
+            272 LOAD_CONST               5 ('\\{.*\\}')
+            274 LOAD_FAST                0 (text)
+            276 LOAD_GLOBAL              4 (re)
+            286 LOAD_ATTR               16 (S)
+            306 KW_NAMES                 6 (('flags',))
+            308 CALL                     3
+            316 STORE_FAST               1 (match)
+
+ 54         318 LOAD_FAST                1 (match)
+            320 POP_JUMP_IF_TRUE         1 (to 324)
+
+ 55         322 RAISE_VARARGS            0
+
+ 56     >>  324 LOAD_GLOBAL              9 (NULL + json)
+            334 LOAD_ATTR               10 (loads)
+            354 LOAD_FAST                1 (match)
+            356 LOAD_ATTR               19 (NULL|self + group)
+            376 LOAD_CONST               7 (0)
+            378 CALL                     1
+            386 CALL                     1
+            394 SWAP                     2
+            396 POP_EXCEPT
+            398 RETURN_VALUE
+
+ 52     >>  400 RERAISE                  0
+        >>  402 COPY                     3
+            404 POP_EXCEPT
+            406 RERAISE                  1
+ExceptionTable:
+  162 to 200 -> 204 [0]
+  204 to 394 -> 402 [1] lasti
+  400 to 400 -> 402 [1] lasti
+
+Disassembly of <code object _post_chat_completion at <address>, file "xiaoguan_classifier\model_client.py", line 59>:
+ 59           0 RESUME                   0
+
+ 60           2 NOP
+
+ 61           4 LOAD_GLOBAL              1 (NULL + requests)
+             14 LOAD_ATTR                2 (post)
+             34 LOAD_FAST                0 (config)
+             36 LOAD_ATTR                4 (chat_completions_url)
+             56 LOAD_FAST                1 (headers)
+             58 LOAD_FAST                2 (payload)
+             60 LOAD_CONST               1 (90)
+             62 KW_NAMES                 2 (('headers', 'json', 'timeout'))
+             64 CALL                     4
+             72 STORE_FAST               3 (response)
+
+ 65          74 LOAD_FAST                3 (response)
+             76 LOAD_ATTR               10 (status_code)
+             96 LOAD_CONST               4 (400)
+             98 COMPARE_OP               2 (<)
+            102 POP_JUMP_IF_TRUE        14 (to 132)
+            104 LOAD_CONST               5 ('response_format')
+            106 LOAD_FAST                3 (response)
+            108 LOAD_ATTR               12 (text)
+            128 CONTAINS_OP              1
+            130 POP_JUMP_IF_FALSE        2 (to 136)
+
+ 66     >>  132 LOAD_FAST                3 (response)
+            134 RETURN_VALUE
+
+ 68     >>  136 LOAD_GLOBAL             15 (NULL + dict)
+            146 LOAD_FAST                2 (payload)
+            148 CALL                     1
+            156 STORE_FAST               5 (fallback_payload)
+
+ 69         158 LOAD_FAST                5 (fallback_payload)
+            160 LOAD_ATTR               17 (NULL|self + pop)
+            180 LOAD_CONST               5 ('response_format')
+            182 LOAD_CONST               0 (None)
+            184 CALL                     2
+            192 POP_TOP
+
+ 70         194 LOAD_GLOBAL              1 (NULL + requests)
+            204 LOAD_ATTR                2 (post)
+            224 LOAD_FAST                0 (config)
+            226 LOAD_ATTR                4 (chat_completions_url)
+            246 LOAD_FAST                1 (headers)
+            248 LOAD_FAST                5 (fallback_payload)
+            250 LOAD_CONST               1 (90)
+            252 KW_NAMES                 2 (('headers', 'json', 'timeout'))
+            254 CALL                     4
+            262 RETURN_VALUE
+        >>  264 PUSH_EXC_INFO
+
+ 62         266 LOAD_GLOBAL              0 (requests)
+            276 LOAD_ATTR                6 (RequestException)
+            296 CHECK_EXC_MATCH
+            298 POP_JUMP_IF_FALSE       20 (to 340)
+            300 STORE_FAST               4 (exc)
+
+ 63         302 LOAD_GLOBAL              9 (NULL + ModelClientError)
+            312 LOAD_CONST               3 ('模型接口连接失败: ')
+            314 LOAD_FAST                4 (exc)
+            316 FORMAT_VALUE             0
+            318 BUILD_STRING             2
+            320 CALL                     1
+            328 LOAD_FAST                4 (exc)
+            330 RAISE_VARARGS            2
+        >>  332 LOAD_CONST               0 (None)
+            334 STORE_FAST               4 (exc)
+            336 DELETE_FAST              4 (exc)
+            338 RERAISE                  1
+
+ 62     >>  340 RERAISE                  0
+        >>  342 COPY                     3
+            344 POP_EXCEPT
+            346 RERAISE                  1
+ExceptionTable:
+  4 to 72 -> 264 [0]
+  264 to 300 -> 342 [1] lasti
+  302 to 330 -> 332 [1] lasti
+  332 to 340 -> 342 [1] lasti
+
+Disassembly of <code object _usage_from_response at <address>, file "xiaoguan_classifier\model_client.py", line 73>:
+ 73           0 RESUME                   0
+
+ 74           2 LOAD_FAST                0 (data)
+              4 LOAD_ATTR                1 (NULL|self + get)
+             24 LOAD_CONST               1 ('usage')
+             26 CALL                     1
+             34 COPY                     1
+             36 POP_JUMP_IF_TRUE         2 (to 42)
+             38 POP_TOP
+             40 BUILD_MAP                0
+        >>   42 STORE_FAST               1 (usage)
+
+ 75          44 LOAD_GLOBAL              3 (NULL + isinstance)
+             54 LOAD_FAST                1 (usage)
+             56 LOAD_GLOBAL              4 (dict)
+             66 CALL                     2
+             74 POP_JUMP_IF_TRUE         1 (to 78)
+
+ 76          76 RETURN_CONST             2 ((0, 0, 0))
+
+ 77     >>   78 LOAD_GLOBAL              7 (NULL + _safe_usage_int)
+             88 LOAD_FAST                1 (usage)
+             90 LOAD_ATTR                1 (NULL|self + get)
+            110 LOAD_CONST               3 ('prompt_tokens')
+            112 CALL                     1
+            120 COPY                     1
+            122 POP_JUMP_IF_TRUE        17 (to 158)
+            124 POP_TOP
+            126 LOAD_FAST                1 (usage)
+            128 LOAD_ATTR                1 (NULL|self + get)
+            148 LOAD_CONST               4 ('input_tokens')
+            150 CALL                     1
+        >>  158 CALL                     1
+            166 STORE_FAST               2 (prompt_tokens)
+
+ 78         168 LOAD_GLOBAL              7 (NULL + _safe_usage_int)
+            178 LOAD_FAST                1 (usage)
+            180 LOAD_ATTR                1 (NULL|self + get)
+            200 LOAD_CONST               5 ('completion_tokens')
+            202 CALL                     1
+            210 COPY                     1
+            212 POP_JUMP_IF_TRUE        17 (to 248)
+            214 POP_TOP
+            216 LOAD_FAST                1 (usage)
+            218 LOAD_ATTR                1 (NULL|self + get)
+            238 LOAD_CONST               6 ('output_tokens')
+            240 CALL                     1
+        >>  248 CALL                     1
+            256 STORE_FAST               3 (completion_tokens)
+
+ 79         258 LOAD_GLOBAL              7 (NULL + _safe_usage_int)
+            268 LOAD_FAST                1 (usage)
+            270 LOAD_ATTR                1 (NULL|self + get)
+            290 LOAD_CONST               7 ('total_tokens')
+            292 CALL                     1
+            300 CALL                     1
+            308 STORE_FAST               4 (total_tokens)
+
+ 80         310 LOAD_FAST                4 (total_tokens)
+            312 LOAD_CONST               8 (0)
+            314 COMPARE_OP              26 (<=)
+            318 POP_JUMP_IF_FALSE        5 (to 330)
+
+ 81         320 LOAD_FAST                2 (prompt_tokens)
+            322 LOAD_FAST                3 (completion_tokens)
+            324 BINARY_OP                0 (+)
+            328 STORE_FAST               4 (total_tokens)
+
+ 82     >>  330 LOAD_FAST                2 (prompt_tokens)
+            332 LOAD_FAST                3 (completion_tokens)
+            334 LOAD_FAST                4 (total_tokens)
+            336 BUILD_TUPLE              3
+            338 RETURN_VALUE
+
+Disassembly of <code object _safe_usage_int at <address>, file "xiaoguan_classifier\model_client.py", line 85>:
+ 85           0 RESUME                   0
+
+ 86           2 NOP
+
+ 87           4 LOAD_GLOBAL              1 (NULL + max)
+             14 LOAD_CONST               1 (0)
+             16 LOAD_GLOBAL              3 (NULL + int)
+             26 LOAD_FAST                0 (value)
+             28 COPY                     1
+             30 POP_JUMP_IF_TRUE         2 (to 36)
+             32 POP_TOP
+             34 LOAD_CONST               1 (0)
+        >>   36 CALL                     1
+             44 CALL                     2
+             52 RETURN_VALUE
+        >>   54 PUSH_EXC_INFO
+
+ 88          56 LOAD_GLOBAL              4 (TypeError)
+             66 LOAD_GLOBAL              6 (ValueError)
+             76 BUILD_TUPLE              2
+             78 CHECK_EXC_MATCH
+             80 POP_JUMP_IF_FALSE        3 (to 88)
+             82 POP_TOP
+
+ 89          84 POP_EXCEPT
+             86 RETURN_CONST             1 (0)
+
+ 88     >>   88 RERAISE                  0
+        >>   90 COPY                     3
+             92 POP_EXCEPT
+             94 RERAISE                  1
+ExceptionTable:
+  4 to 50 -> 54 [0]
+  54 to 82 -> 90 [1] lasti
+  88 to 88 -> 90 [1] lasti
+
+Disassembly of <code object _limited_classification_tokens at <address>, file "xiaoguan_classifier\model_client.py", line 92>:
+ 92           0 RESUME                   0
+
+ 93           2 LOAD_GLOBAL              1 (NULL + max)
+             12 LOAD_CONST               1 (128)
+             14 LOAD_GLOBAL              3 (NULL + min)
+             24 LOAD_CONST               2 (1600)
+             26 LOAD_GLOBAL              5 (NULL + int)
+             36 LOAD_GLOBAL              7 (NULL + getattr)
+             46 LOAD_FAST                0 (config)
+             48 LOAD_CONST               3 ('max_tokens')
+             50 LOAD_CONST               4 (500)
+             52 CALL                     3
+             60 COPY                     1
+             62 POP_JUMP_IF_TRUE         2 (to 68)
+             64 POP_TOP
+             66 LOAD_CONST               4 (500)
+        >>   68 CALL                     1
+             76 CALL                     2
+             84 CALL                     2
+             92 RETURN_VALUE
+
+Disassembly of <code object classify_material at <address>, file "xiaoguan_classifier\model_client.py", line 96>:
+ 96           0 RESUME                   0
+
+105           2 LOAD_GLOBAL              1 (NULL + load_api_key)
+             12 LOAD_FAST                0 (config)
+             14 CALL                     1
+             22 STORE_FAST               7 (api_key)
+
+106          24 LOAD_FAST                7 (api_key)
+             26 POP_JUMP_IF_TRUE        24 (to 76)
+
+107          28 LOAD_GLOBAL              3 (NULL + ModelClientError)
+             38 LOAD_CONST               1 ('缺少 API Key: ')
+             40 LOAD_FAST                0 (config)
+             42 LOAD_ATTR                4 (api_key_env)
+             62 FORMAT_VALUE             0
+             64 BUILD_STRING             2
+             66 CALL                     1
+             74 RAISE_VARARGS            1
+
+108     >>   76 LOAD_FAST                0 (config)
+             78 LOAD_ATTR                6 (model)
+             98 LOAD_ATTR                9 (NULL|self + strip)
+            118 CALL                     0
+            126 POP_JUMP_IF_TRUE        11 (to 150)
+
+109         128 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            138 LOAD_CONST               2 ('缺少模型名称，请在 API 配置中填写')
+            140 CALL                     1
+            148 RAISE_VARARGS            1
+
+111     >>  150 LOAD_CONST               3 ('text')
+            152 LOAD_GLOBAL             11 (NULL + user_prompt_for_material)
+            162 LOAD_FAST                2 (filename)
+            164 LOAD_FAST                3 (source_hint)
+            166 CALL                     2
+            174 LOAD_CONST               4 (('type', 'text'))
+            176 BUILD_CONST_KEY_MAP      2
+            178 BUILD_LIST               1
+            180 STORE_FAST               8 (content)
+
+112         182 LOAD_GLOBAL             13 (NULL + encode_images_as_data_urls)
+            192 LOAD_FAST                1 (image_paths)
+            194 CALL                     1
+            202 GET_ITER
+        >>  204 FOR_ITER                24 (to 256)
+            208 STORE_FAST               9 (data_url)
+
+113         210 LOAD_FAST                8 (content)
+            212 LOAD_ATTR               15 (NULL|self + append)
+            232 LOAD_CONST               5 ('image_url')
+            234 LOAD_CONST               6 ('url')
+            236 LOAD_FAST                9 (data_url)
+            238 BUILD_MAP                1
+            240 LOAD_CONST               7 (('type', 'image_url'))
+            242 BUILD_CONST_KEY_MAP      2
+            244 CALL                     1
+            252 POP_TOP
+            254 JUMP_BACKWARD           26 (to 204)
+
+112     >>  256 END_FOR
+
+115         258 LOAD_FAST                4 (template)
+            260 POP_JUMP_IF_NONE        11 (to 284)
+            262 LOAD_GLOBAL             17 (NULL + system_prompt_for_template)
+            272 LOAD_FAST                4 (template)
+            274 CALL                     1
+            282 JUMP_FORWARD             5 (to 294)
+        >>  284 LOAD_GLOBAL             18 (CLASSIFIER_SYSTEM_PROMPT)
+        >>  294 STORE_FAST              10 (system_prompt)
+
+116         296 LOAD_FAST                4 (template)
+            298 POP_JUMP_IF_NONE        12 (to 324)
+            300 LOAD_FAST                4 (template)
+            302 LOAD_ATTR               20 (taxonomy)
+            322 JUMP_FORWARD             1 (to 326)
+        >>  324 LOAD_CONST               0 (None)
+        >>  326 STORE_FAST              11 (taxonomy)
+
+118         328 LOAD_FAST                0 (config)
+            330 LOAD_ATTR                6 (model)
+
+120         350 LOAD_CONST               8 ('system')
+            352 LOAD_FAST               10 (system_prompt)
+            354 LOAD_CONST               9 (('role', 'content'))
+            356 BUILD_CONST_KEY_MAP      2
+
+121         358 LOAD_CONST              10 ('user')
+            360 LOAD_FAST                8 (content)
+            362 LOAD_CONST               9 (('role', 'content'))
+            364 BUILD_CONST_KEY_MAP      2
+
+119         366 BUILD_LIST               2
+
+123         368 LOAD_CONST              11 (0.1)
+
+124         370 LOAD_GLOBAL             23 (NULL + _limited_classification_tokens)
+            380 LOAD_FAST                0 (config)
+            382 CALL                     1
+
+125         390 LOAD_CONST              12 ('type')
+            392 LOAD_CONST              13 ('json_object')
+            394 BUILD_MAP                1
+
+117         396 LOAD_CONST              14 (('model', 'messages', 'temperature', 'max_tokens', 'response_format'))
+            398 BUILD_CONST_KEY_MAP      5
+            400 STORE_FAST              12 (payload)
+
+127         402 LOAD_CONST              15 ('Bearer ')
+            404 LOAD_FAST                7 (api_key)
+            406 FORMAT_VALUE             0
+            408 BUILD_STRING             2
+            410 LOAD_CONST              16 ('application/json')
+            412 LOAD_CONST              17 (('Authorization', 'Content-Type'))
+            414 BUILD_CONST_KEY_MAP      2
+            416 STORE_FAST              13 (headers)
+
+129         418 LOAD_GLOBAL             25 (NULL + _now_text)
+            428 CALL                     0
+
+130         436 LOAD_FAST                0 (config)
+            438 LOAD_ATTR               26 (provider)
+
+131         458 LOAD_FAST                0 (config)
+            460 LOAD_ATTR                6 (model)
+
+132         480 LOAD_FAST                2 (filename)
+
+133         482 LOAD_GLOBAL             29 (NULL + len)
+            492 LOAD_FAST                1 (image_paths)
+            494 CALL                     1
+
+134         502 LOAD_FAST               12 (payload)
+            504 LOAD_CONST              18 ('max_tokens')
+            506 BINARY_SUBSCR
+
+128         510 LOAD_CONST              19 (('started_at', 'provider', 'model', 'filename', 'image_count', 'max_tokens'))
+            512 BUILD_CONST_KEY_MAP      6
+            514 STORE_FAST              14 (log_base)
+
+136         516 LOAD_FAST                6 (request_context)
+            518 POP_JUMP_IF_FALSE       17 (to 554)
+
+137         520 LOAD_FAST               14 (log_base)
+            522 LOAD_ATTR               31 (NULL|self + update)
+            542 LOAD_FAST                6 (request_context)
+            544 CALL                     1
+            552 POP_TOP
+
+139     >>  554 NOP
+
+140         556 LOAD_GLOBAL             33 (NULL + _post_chat_completion)
+            566 LOAD_FAST                0 (config)
+            568 LOAD_FAST               13 (headers)
+            570 LOAD_FAST               12 (payload)
+            572 CALL                     3
+            580 STORE_FAST              15 (response)
+
+141         582 LOAD_FAST               15 (response)
+            584 LOAD_ATTR               34 (status_code)
+            604 LOAD_CONST              20 (400)
+            606 COMPARE_OP              92 (>=)
+            610 POP_JUMP_IF_FALSE       40 (to 692)
+
+142         612 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            622 LOAD_CONST              21 ('模型接口错误 ')
+            624 LOAD_FAST               15 (response)
+            626 LOAD_ATTR               34 (status_code)
+            646 FORMAT_VALUE             0
+            648 LOAD_CONST              22 (': ')
+            650 LOAD_FAST               15 (response)
+            652 LOAD_ATTR               36 (text)
+            672 LOAD_CONST               0 (None)
+            674 LOAD_CONST              23 (500)
+            676 BINARY_SLICE
+            678 FORMAT_VALUE             0
+            680 BUILD_STRING             4
+            682 CALL                     1
+            690 RAISE_VARARGS            1
+
+144     >>  692 LOAD_FAST               15 (response)
+            694 LOAD_ATTR               39 (NULL|self + json)
+            714 CALL                     0
+            722 STORE_FAST              16 (data)
+
+145         724 NOP
+
+146         726 LOAD_FAST               16 (data)
+            728 LOAD_CONST              24 ('choices')
+            730 BINARY_SUBSCR
+            734 LOAD_CONST              25 (0)
+            736 BINARY_SUBSCR
+            740 LOAD_CONST              26 ('message')
+            742 BINARY_SUBSCR
+            746 LOAD_CONST              27 ('content')
+            748 BINARY_SUBSCR
+            752 STORE_FAST              17 (text)
+
+149         754 LOAD_GLOBAL             49 (NULL + normalize_classification)
+            764 LOAD_GLOBAL             51 (NULL + _extract_json)
+            774 LOAD_FAST               17 (text)
+            776 CALL                     1
+            784 LOAD_FAST               11 (taxonomy)
+            786 CALL                     2
+            794 STORE_FAST              19 (classification)
+
+150         796 LOAD_GLOBAL             53 (NULL + _usage_from_response)
+            806 LOAD_FAST               16 (data)
+            808 CALL                     1
+            816 UNPACK_SEQUENCE          3
+            820 STORE_FAST              20 (prompt_tokens)
+            822 STORE_FAST              21 (completion_tokens)
+            824 STORE_FAST              22 (total_tokens)
+
+151         826 LOAD_FAST                5 (request_logger)
+            828 POP_JUMP_IF_FALSE       28 (to 886)
+
+152         830 PUSH_NULL
+            832 LOAD_FAST                5 (request_logger)
+
+153         834 BUILD_MAP                0
+
+154         836 LOAD_FAST               14 (log_base)
+
+153         838 DICT_UPDATE              1
+
+155         840 LOAD_GLOBAL             25 (NULL + _now_text)
+            850 CALL                     0
+
+156         858 LOAD_CONST              29 ('success')
+
+157         860 LOAD_CONST              30 ('')
+
+158         862 LOAD_CONST              30 ('')
+
+159         864 LOAD_FAST               20 (prompt_tokens)
+
+160         866 LOAD_FAST               21 (completion_tokens)
+
+161         868 LOAD_FAST               22 (total_tokens)
+
+153         870 LOAD_CONST              31 (('ended_at', 'status', 'failure_type', 'error', 'prompt_tokens', 'completion_tokens', 'total_tokens'))
+            872 BUILD_CONST_KEY_MAP      7
+            874 DICT_UPDATE              1
+
+152         876 CALL                     1
+            884 POP_TOP
+
+164     >>  886 LOAD_GLOBAL             55 (NULL + replace)
+
+165         896 LOAD_FAST               19 (classification)
+
+166         898 LOAD_FAST               20 (prompt_tokens)
+
+167         900 LOAD_FAST               21 (completion_tokens)
+
+168         902 LOAD_FAST               22 (total_tokens)
+
+164         904 KW_NAMES                32 (('prompt_tokens', 'completion_tokens', 'total_tokens'))
+            906 CALL                     4
+            914 RETURN_VALUE
+        >>  916 PUSH_EXC_INFO
+
+147         918 LOAD_GLOBAL             40 (KeyError)
+            928 LOAD_GLOBAL             42 (IndexError)
+            938 LOAD_GLOBAL             44 (TypeError)
+            948 BUILD_TUPLE              3
+            950 CHECK_EXC_MATCH
+            952 POP_JUMP_IF_FALSE       29 (to 1012)
+            954 STORE_FAST              18 (exc)
+
+148         956 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            966 LOAD_CONST              28 ('模型返回格式异常: ')
+            968 LOAD_GLOBAL             47 (NULL + str)
+            978 LOAD_FAST               18 (exc)
+            980 CALL                     1
+            988 FORMAT_VALUE             0
+            990 BUILD_STRING             2
+            992 CALL                     1
+           1000 LOAD_FAST               18 (exc)
+           1002 RAISE_VARARGS            2
+        >> 1004 LOAD_CONST               0 (None)
+           1006 STORE_FAST              18 (exc)
+           1008 DELETE_FAST             18 (exc)
+           1010 RERAISE                  1
+
+147     >> 1012 RERAISE                  0
+        >> 1014 COPY                     3
+           1016 POP_EXCEPT
+           1018 RERAISE                  1
+        >> 1020 PUSH_EXC_INFO
+
+170        1022 LOAD_GLOBAL             56 (Exception)
+           1032 CHECK_EXC_MATCH
+           1034 POP_JUMP_IF_FALSE       54 (to 1144)
+           1036 STORE_FAST              18 (exc)
+
+171        1038 LOAD_FAST                5 (request_logger)
+           1040 POP_JUMP_IF_FALSE       46 (to 1134)
+
+172        1042 PUSH_NULL
+           1044 LOAD_FAST                5 (request_logger)
+
+173        1046 BUILD_MAP                0
+
+174        1048 LOAD_FAST               14 (log_base)
+
+173        1050 DICT_UPDATE              1
+
+175        1052 LOAD_GLOBAL             25 (NULL + _now_text)
+           1062 CALL                     0
+
+176        1070 LOAD_CONST              33 ('failed')
+
+177        1072 LOAD_GLOBAL             59 (NULL + _failure_type)
+           1082 LOAD_FAST               18 (exc)
+           1084 CALL                     1
+
+178        1092 LOAD_GLOBAL             47 (NULL + str)
+           1102 LOAD_FAST               18 (exc)
+           1104 CALL                     1
+
+179        1112 LOAD_CONST              25 (0)
+
+180        1114 LOAD_CONST              25 (0)
+
+181        1116 LOAD_CONST              25 (0)
+
+173        1118 LOAD_CONST              31 (('ended_at', 'status', 'failure_type', 'error', 'prompt_tokens', 'completion_tokens', 'total_tokens'))
+           1120 BUILD_CONST_KEY_MAP      7
+           1122 DICT_UPDATE              1
+
+172        1124 CALL                     1
+           1132 POP_TOP
+
+184     >> 1134 RAISE_VARARGS            0
+        >> 1136 LOAD_CONST               0 (None)
+           1138 STORE_FAST              18 (exc)
+           1140 DELETE_FAST             18 (exc)
+           1142 RERAISE                  1
+
+170     >> 1144 RERAISE                  0
+        >> 1146 COPY                     3
+           1148 POP_EXCEPT
+           1150 RERAISE                  1
+ExceptionTable:
+  556 to 722 -> 1020 [0]
+  726 to 752 -> 916 [0]
+  754 to 912 -> 1020 [0]
+  916 to 954 -> 1014 [1] lasti
+  956 to 1002 -> 1004 [1] lasti
+  1004 to 1012 -> 1014 [1] lasti
+  1014 to 1018 -> 1020 [0]
+  1020 to 1036 -> 1146 [1] lasti
+  1038 to 1134 -> 1136 [1] lasti
+  1136 to 1144 -> 1146 [1] lasti
+
+Disassembly of <code object generate_template_draft at <address>, file "xiaoguan_classifier\model_client.py", line 187>:
+187           0 RESUME                   0
+
+188           2 LOAD_GLOBAL              1 (NULL + load_api_key)
+             12 LOAD_FAST                0 (config)
+             14 CALL                     1
+             22 STORE_FAST               3 (api_key)
+
+189          24 LOAD_FAST                3 (api_key)
+             26 POP_JUMP_IF_TRUE        24 (to 76)
+
+190          28 LOAD_GLOBAL              3 (NULL + ModelClientError)
+             38 LOAD_CONST               1 ('缺少 API Key: ')
+             40 LOAD_FAST                0 (config)
+             42 LOAD_ATTR                4 (api_key_env)
+             62 FORMAT_VALUE             0
+             64 BUILD_STRING             2
+             66 CALL                     1
+             74 RAISE_VARARGS            1
+
+191     >>   76 LOAD_FAST                0 (config)
+             78 LOAD_ATTR                6 (model)
+             98 LOAD_ATTR                9 (NULL|self + strip)
+            118 CALL                     0
+            126 POP_JUMP_IF_TRUE        11 (to 150)
+
+192         128 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            138 LOAD_CONST               2 ('缺少模型名称，请在 API 配置中填写')
+            140 CALL                     1
+            148 RAISE_VARARGS            1
+
+193     >>  150 LOAD_FAST                2 (product_info)
+            152 LOAD_ATTR                9 (NULL|self + strip)
+            172 CALL                     0
+            180 POP_JUMP_IF_TRUE        11 (to 204)
+
+194         182 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            192 LOAD_CONST               3 ('请先填写新产品信息')
+            194 CALL                     1
+            202 RAISE_VARARGS            1
+
+196     >>  204 LOAD_CONST               4 ('\n')
+            206 LOAD_ATTR               11 (NULL|self + join)
+            226 LOAD_CONST               5 (<code object <genexpr> at <address>, file "xiaoguan_classifier\model_client.py", line 196>)
+            228 MAKE_FUNCTION            0
+
+198         230 LOAD_FAST                1 (base_template)
+            232 LOAD_ATTR               12 (taxonomy)
+            252 LOAD_ATTR               15 (NULL|self + items)
+            272 CALL                     0
+            280 GET_ITER
+
+196         282 CALL                     0
+            290 CALL                     1
+            298 STORE_FAST               4 (taxonomy_lines)
+
+201         300 LOAD_CONST               6 ('请基于现有素材分类模板，为新产品生成一个可直接人工修改的分类方案草案。\n目标是服务短视频素材整理、剪辑检索和投放复盘：一级类目要稳定，二级类目必须能对应画面构建，不要堆商品参数。\n请把分类方案设计成后续容易自检和人工纠错的形式：每个二级类目都要有明确画面判断标准，容易混淆的边界必须写清楚。\n\n参考模板名称：')
+
+204         302 LOAD_FAST                1 (base_template)
+            304 LOAD_ATTR               16 (name)
+            324 FORMAT_VALUE             0
+            326 LOAD_CONST               7 ('\n参考产品：')
+
+205         328 LOAD_FAST                1 (base_template)
+            330 LOAD_ATTR               18 (product_name)
+            350 FORMAT_VALUE             0
+            352 LOAD_CONST               8 ('\n参考分类结构：\n')
+
+206         354 LOAD_FAST                4 (taxonomy_lines)
+            356 FORMAT_VALUE             0
+            358 LOAD_CONST               9 ('\n参考边界规则：\n')
+
+207         360 LOAD_FAST                1 (base_template)
+            362 LOAD_ATTR               20 (rules)
+            382 LOAD_CONST               0 (None)
+            384 LOAD_CONST              10 (1200)
+            386 BINARY_SLICE
+            388 FORMAT_VALUE             0
+            390 LOAD_CONST              11 ('\n固定命名规则：')
+
+208         392 LOAD_FAST                1 (base_template)
+            394 LOAD_ATTR               22 (naming_rule)
+            414 FORMAT_VALUE             0
+            416 LOAD_CONST              12 ('\n\n新产品信息：\n')
+
+209         418 LOAD_FAST                2 (product_info)
+            420 LOAD_ATTR                9 (NULL|self + strip)
+            440 CALL                     0
+            448 FORMAT_VALUE             0
+            450 LOAD_CONST              13 ('\n\n请只输出 JSON，不要输出解释。JSON 格式：\n{\n  "name": "方案名称",\n  "product_name": "产品/项目名称",\n  "taxonomy": {"00_待筛素材": ["画面不明确或低相关"], "01_一级分类": ["二级类目"]},\n  "rules": "分类规则和边界说明，必须包含：1判断优先级；2每个一级/二级类目的画面构建标准；3容易混淆的边界；4错分后怎么修正；5自检重点；6命名注意事项",\n  "naming_rule": "产品名_二级分类_具体画面_景别_日期_序号"\n}\n约束：\n- 一级类目不要太碎；痛点、卖点、产品、使用、口播、达人、AI生成这类主功能优先。\n- 二级类目必须是看画面能判断的镜头类型或场景，不要只写抽象卖点词。\n- 如果用户提供了错分纠正样例，必须把样例沉淀到 rules 的边界规则里。\n- rules 要写成可执行规则，不要写空泛口号。\n')
+
+201         452 BUILD_STRING            13
+
+200         454 STORE_FAST               5 (user_text)
+
+225         456 LOAD_FAST                0 (config)
+            458 LOAD_ATTR                6 (model)
+
+228         478 LOAD_CONST              14 ('system')
+
+229         480 LOAD_CONST              15 ('你是电商短视频素材库分类方案设计助手。请输出严格 JSON。')
+
+227         482 LOAD_CONST              16 (('role', 'content'))
+            484 BUILD_CONST_KEY_MAP      2
+
+231         486 LOAD_CONST              17 ('user')
+            488 LOAD_FAST                5 (user_text)
+            490 LOAD_CONST              16 (('role', 'content'))
+            492 BUILD_CONST_KEY_MAP      2
+
+226         494 BUILD_LIST               2
+
+233         496 LOAD_CONST              18 (0.2)
+
+234         498 LOAD_CONST              19 (1600)
+
+235         500 LOAD_CONST              20 ('type')
+            502 LOAD_CONST              21 ('json_object')
+            504 BUILD_MAP                1
+
+224         506 LOAD_CONST              22 (('model', 'messages', 'temperature', 'max_tokens', 'response_format'))
+            508 BUILD_CONST_KEY_MAP      5
+            510 STORE_FAST               6 (payload)
+
+237         512 LOAD_CONST              23 ('Bearer ')
+            514 LOAD_FAST                3 (api_key)
+            516 FORMAT_VALUE             0
+            518 BUILD_STRING             2
+            520 LOAD_CONST              24 ('application/json')
+            522 LOAD_CONST              25 (('Authorization', 'Content-Type'))
+            524 BUILD_CONST_KEY_MAP      2
+            526 STORE_FAST               7 (headers)
+
+238         528 LOAD_GLOBAL             25 (NULL + _post_chat_completion)
+            538 LOAD_FAST                0 (config)
+            540 LOAD_FAST                7 (headers)
+            542 LOAD_FAST                6 (payload)
+            544 CALL                     3
+            552 STORE_FAST               8 (response)
+
+239         554 LOAD_FAST                8 (response)
+            556 LOAD_ATTR               26 (status_code)
+            576 LOAD_CONST              26 (400)
+            578 COMPARE_OP              92 (>=)
+            582 POP_JUMP_IF_FALSE       40 (to 664)
+
+240         584 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            594 LOAD_CONST              27 ('模型接口错误 ')
+            596 LOAD_FAST                8 (response)
+            598 LOAD_ATTR               26 (status_code)
+            618 FORMAT_VALUE             0
+            620 LOAD_CONST              28 (': ')
+            622 LOAD_FAST                8 (response)
+            624 LOAD_ATTR               28 (text)
+            644 LOAD_CONST               0 (None)
+            646 LOAD_CONST              29 (500)
+            648 BINARY_SLICE
+            650 FORMAT_VALUE             0
+            652 BUILD_STRING             4
+            654 CALL                     1
+            662 RAISE_VARARGS            1
+
+241     >>  664 LOAD_FAST                8 (response)
+            666 LOAD_ATTR               31 (NULL|self + json)
+            686 CALL                     0
+            694 STORE_FAST               9 (data)
+
+242         696 NOP
+
+243         698 LOAD_FAST                9 (data)
+            700 LOAD_CONST              30 ('choices')
+            702 BINARY_SUBSCR
+            706 LOAD_CONST              31 (0)
+            708 BINARY_SUBSCR
+            712 LOAD_CONST              32 ('message')
+            714 BINARY_SUBSCR
+            718 LOAD_CONST              33 ('content')
+            720 BINARY_SUBSCR
+            724 STORE_FAST              10 (text)
+
+246         726 LOAD_GLOBAL             41 (NULL + _extract_json)
+            736 LOAD_FAST               10 (text)
+            738 CALL                     1
+            746 STORE_FAST              12 (draft)
+
+247         748 LOAD_FAST                1 (base_template)
+            750 LOAD_ATTR               42 (template_id)
+            770 LOAD_FAST               12 (draft)
+            772 LOAD_CONST              35 ('template_id')
+            774 STORE_SUBSCR
+
+248         778 LOAD_GLOBAL             45 (NULL + template_from_dict)
+            788 LOAD_FAST               12 (draft)
+            790 CALL                     1
+            798 RETURN_VALUE
+        >>  800 PUSH_EXC_INFO
+
+244         802 LOAD_GLOBAL             32 (KeyError)
+            812 LOAD_GLOBAL             34 (IndexError)
+            822 LOAD_GLOBAL             36 (TypeError)
+            832 BUILD_TUPLE              3
+            834 CHECK_EXC_MATCH
+            836 POP_JUMP_IF_FALSE       29 (to 896)
+            838 STORE_FAST              11 (exc)
+
+245         840 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            850 LOAD_CONST              34 ('模型返回格式异常: ')
+            852 LOAD_GLOBAL             39 (NULL + str)
+            862 LOAD_FAST               11 (exc)
+            864 CALL                     1
+            872 FORMAT_VALUE             0
+            874 BUILD_STRING             2
+            876 CALL                     1
+            884 LOAD_FAST               11 (exc)
+            886 RAISE_VARARGS            2
+        >>  888 LOAD_CONST               0 (None)
+            890 STORE_FAST              11 (exc)
+            892 DELETE_FAST             11 (exc)
+            894 RERAISE                  1
+
+244     >>  896 RERAISE                  0
+        >>  898 COPY                     3
+            900 POP_EXCEPT
+            902 RERAISE                  1
+ExceptionTable:
+  698 to 724 -> 800 [0]
+  800 to 838 -> 898 [1] lasti
+  840 to 886 -> 888 [1] lasti
+  888 to 896 -> 898 [1] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\model_client.py", line 196>:
+196           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+
+198     >>    8 FOR_ITER                32 (to 76)
+             12 UNPACK_SEQUENCE          2
+             16 STORE_FAST               1 (category)
+             18 STORE_FAST               2 (subcategories)
+
+197          20 LOAD_FAST                1 (category)
+             22 FORMAT_VALUE             0
+             24 LOAD_CONST               0 (': ')
+             26 LOAD_CONST               1 (', ')
+             28 LOAD_ATTR                1 (NULL|self + join)
+             48 LOAD_FAST                2 (subcategories)
+             50 LOAD_CONST               2 (None)
+             52 LOAD_CONST               3 (8)
+             54 BINARY_SLICE
+             56 CALL                     1
+             64 FORMAT_VALUE             0
+             66 BUILD_STRING             3
+             68 YIELD_VALUE              1
+             70 RESUME                   1
+             72 POP_TOP
+             74 JUMP_BACKWARD           34 (to 8)
+
+198     >>   76 END_FOR
+             78 RETURN_CONST             2 (None)
+        >>   80 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             82 RERAISE                  1
+ExceptionTable:
+  4 to 78 -> 80 [0] lasti
+
+Disassembly of <code object test_vision_model_connection at <address>, file "xiaoguan_classifier\model_client.py", line 251>:
+251           0 RESUME                   0
+
+252           2 LOAD_GLOBAL              1 (NULL + tempfile)
+             12 LOAD_ATTR                2 (TemporaryDirectory)
+             32 LOAD_CONST               1 ('xiaoguan_model_test_')
+             34 KW_NAMES                 2 (('prefix',))
+             36 CALL                     1
+             44 BEFORE_WITH
+             46 STORE_FAST               1 (temp_dir)
+
+253          48 LOAD_GLOBAL              5 (NULL + Path)
+             58 LOAD_FAST                1 (temp_dir)
+             60 CALL                     1
+             68 LOAD_CONST               3 ('vision_test.jpg')
+             70 BINARY_OP               11 (/)
+             74 STORE_FAST               2 (image_path)
+
+254          76 LOAD_GLOBAL              7 (NULL + Image)
+             86 LOAD_ATTR                8 (new)
+            106 LOAD_CONST               4 ('RGB')
+            108 LOAD_CONST               5 ((320, 180))
+            110 LOAD_CONST               6 ('white')
+            112 CALL                     3
+            120 STORE_FAST               3 (image)
+
+255         122 LOAD_GLOBAL             11 (NULL + ImageDraw)
+            132 LOAD_ATTR               12 (Draw)
+            152 LOAD_FAST                3 (image)
+            154 CALL                     1
+            162 STORE_FAST               4 (draw)
+
+256         164 LOAD_FAST                4 (draw)
+            166 LOAD_ATTR               15 (NULL|self + rectangle)
+            186 LOAD_CONST               7 ((96, 32, 224, 148))
+            188 LOAD_CONST               8 ((38, 111, 205))
+            190 KW_NAMES                 9 (('fill',))
+            192 CALL                     2
+            200 POP_TOP
+
+257         202 LOAD_FAST                4 (draw)
+            204 LOAD_ATTR               17 (NULL|self + text)
+            224 LOAD_CONST              10 ((112, 76))
+            226 LOAD_CONST              11 ('TEST')
+            228 LOAD_CONST               6 ('white')
+            230 KW_NAMES                 9 (('fill',))
+            232 CALL                     3
+            240 POP_TOP
+
+258         242 LOAD_FAST                3 (image)
+            244 LOAD_ATTR               19 (NULL|self + save)
+            264 LOAD_FAST                2 (image_path)
+            266 LOAD_CONST              12 ('JPEG')
+            268 LOAD_CONST              13 (82)
+            270 KW_NAMES                14 (('quality',))
+            272 CALL                     3
+            280 POP_TOP
+
+259         282 LOAD_GLOBAL             21 (NULL + classify_material)
+            292 LOAD_FAST                0 (config)
+            294 LOAD_FAST                2 (image_path)
+            296 BUILD_LIST               1
+            298 LOAD_CONST              15 ('视觉模型连接测试.jpg')
+            300 LOAD_CONST              16 ('来源线索：API连接测试')
+            302 CALL                     4
+
+252         310 SWAP                     2
+            312 LOAD_CONST               0 (None)
+            314 LOAD_CONST               0 (None)
+            316 LOAD_CONST               0 (None)
+            318 CALL                     2
+            326 POP_TOP
+            328 RETURN_VALUE
+        >>  330 PUSH_EXC_INFO
+            332 WITH_EXCEPT_START
+            334 POP_JUMP_IF_TRUE         1 (to 338)
+            336 RERAISE                  2
+        >>  338 POP_TOP
+            340 POP_EXCEPT
+            342 POP_TOP
+            344 POP_TOP
+            346 RETURN_CONST             0 (None)
+        >>  348 COPY                     3
+            350 POP_EXCEPT
+            352 RERAISE                  1
+ExceptionTable:
+  46 to 308 -> 330 [1] lasti
+  330 to 338 -> 348 [3] lasti
+
+Disassembly of <code object test_text_model_connection at <address>, file "xiaoguan_classifier\model_client.py", line 262>:
+262           0 RESUME                   0
+
+263           2 LOAD_GLOBAL              1 (NULL + load_api_key)
+             12 LOAD_FAST                0 (config)
+             14 CALL                     1
+             22 STORE_FAST               1 (api_key)
+
+264          24 LOAD_FAST                1 (api_key)
+             26 POP_JUMP_IF_TRUE        24 (to 76)
+
+265          28 LOAD_GLOBAL              3 (NULL + ModelClientError)
+             38 LOAD_CONST               1 ('缺少 API Key: ')
+             40 LOAD_FAST                0 (config)
+             42 LOAD_ATTR                4 (api_key_env)
+             62 FORMAT_VALUE             0
+             64 BUILD_STRING             2
+             66 CALL                     1
+             74 RAISE_VARARGS            1
+
+266     >>   76 LOAD_FAST                0 (config)
+             78 LOAD_ATTR                6 (model)
+             98 LOAD_ATTR                9 (NULL|self + strip)
+            118 CALL                     0
+            126 POP_JUMP_IF_TRUE        11 (to 150)
+
+267         128 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            138 LOAD_CONST               2 ('缺少模型名称，请在 API 配置中填写')
+            140 CALL                     1
+            148 RAISE_VARARGS            1
+
+269     >>  150 LOAD_FAST                0 (config)
+            152 LOAD_ATTR                6 (model)
+
+271         172 LOAD_CONST               3 ('system')
+            174 LOAD_CONST               4 ('你是接口连通性测试助手，只返回简短中文。')
+            176 LOAD_CONST               5 (('role', 'content'))
+            178 BUILD_CONST_KEY_MAP      2
+
+272         180 LOAD_CONST               6 ('user')
+            182 LOAD_CONST               7 ('请回复：文本模型连接成功')
+            184 LOAD_CONST               5 (('role', 'content'))
+            186 BUILD_CONST_KEY_MAP      2
+
+270         188 BUILD_LIST               2
+
+274         190 LOAD_CONST               8 (0)
+
+275         192 LOAD_CONST               9 (32)
+
+268         194 LOAD_CONST              10 (('model', 'messages', 'temperature', 'max_tokens'))
+            196 BUILD_CONST_KEY_MAP      4
+            198 STORE_FAST               2 (payload)
+
+277         200 LOAD_CONST              11 ('Bearer ')
+            202 LOAD_FAST                1 (api_key)
+            204 FORMAT_VALUE             0
+            206 BUILD_STRING             2
+            208 LOAD_CONST              12 ('application/json')
+            210 LOAD_CONST              13 (('Authorization', 'Content-Type'))
+            212 BUILD_CONST_KEY_MAP      2
+            214 STORE_FAST               3 (headers)
+
+278         216 LOAD_GLOBAL             11 (NULL + _post_chat_completion)
+            226 LOAD_FAST                0 (config)
+            228 LOAD_FAST                3 (headers)
+            230 LOAD_FAST                2 (payload)
+            232 CALL                     3
+            240 STORE_FAST               4 (response)
+
+279         242 LOAD_FAST                4 (response)
+            244 LOAD_ATTR               12 (status_code)
+            264 LOAD_CONST              14 (400)
+            266 COMPARE_OP              92 (>=)
+            270 POP_JUMP_IF_FALSE       40 (to 352)
+
+280         272 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            282 LOAD_CONST              15 ('模型接口错误 ')
+            284 LOAD_FAST                4 (response)
+            286 LOAD_ATTR               12 (status_code)
+            306 FORMAT_VALUE             0
+            308 LOAD_CONST              16 (': ')
+            310 LOAD_FAST                4 (response)
+            312 LOAD_ATTR               14 (text)
+            332 LOAD_CONST               0 (None)
+            334 LOAD_CONST              17 (500)
+            336 BINARY_SLICE
+            338 FORMAT_VALUE             0
+            340 BUILD_STRING             4
+            342 CALL                     1
+            350 RAISE_VARARGS            1
+
+281     >>  352 LOAD_FAST                4 (response)
+            354 LOAD_ATTR               17 (NULL|self + json)
+            374 CALL                     0
+            382 STORE_FAST               5 (data)
+
+282         384 NOP
+
+283         386 LOAD_GLOBAL             19 (NULL + str)
+            396 LOAD_FAST                5 (data)
+            398 LOAD_CONST              18 ('choices')
+            400 BINARY_SUBSCR
+            404 LOAD_CONST               8 (0)
+            406 BINARY_SUBSCR
+            410 LOAD_CONST              19 ('message')
+            412 BINARY_SUBSCR
+            416 LOAD_CONST              20 ('content')
+            418 BINARY_SUBSCR
+            422 CALL                     1
+            430 LOAD_ATTR                9 (NULL|self + strip)
+            450 CALL                     0
+            458 RETURN_VALUE
+        >>  460 PUSH_EXC_INFO
+
+284         462 LOAD_GLOBAL             20 (KeyError)
+            472 LOAD_GLOBAL             22 (IndexError)
+            482 LOAD_GLOBAL             24 (TypeError)
+            492 BUILD_TUPLE              3
+            494 CHECK_EXC_MATCH
+            496 POP_JUMP_IF_FALSE       29 (to 556)
+            498 STORE_FAST               6 (exc)
+
+285         500 LOAD_GLOBAL              3 (NULL + ModelClientError)
+            510 LOAD_CONST              21 ('模型返回格式异常: ')
+            512 LOAD_GLOBAL             19 (NULL + str)
+            522 LOAD_FAST                6 (exc)
+            524 CALL                     1
+            532 FORMAT_VALUE             0
+            534 BUILD_STRING             2
+            536 CALL                     1
+            544 LOAD_FAST                6 (exc)
+            546 RAISE_VARARGS            2
+        >>  548 LOAD_CONST               0 (None)
+            550 STORE_FAST               6 (exc)
+            552 DELETE_FAST              6 (exc)
+            554 RERAISE                  1
+
+284     >>  556 RERAISE                  0
+        >>  558 COPY                     3
+            560 POP_EXCEPT
+            562 RERAISE                  1
+ExceptionTable:
+  386 to 456 -> 460 [0]
+  460 to 498 -> 558 [1] lasti
+  500 to 546 -> 548 [1] lasti
+  548 to 556 -> 558 [1] lasti

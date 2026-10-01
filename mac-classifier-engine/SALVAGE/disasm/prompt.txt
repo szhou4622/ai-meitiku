@@ -1,0 +1,172 @@
+module: xiaoguan_classifier.prompt
+bytecode: src/xiaoguan_classifier/prompt.pyc
+sha256: 52665f14af2c503d1075fd127a9c5fb1dbcba0bc4a459de87de5f718790a03c8
+python: 3.12.14
+source_filename: xiaoguan_classifier\prompt.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (('Any',))
+             18 IMPORT_NAME              2 (typing)
+             20 IMPORT_FROM              3 (Any)
+             22 STORE_NAME               3 (Any)
+             24 POP_TOP
+
+  5          26 LOAD_CONST               3 (1)
+             28 LOAD_CONST               4 (('TAXONOMY',))
+             30 IMPORT_NAME              4 (taxonomy)
+             32 IMPORT_FROM              5 (TAXONOMY)
+             34 STORE_NAME               5 (TAXONOMY)
+             36 POP_TOP
+
+  8          38 LOAD_CONST              12 (('return', 'str'))
+             40 LOAD_CONST               5 (<code object taxonomy_text at <address>, file "xiaoguan_classifier\prompt.py", line 8>)
+             42 MAKE_FUNCTION            4 (annotations)
+             44 STORE_NAME               6 (taxonomy_text)
+
+ 12          46 LOAD_CONST              13 (('taxonomy', 'dict[str, list[str]]', 'return', 'str'))
+             48 LOAD_CONST               6 (<code object taxonomy_text_for at <address>, file "xiaoguan_classifier\prompt.py", line 12>)
+             50 MAKE_FUNCTION            4 (annotations)
+             52 STORE_NAME               7 (taxonomy_text_for)
+
+ 19          54 LOAD_CONST              14 (('template', 'Any', 'return', 'str'))
+             56 LOAD_CONST               7 (<code object system_prompt_for_template at <address>, file "xiaoguan_classifier\prompt.py", line 19>)
+             58 MAKE_FUNCTION            4 (annotations)
+             60 STORE_NAME               8 (system_prompt_for_template)
+
+ 52          62 LOAD_CONST               8 ('\n你是小罐茶浓萃乌龙素材库分类助手。请根据视频多帧抽帧拼图或图片画面，把素材归入固定分类。视频拼图从左到右是同一个镜头的连续关键帧。\n\n固定分类如下：\n')
+
+ 56          64 PUSH_NULL
+             66 LOAD_NAME                6 (taxonomy_text)
+             68 CALL                     0
+             76 FORMAT_VALUE             0
+             78 LOAD_CONST               9 ('\n\n核心判断顺序：\n产品画面 > 明确痛点动作 > 明确使用动作 > 达人/真人口播 > 卖点反应 > 待筛。\n\n硬规则：\n1. 最终判断必须看多帧整体主价值，不能只看单帧、文件夹名、达人名、颜色、肤色、亮度或自动预分类。\n2. `09_风味氛围` 当前不启用；不要输出这个一级分类。冰杯、茶汤、倒饮、水珠、冷藏感、液体流动都归入 `02_产品镜头` 下的 `冰爽清冽` 或 `液体质感`。\n3. `原料氛围` 当前不启用。只有茶叶/咖啡豆且没有产品主体时，归 `00_待筛素材`；产品和原料共同作为前景主体时，归 `02_产品镜头/产品组合`。\n4. 产品镜头不看达人来源。瓶身、瓶标、背标、整箱、包装、配料表、营养成分、活动机制、冰杯、茶汤、倒饮、水珠、产品空镜是主体时，归 `02_产品镜头`。\n5. 产品组合必须是多个产品、产品+整箱、产品+杯装茶汤、产品+原料共同作为前景主体。背景有多瓶但前景主体只有一瓶时，归 `02_产品镜头/瓶身展示`。\n6. `产品镜头/包装信息` 必须看得到实际包装信息，例如标签、箱体、规格、保质期、储存条件、官方标识；不能从白底、亮光、字幕、页面感或泛文本判断。\n7. 痛点镜头只打“犯困”，必须看得到打哈欠、揉眼、低头闭眼、趴桌、发呆、强撑、犯困驾驶等明确动作/状态。暗光、疲惫氛围、普通人物场景不够。\n8. 使用镜头必须有清晰产品使用行为：拿起、打开、倒入、普通喝一口、放置、外带、杯架/桌面使用。只有人物、手、杯子、茶色液体或蓝色背景不够。\n9. `使用镜头/冰饮畅饮` 只收冰饮使用行为：冰箱取出、倒入冰杯、拿冰杯喝、夏天清爽大口喝。纯冰杯/茶汤/倒饮特写归 `02_产品镜头/冰爽清冽` 或 `02_产品镜头/液体质感`。\n10. `达人素材` 只允许 `达人原片` 和 `达人口播` 两个二级类目。不要输出 `达人试喝`、`达人测评`、`达人开箱`、`达人场景推荐`。\n11. 完整或接近完整的达人长素材才归 `08_达人素材/达人原片`；拆分后的人物主体片段通常归 `08_达人素材/达人口播`。\n12. 达人口播包括达人本人作为主体的讲解、推荐、试喝评价、测评、开箱、手持产品展示、场景讲述。达人文件夹里的纯瓶身、冰杯、茶汤、配料表仍按画面归产品镜头。\n13. 真人口播只用于自有演员、主播、员工或素人口播；外部达人口播不要归真人口播。\n14. 卖点镜头只有提神醒脑、配料干净低负担、好喝体验三类。好喝体验必须有明显惊喜、点头、舒爽、认可、忍不住再喝等强反应；普通喝一口归使用镜头。\n15. 产品镜头/配料表、营养成分是资料型证据；卖点镜头/配料干净低负担是说服型镜头，必须把配料或营养信息转化成购买理由。\n16. 多帧仍看不清主体、动作不完整、人物/产品关系不明确、只有颜色/光线/肤色/字幕等弱线索时，归入 `00_待筛素材 / 画面不明确或低相关`。\n\n只输出 JSON，不要输出解释性正文。JSON 字段：\n{\n  "category": "一级分类，必须来自固定分类",\n  "subcategory": "二级分类，必须来自对应一级分类",\n  "detail": "8到16个中文字，描述具体画面，用于文件名",\n  "form": "特写/近景/中景/远景/俯拍/手持/海报/详情页/截图/空镜/动效 之一",\n  "confidence": 0.0到1.0,\n  "reason": "一句话说明判断依据"\n}\n')
+
+ 52          80 BUILD_STRING             3
+
+ 88          82 LOAD_ATTR               19 (NULL|self + strip)
+            102 CALL                     0
+
+ 52         110 STORE_NAME              10 (CLASSIFIER_SYSTEM_PROMPT)
+
+ 91         112 LOAD_CONST              15 (('',))
+            114 LOAD_CONST              16 (('filename', 'str', 'source_hint', 'str', 'return', 'str'))
+            116 LOAD_CONST              10 (<code object user_prompt_for_material at <address>, file "xiaoguan_classifier\prompt.py", line 91>)
+            118 MAKE_FUNCTION            5 (defaults, annotations)
+            120 STORE_NAME              11 (user_prompt_for_material)
+            122 RETURN_CONST            11 (None)
+
+Disassembly of <code object taxonomy_text at <address>, file "xiaoguan_classifier\prompt.py", line 8>:
+  8           0 RESUME                   0
+
+  9           2 LOAD_GLOBAL              1 (NULL + taxonomy_text_for)
+             12 LOAD_GLOBAL              2 (TAXONOMY)
+             22 CALL                     1
+             30 RETURN_VALUE
+
+Disassembly of <code object taxonomy_text_for at <address>, file "xiaoguan_classifier\prompt.py", line 12>:
+ 12           0 RESUME                   0
+
+ 13           2 BUILD_LIST               0
+              4 STORE_FAST               1 (lines)
+
+ 14           6 LOAD_FAST                0 (taxonomy)
+              8 LOAD_ATTR                1 (NULL|self + items)
+             28 CALL                     0
+             36 GET_ITER
+        >>   38 FOR_ITER                42 (to 126)
+             42 UNPACK_SEQUENCE          2
+             46 STORE_FAST               2 (category)
+             48 STORE_FAST               3 (subcategories)
+
+ 15          50 LOAD_FAST                1 (lines)
+             52 LOAD_ATTR                3 (NULL|self + append)
+             72 LOAD_FAST                2 (category)
+             74 FORMAT_VALUE             0
+             76 LOAD_CONST               1 (': ')
+             78 LOAD_CONST               2 (', ')
+             80 LOAD_ATTR                5 (NULL|self + join)
+            100 LOAD_FAST                3 (subcategories)
+            102 CALL                     1
+            110 FORMAT_VALUE             0
+            112 BUILD_STRING             3
+            114 CALL                     1
+            122 POP_TOP
+            124 JUMP_BACKWARD           44 (to 38)
+
+ 14     >>  126 END_FOR
+
+ 16         128 LOAD_CONST               3 ('\n')
+            130 LOAD_ATTR                5 (NULL|self + join)
+            150 LOAD_FAST                1 (lines)
+            152 CALL                     1
+            160 RETURN_VALUE
+
+Disassembly of <code object system_prompt_for_template at <address>, file "xiaoguan_classifier\prompt.py", line 19>:
+ 19           0 RESUME                   0
+
+ 20           2 LOAD_CONST               1 ('\n你是素材库分类助手。请根据视频多帧抽帧拼图或图片画面，把素材归入当前分类方案。\n视频拼图按 Frame 编号顺序展示同一个镜头的连续关键帧。\n\n当前分类方案：')
+
+ 24           4 LOAD_FAST                0 (template)
+              6 LOAD_ATTR                0 (name)
+             26 FORMAT_VALUE             0
+             28 LOAD_CONST               2 ('\n产品/项目名称：')
+
+ 25          30 LOAD_FAST                0 (template)
+             32 LOAD_ATTR                2 (product_name)
+             52 FORMAT_VALUE             0
+             54 LOAD_CONST               3 ('\n\n固定分类如下：\n')
+
+ 28          56 LOAD_GLOBAL              5 (NULL + taxonomy_text_for)
+             66 LOAD_FAST                0 (template)
+             68 LOAD_ATTR                6 (taxonomy)
+             88 CALL                     1
+             96 FORMAT_VALUE             0
+             98 LOAD_CONST               4 ('\n\n分类规则：\n')
+
+ 31         100 LOAD_FAST                0 (template)
+            102 LOAD_ATTR                8 (rules)
+            122 COPY                     1
+            124 POP_JUMP_IF_TRUE         2 (to 130)
+            126 POP_TOP
+            128 LOAD_CONST               5 ('按画面主体、动作、表达和可复用价值判断；无法稳定判断时放入待筛。')
+        >>  130 FORMAT_VALUE             0
+            132 LOAD_CONST               6 ('\n\n硬规则：\n1. 只能输出当前分类方案里的一级分类和对应二级分类，不要自己新增文件夹。\n2. 最终判断必须看多帧整体主价值，不能只看单帧、文件夹名、达人名、颜色、肤色、亮度或自动预分类。\n3. 文件夹名和文件名只能作为来源线索，最终按画面内容分类。\n4. 动态动作类素材要看连续帧的前后变化；只要多帧能看出擦拭、清洗、冲洗、使用、打开、倒入、试用、前后效果变化等明确动作或结果，就优先归入对应使用/卖点/效果类目，不要因为某一帧静态不清而归入待筛。\n5. 多帧仍看不清主体、动作不完整、人物/产品关系不明确、只有颜色/光线/肤色/字幕等弱线索时，归入待筛类目。\n\n只输出 JSON，不要输出解释性正文。JSON 字段：\n{\n  "category": "一级分类，必须来自当前分类方案",\n  "subcategory": "二级分类，必须来自对应一级分类",\n  "detail": "8到16个中文字，描述具体画面，用于文件名",\n  "form": "特写/近景/中景/远景/俯拍/手持/海报/详情页/截图/空镜/动效 之一",\n  "confidence": 0.0到1.0,\n  "reason": "一句话说明判断依据"\n}\n')
+
+ 20         134 BUILD_STRING             9
+
+ 49         136 LOAD_ATTR               11 (NULL|self + strip)
+            156 CALL                     0
+
+ 20         164 RETURN_VALUE
+
+Disassembly of <code object user_prompt_for_material at <address>, file "xiaoguan_classifier\prompt.py", line 91>:
+ 91           0 RESUME                   0
+
+ 92           2 LOAD_FAST                1 (source_hint)
+              4 POP_JUMP_IF_FALSE        5 (to 16)
+              6 LOAD_CONST               1 ('\n')
+              8 LOAD_FAST                1 (source_hint)
+             10 FORMAT_VALUE             0
+             12 BUILD_STRING             2
+             14 JUMP_FORWARD             1 (to 18)
+        >>   16 LOAD_CONST               2 ('')
+        >>   18 STORE_FAST               2 (hint)
+
+ 93          20 LOAD_CONST               3 ('请分类这个素材。原文件名：')
+             22 LOAD_FAST                0 (filename)
+             24 FORMAT_VALUE             0
+             26 LOAD_CONST               4 ('。')
+             28 LOAD_FAST                2 (hint)
+             30 FORMAT_VALUE             0
+             32 LOAD_CONST               5 ('\n请严格返回 JSON。')
+             34 BUILD_STRING             5
+             36 RETURN_VALUE

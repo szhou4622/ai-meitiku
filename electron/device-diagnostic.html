@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>AI媒体库设备核验工具</title>
+  <link rel="stylesheet" href="device-diagnostic.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="badge">AI</div>
+    <h1>设备冲突核验</h1>
+    <p class="lead">用于处理两台电脑机器码相同、授权无法激活的情况。</p>
+    <p class="hint">使用前请先完全退出 AI媒体库主程序，避免两个进程同时写入授权数据。</p>
+    <section class="privacy">
+      <h2>工具会上传什么？</h2>
+      <ul>
+        <li>一次性核验码、系统平台和机器码</li>
+        <li>经过单向哈希处理的设备因子</li>
+        <li>由本机安全存储保护的随机安装核验凭据</li>
+      </ul>
+      <p>不会上传硬件序列号原文、激活码、设备凭证、API Key 或用户文件。</p>
+    </section>
+    <form id="diagnostic-form" novalidate>
+      <label for="verification-code">管理员提供的一次性核验码</label>
+      <input id="verification-code" name="verification-code" inputmode="text" autocomplete="one-time-code" maxlength="9" placeholder="XXXX-XXXX" spellcheck="false">
+      <p class="hint">核验码有效期 15 分钟，只能使用一次。</p>
+      <button id="submit-button" type="submit">采集并安全上传</button>
+    </form>
+    <div id="status" class="status" aria-live="polite"></div>
+    <footer id="runtime"></footer>
+  </main>
+  <script src="device-diagnostic-renderer.js"></script>
+</body>
+</html>

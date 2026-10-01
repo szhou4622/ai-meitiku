@@ -1,0 +1,79 @@
+{
+  "module": "xiaoguan_classifier.license_client",
+  "observed": true,
+  "network_used": false,
+  "note": "All HTTP behavior was captured with a local fake urlopen; no request left the process.",
+  "samples": {
+    "url": "https://license.dadaozixun.com/api/license/activate",
+    "method": "POST",
+    "timeout_seconds": 12,
+    "headers": {
+      "Content-type": "application/json; charset=utf-8",
+      "Accept": "application/json"
+    },
+    "request_fields": [
+      "activation_code",
+      "app_name",
+      "client_version",
+      "code",
+      "machine_code",
+      "platform",
+      "software_version"
+    ],
+    "request_sample": {
+      "app_name": "DadaoMaterialClassifier",
+      "activation_code": "<redacted-activation-code>",
+      "code": "<redacted-activation-code>",
+      "machine_code": "<redacted-machine-code>",
+      "software_version": "0.1.0",
+      "client_version": "0.1.0",
+      "platform": "darwin"
+    },
+    "response_sample": {
+      "http_status": 200,
+      "body": {
+        "ok": true,
+        "data": {
+          "status": "active"
+        }
+      }
+    },
+    "normalized_state_fields": [
+      "activated",
+      "activated_at_utc",
+      "activation_credential",
+      "app_name",
+      "code_id",
+      "credits",
+      "expires_at",
+      "issued_at",
+      "last_online_check_utc",
+      "last_seen_utc",
+      "last_server_message",
+      "license_type",
+      "machine_code",
+      "software_version",
+      "status",
+      "unlimited"
+    ],
+    "normalized_state_sample": {
+      "app_name": "DadaoMaterialClassifier",
+      "activated": true,
+      "machine_code": "<redacted-machine-code>",
+      "activation_credential": "<redacted-activation-code>",
+      "software_version": "0.1.0",
+      "activated_at_utc": "2026-09-16T07:08:03.704727Z",
+      "issued_at": "2026-09-16T00:00:00Z",
+      "expires_at": "2026-10-16T00:00:00Z",
+      "unlimited": false,
+      "license_type": "monthly",
+      "credits": 0,
+      "code_id": "sample-code-id",
+      "status": "active",
+      "last_online_check_utc": "2026-09-16T07:08:03.704727Z",
+      "last_seen_utc": "2026-09-16T07:08:03.704727Z",
+      "last_server_message": "服务器拒绝授权。"
+    },
+    "machine_code_format_sample": "BB24-0B8A-504F-9F3D-31D2"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "module": "xiaoguan_classifier.source",
+  "bytecode_sha256": "7d42d82558a8fbc9b6dffe11321816da20260300f0e1ed75b8016a063a5285bf",
+  "observed_in_classification_run": true,
+  "sample_count": 3,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.source",
+      "function": "<module>",
+      "calls": 7,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.source",
+      "function": "SourceInfo",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.source",
+      "function": "__create_fn__",
+      "calls": 6,
+      "input": {
+        "__dataclass_type_source_type__": "str",
+        "__dataclass_type_source_name__": "str",
+        "__dataclass_type_relative_path__": "str",
+        "__dataclass_HAS_DEFAULT_FACTORY__": {
+          "type": "_HAS_DEFAULT_FACTORY_CLASS",
+          "fields": {}
+        },
+        "__dataclass_builtins_object__": {
+          "type": "type",
+          "fields": "<builtins.mappingproxy>"
+        },
+        "__dataclass_return_type__": null
+      },
+      "output": {
+        "type": "function",
+        "fields": {}
+      }
+    }
+  ],
+  "note": ""
+}

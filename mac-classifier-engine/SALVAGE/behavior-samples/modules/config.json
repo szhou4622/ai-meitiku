@@ -1,0 +1,155 @@
+{
+  "module": "xiaoguan_classifier.config",
+  "bytecode_sha256": "2205b530f7796bd623d03ca795f857e49bc4a741fe3e69e67a479519534910bf",
+  "observed_in_classification_run": true,
+  "sample_count": 9,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "<module>",
+      "calls": 4,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "resolve_app_root",
+      "calls": 1,
+      "input": {},
+      "output": "<runtime>"
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "ProviderConfig",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "__create_fn__",
+      "calls": 3,
+      "input": {
+        "__dataclass_type_provider__": "str",
+        "__dataclass_type_base_url__": "str",
+        "__dataclass_type_model__": "str",
+        "__dataclass_type_api_key_env__": "<redacted:str>",
+        "__dataclass_type_max_workers__": "int",
+        "__dataclass_type_frame_count__": "int",
+        "__dataclass_type_classification_mode__": "str",
+        "__dataclass_type_smart_frames__": "bool",
+        "__dataclass_type_auto_retry__": "bool",
+        "__dataclass_type_max_tokens__": "<redacted:str>",
+        "__dataclass_HAS_DEFAULT_FACTORY__": {
+          "type": "_HAS_DEFAULT_FACTORY_CLASS",
+          "fields": {}
+        },
+        "__dataclass_builtins_object__": {
+          "type": "type",
+          "fields": "<builtins.mappingproxy>"
+        },
+        "__dataclass_dflt_provider__": "volcengine",
+        "__dataclass_dflt_base_url__": "https://ark.cn-beijing.volces.com/api/v3",
+        "__dataclass_dflt_model__": "",
+        "__dataclass_dflt_api_key_env__": "<redacted:str>",
+        "__dataclass_dflt_max_workers__": 4,
+        "__dataclass_dflt_frame_count__": 8,
+        "__dataclass_dflt_classification_mode__": "balanced",
+        "__dataclass_dflt_smart_frames__": true,
+        "__dataclass_dflt_auto_retry__": false,
+        "__dataclass_dflt_max_tokens__": "<redacted:int>",
+        "__dataclass_return_type__": null
+      },
+      "output": {
+        "type": "function",
+        "fields": {}
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "__create_fn__.<locals>.__init__",
+      "calls": 6,
+      "input": {
+        "self": {
+          "type": "ProviderConfig",
+          "fields": {}
+        },
+        "provider": "volcengine",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "model": "",
+        "api_key_env": "<redacted:str>",
+        "max_workers": 4,
+        "frame_count": 8,
+        "classification_mode": "balanced",
+        "smart_frames": true,
+        "auto_retry": false,
+        "max_tokens": "<redacted:int>"
+      },
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "load_settings",
+      "calls": 1,
+      "input": {},
+      "output": {
+        "type": "ProviderConfig",
+        "fields": {
+          "provider": "volcengine",
+          "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+          "model": "ep-20260408111308-zhqkv",
+          "api_key_env": "<redacted:str>",
+          "max_workers": 4,
+          "frame_count": 8,
+          "classification_mode": "balanced",
+          "smart_frames": true,
+          "auto_retry": false,
+          "max_tokens": "<redacted:int>"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "get_provider_defaults",
+      "calls": 1,
+      "input": {
+        "provider": "volcengine"
+      },
+      "output": {
+        "type": "ProviderConfig",
+        "fields": {
+          "provider": "volcengine",
+          "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+          "model": "",
+          "api_key_env": "<redacted:str>",
+          "max_workers": 4,
+          "frame_count": 8,
+          "classification_mode": "balanced",
+          "smart_frames": true,
+          "auto_retry": false,
+          "max_tokens": "<redacted:int>"
+        }
+      }
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "_safe_mode",
+      "calls": 1,
+      "input": {
+        "value": "balanced"
+      },
+      "output": "balanced"
+    },
+    {
+      "module": "xiaoguan_classifier.config",
+      "function": "_safe_bool",
+      "calls": 2,
+      "input": {
+        "value": true,
+        "default": true
+      },
+      "output": true
+    }
+  ],
+  "note": ""
+}

@@ -1,47 +1,111 @@
-# Local configuration and credentials
+# Dependencies
+/node_modules/
+/.pnp
+.pnp.*
+/.yarn/*
+!/.yarn/patches/
+!/.yarn/plugins/
+!/.yarn/releases/
+!/.yarn/versions/
+
+# Frontend and Electron build outputs
+/dist/
+/out/
+/.next/
+/.vinext/
+/release/
+/.wrangler/
+/outputs/
+/work/
+/.download-runtime/
+/.build/
+/coverage/
+/.coverage
+/.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Generated build content. Keep the checked-in build inputs required by Vite
+# and electron-builder while ignoring any other generated files in this folder.
+/build/*
+!/build/sites-vite-plugin.ts
+!/build/app-icon.svg
+!/build/icon.png
+!/build/icon.icns
+
+# Large packaged runtimes are restored outside Git; see bundled-manifest.json.
+/bundled-classifier/
+/bundled-downloaders/
+/bundled-models/
+/bundled-tools/
+
+# Local backups
+/backups/
+
+# Generated Python cache. Do not ignore the recovered classifier payload under
+# mac-classifier-engine/src/xiaoguan_classifier: those .pyc files are the only
+# surviving form of the historical business modules.
+/mac-classifier-engine/__pycache__/
+
+# Environment files and secrets
 .env
 .env.*
+**/.env
+**/.env.local
 !.env.example
-!.env.*.example
+!**/.env.example
 *.pem
 *.key
 *.p12
 *.pfx
-credentials*.json
-secrets*.json
+*.cer
+*.crt
+*.mobileprovision
+*.provisionprofile
 
-# Dependencies and build outputs
-node_modules/
-.venv/
-venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-dist/
-build/
-coverage/
-*.egg-info/
+# Authorization local artifacts (path-scoped; do not ignore unrelated *.bin)
+/userData/**/*.bin
+/user-data/**/*.bin
+/license/**/*.bin
+license-*.bin
+license-credential.*
+license-machine-code.*
+license-machine-seed.*
+license-machine-identity.*
+license-offline-hmac-key.*
+license-offline-grant.*
+/license/
+/userData/
+/user-data/
 
-# Runtime data and installation packages
-*.db
-*.db-*
+# Local databases and runtime state
 *.sqlite
 *.sqlite3
-*.log
-*.exe
+*.db
+*.db-*
+
+# Packaged installers and archives do not belong in the public source repo
 *.dmg
+*.exe
 *.zip
 *.tar
 *.tar.gz
-uploads/
-downloads/
-backups/
-state/
-.task-temp/
 
-# OS and editor files
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Temporary and operating-system files
 .DS_Store
 ._*
 Thumbs.db
 .idea/
 .vscode/
+*.tmp
+*.temp
+*.swp
+*~

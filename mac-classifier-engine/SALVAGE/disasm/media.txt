@@ -1,0 +1,2181 @@
+module: xiaoguan_classifier.media
+bytecode: src/xiaoguan_classifier/media.pyc
+sha256: 7b798eb4808c139b41d8cc225579bd3be37bbcc071aa8a18ae9ed9a141588401
+python: 3.12.14
+source_filename: xiaoguan_classifier\media.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (base64)
+             20 STORE_NAME               2 (base64)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (math)
+             28 STORE_NAME               3 (math)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               2 (None)
+             34 IMPORT_NAME              4 (re)
+             36 STORE_NAME               4 (re)
+
+  6          38 LOAD_CONST               0 (0)
+             40 LOAD_CONST               2 (None)
+             42 IMPORT_NAME              5 (subprocess)
+             44 STORE_NAME               5 (subprocess)
+
+  7          46 LOAD_CONST               0 (0)
+             48 LOAD_CONST               2 (None)
+             50 IMPORT_NAME              6 (sys)
+             52 STORE_NAME               6 (sys)
+
+  8          54 LOAD_CONST               0 (0)
+             56 LOAD_CONST               3 (('datetime',))
+             58 IMPORT_NAME              7 (datetime)
+             60 IMPORT_FROM              7 (datetime)
+             62 STORE_NAME               7 (datetime)
+             64 POP_TOP
+
+  9          66 LOAD_CONST               0 (0)
+             68 LOAD_CONST               4 (('Path',))
+             70 IMPORT_NAME              8 (pathlib)
+             72 IMPORT_FROM              9 (Path)
+             74 STORE_NAME               9 (Path)
+             76 POP_TOP
+
+ 10          78 LOAD_CONST               0 (0)
+             80 LOAD_CONST               5 (('Iterable',))
+             82 IMPORT_NAME             10 (typing)
+             84 IMPORT_FROM             11 (Iterable)
+             86 STORE_NAME              11 (Iterable)
+             88 POP_TOP
+
+ 12          90 LOAD_CONST               0 (0)
+             92 LOAD_CONST               6 (('Image', 'ImageChops', 'ImageDraw', 'ImageFont', 'ImageStat'))
+             94 IMPORT_NAME             12 (PIL)
+             96 IMPORT_FROM             13 (Image)
+             98 STORE_NAME              13 (Image)
+            100 IMPORT_FROM             14 (ImageChops)
+            102 STORE_NAME              14 (ImageChops)
+            104 IMPORT_FROM             15 (ImageDraw)
+            106 STORE_NAME              15 (ImageDraw)
+            108 IMPORT_FROM             16 (ImageFont)
+            110 STORE_NAME              16 (ImageFont)
+            112 IMPORT_FROM             17 (ImageStat)
+            114 STORE_NAME              17 (ImageStat)
+            116 POP_TOP
+
+ 14         118 BUILD_SET                0
+            120 LOAD_CONST               7 (frozenset({'.mov', '.m4v', '.mp4', '.avi'}))
+            122 SET_UPDATE               1
+            124 STORE_NAME              18 (VIDEO_EXTS)
+
+ 15         126 BUILD_SET                0
+            128 LOAD_CONST               8 (frozenset({'.jpg', '.jpeg', '.webp', '.png'}))
+            130 SET_UPDATE               1
+            132 STORE_NAME              19 (IMAGE_EXTS)
+
+ 16         134 LOAD_NAME               18 (VIDEO_EXTS)
+            136 LOAD_NAME               19 (IMAGE_EXTS)
+            138 BINARY_OP                7 (|)
+            142 STORE_NAME              20 (MEDIA_EXTS)
+
+ 19         144 LOAD_CONST              26 (('value', 'str', 'return', 'str | None'))
+            146 LOAD_CONST               9 (<code object _parse_date_text at <address>, file "xiaoguan_classifier\media.py", line 19>)
+            148 MAKE_FUNCTION            4 (annotations)
+            150 STORE_NAME              21 (_parse_date_text)
+
+ 33         152 LOAD_CONST              27 (('path', 'Path', 'return', 'tuple[str, str] | None'))
+            154 LOAD_CONST              10 (<code object _filename_date at <address>, file "xiaoguan_classifier\media.py", line 33>)
+            156 MAKE_FUNCTION            4 (annotations)
+            158 STORE_NAME              22 (_filename_date)
+
+ 51         160 LOAD_CONST              27 (('path', 'Path', 'return', 'tuple[str, str] | None'))
+            162 LOAD_CONST              11 (<code object _video_metadata_date at <address>, file "xiaoguan_classifier\media.py", line 51>)
+            164 MAKE_FUNCTION            4 (annotations)
+            166 STORE_NAME              23 (_video_metadata_date)
+
+ 76         168 LOAD_CONST              27 (('path', 'Path', 'return', 'tuple[str, str] | None'))
+            170 LOAD_CONST              12 (<code object _image_exif_date at <address>, file "xiaoguan_classifier\media.py", line 76>)
+            172 MAKE_FUNCTION            4 (annotations)
+            174 STORE_NAME              24 (_image_exif_date)
+
+ 87         176 LOAD_CONST              28 (('path', 'Path', 'return', 'tuple[str, str, str]'))
+            178 LOAD_CONST              13 (<code object material_shoot_date at <address>, file "xiaoguan_classifier\media.py", line 87>)
+            180 MAKE_FUNCTION            4 (annotations)
+            182 STORE_NAME              25 (material_shoot_date)
+
+111         184 LOAD_CONST              29 (('folder', 'Path', 'return', 'list[Path]'))
+            186 LOAD_CONST              14 (<code object scan_materials at <address>, file "xiaoguan_classifier\media.py", line 111>)
+            188 MAKE_FUNCTION            4 (annotations)
+            190 STORE_NAME              26 (scan_materials)
+
+124         192 LOAD_CONST              30 ((768,))
+            194 LOAD_CONST              31 (('image', 'Image.Image', 'output', 'Path', 'max_side', 'int', 'return', 'Path'))
+            196 LOAD_CONST              15 (<code object _save_compact_jpeg at <address>, file "xiaoguan_classifier\media.py", line 124>)
+            198 MAKE_FUNCTION            5 (defaults, annotations)
+            200 STORE_NAME              27 (_save_compact_jpeg)
+
+132         202 LOAD_CONST              32 ((420, 4))
+            204 LOAD_CONST              33 (('images', 'list[Image.Image]', 'output', 'Path', 'cell_size', 'int', 'columns', 'int', 'return', 'Path'))
+            206 LOAD_CONST              16 (<code object _save_contact_sheet at <address>, file "xiaoguan_classifier\media.py", line 132>)
+            208 MAKE_FUNCTION            5 (defaults, annotations)
+            210 STORE_NAME              28 (_save_contact_sheet)
+
+170         212 LOAD_CONST              34 (('fps', 'float', 'duration', 'float', 'frame_count', 'int', 'return', 'list[int]'))
+            214 LOAD_CONST              17 (<code object _frame_indices at <address>, file "xiaoguan_classifier\media.py", line 170>)
+            216 MAKE_FUNCTION            4 (annotations)
+            218 STORE_NAME              29 (_frame_indices)
+
+181         220 LOAD_CONST              35 (('values', 'list[int]', 'limit', 'int', 'return', 'list[int]'))
+            222 LOAD_CONST              18 (<code object _unique_sorted_indices at <address>, file "xiaoguan_classifier\media.py", line 181>)
+            224 MAKE_FUNCTION            4 (annotations)
+            226 STORE_NAME              30 (_unique_sorted_indices)
+
+194         228 LOAD_CONST              36 (('previous', 'Image.Image', 'current', 'Image.Image', 'return', 'float'))
+            230 LOAD_CONST              19 (<code object _image_difference_score at <address>, file "xiaoguan_classifier\media.py", line 194>)
+            232 MAKE_FUNCTION            4 (annotations)
+            234 STORE_NAME              31 (_image_difference_score)
+
+201         236 LOAD_CONST              37 ((4,))
+            238 LOAD_CONST              38 (('path', 'Path', 'work_dir', 'Path', 'frame_count', 'int', 'return', 'list[Path]'))
+            240 LOAD_CONST              20 (<code object extract_video_frames at <address>, file "xiaoguan_classifier\media.py", line 201>)
+            242 MAKE_FUNCTION            5 (defaults, annotations)
+            244 STORE_NAME              32 (extract_video_frames)
+
+225         246 LOAD_CONST              39 (('fps', 'float', 'duration', 'float', 'frame_count', 'int', 'return', 'list[Image.Image]'))
+            248 LOAD_CONST              21 (<code object _smart_video_frames at <address>, file "xiaoguan_classifier\media.py", line 225>)
+            250 MAKE_FUNCTION            4 (annotations)
+            252 STORE_NAME              33 (_smart_video_frames)
+
+262         254 LOAD_CONST              40 ((4, True))
+            256 LOAD_CONST              41 (('path', 'Path', 'work_dir', 'Path', 'frame_count', 'int', 'smart', 'bool', 'return', 'list[Path]'))
+            258 LOAD_CONST              22 (<code object extract_video_contact_sheet at <address>, file "xiaoguan_classifier\media.py", line 262>)
+            260 MAKE_FUNCTION            5 (defaults, annotations)
+            262 STORE_NAME              34 (extract_video_contact_sheet)
+
+289         264 LOAD_CONST              42 (('path', 'Path', 'work_dir', 'Path', 'return', 'list[Path]'))
+            266 LOAD_CONST              23 (<code object prepare_image_payloads at <address>, file "xiaoguan_classifier\media.py", line 289>)
+            268 MAKE_FUNCTION            4 (annotations)
+            270 STORE_NAME              35 (prepare_image_payloads)
+
+296         272 LOAD_CONST              43 ((4, True, True))
+            274 LOAD_CONST              44 (('path', 'Path', 'work_dir', 'Path', 'frame_count', 'int', 'contact_sheet', 'bool', 'smart_frames', 'bool', 'return', 'list[Path]'))
+            276 LOAD_CONST              24 (<code object prepare_media_payloads at <address>, file "xiaoguan_classifier\media.py", line 296>)
+            278 MAKE_FUNCTION            5 (defaults, annotations)
+            280 STORE_NAME              36 (prepare_media_payloads)
+
+304         282 LOAD_CONST              45 (('paths', 'Iterable[Path]', 'return', 'list[str]'))
+            284 LOAD_CONST              25 (<code object encode_images_as_data_urls at <address>, file "xiaoguan_classifier\media.py", line 304>)
+            286 MAKE_FUNCTION            4 (annotations)
+            288 STORE_NAME              37 (encode_images_as_data_urls)
+            290 RETURN_CONST             2 (None)
+
+Disassembly of <code object _parse_date_text at <address>, file "xiaoguan_classifier\media.py", line 19>:
+ 19           0 RESUME                   0
+
+ 20           2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (value)
+             14 COPY                     1
+             16 POP_JUMP_IF_TRUE         2 (to 22)
+             18 POP_TOP
+             20 LOAD_CONST               1 ('')
+        >>   22 CALL                     1
+             30 LOAD_ATTR                3 (NULL|self + strip)
+             50 CALL                     0
+             58 STORE_FAST               0 (value)
+
+ 21          60 LOAD_GLOBAL              5 (NULL + re)
+             70 LOAD_ATTR                6 (search)
+             90 LOAD_CONST               2 ('(\\d{4})[:/-](\\d{1,2})[:/-](\\d{1,2})')
+             92 LOAD_FAST                0 (value)
+             94 CALL                     2
+            102 STORE_FAST               1 (match)
+
+ 22         104 LOAD_FAST                1 (match)
+            106 POP_JUMP_IF_TRUE         1 (to 110)
+
+ 23         108 RETURN_CONST             0 (None)
+
+ 24     >>  110 LOAD_CONST               3 (<code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 24>)
+            112 MAKE_FUNCTION            0
+            114 LOAD_FAST                1 (match)
+            116 LOAD_ATTR                9 (NULL|self + groups)
+            136 CALL                     0
+            144 GET_ITER
+            146 CALL                     0
+            154 UNPACK_SEQUENCE          3
+            158 STORE_FAST               2 (year)
+            160 STORE_FAST               3 (month)
+            162 STORE_FAST               4 (day)
+
+ 25         164 LOAD_FAST                2 (year)
+            166 LOAD_CONST               4 (2000)
+            168 COMPARE_OP               2 (<)
+            172 POP_JUMP_IF_TRUE         5 (to 184)
+            174 LOAD_FAST                2 (year)
+            176 LOAD_CONST               5 (2100)
+            178 COMPARE_OP              68 (>)
+            182 POP_JUMP_IF_FALSE        1 (to 186)
+
+ 26     >>  184 RETURN_CONST             0 (None)
+
+ 27     >>  186 NOP
+
+ 28         188 LOAD_GLOBAL             11 (NULL + datetime)
+            198 LOAD_FAST                2 (year)
+            200 LOAD_FAST                3 (month)
+            202 LOAD_FAST                4 (day)
+            204 CALL                     3
+            212 LOAD_ATTR               13 (NULL|self + strftime)
+            232 LOAD_CONST               6 ('%Y-%m-%d')
+            234 CALL                     1
+            242 RETURN_VALUE
+        >>  244 PUSH_EXC_INFO
+
+ 29         246 LOAD_GLOBAL             14 (ValueError)
+            256 CHECK_EXC_MATCH
+            258 POP_JUMP_IF_FALSE        3 (to 266)
+            260 POP_TOP
+
+ 30         262 POP_EXCEPT
+            264 RETURN_CONST             0 (None)
+
+ 29     >>  266 RERAISE                  0
+        >>  268 COPY                     3
+            270 POP_EXCEPT
+            272 RERAISE                  1
+ExceptionTable:
+  188 to 240 -> 244 [0]
+  244 to 260 -> 268 [1] lasti
+  266 to 266 -> 268 [1] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 24>:
+ 24           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                15 (to 42)
+             12 STORE_FAST               1 (part)
+             14 LOAD_GLOBAL              1 (NULL + int)
+             24 LOAD_FAST                1 (part)
+             26 CALL                     1
+             34 YIELD_VALUE              1
+             36 RESUME                   1
+             38 POP_TOP
+             40 JUMP_BACKWARD           17 (to 8)
+        >>   42 END_FOR
+             44 RETURN_CONST             0 (None)
+        >>   46 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             48 RERAISE                  1
+ExceptionTable:
+  4 to 44 -> 46 [0] lasti
+
+Disassembly of <code object _filename_date at <address>, file "xiaoguan_classifier\media.py", line 33>:
+ 33           0 RESUME                   0
+
+ 34           2 LOAD_GLOBAL              1 (NULL + re)
+             12 LOAD_ATTR                2 (finditer)
+             32 LOAD_CONST               1 ('(?:原拍摄日期|拍摄日期|shootdate)[_-]?(\\d{6})(?!\\d)')
+             34 LOAD_FAST                0 (path)
+             36 LOAD_ATTR                4 (stem)
+             56 LOAD_GLOBAL              0 (re)
+             66 LOAD_ATTR                6 (IGNORECASE)
+             86 KW_NAMES                 2 (('flags',))
+             88 CALL                     3
+             96 GET_ITER
+        >>   98 FOR_ITER               126 (to 354)
+            102 STORE_FAST               1 (match)
+
+ 35         104 LOAD_FAST                1 (match)
+            106 LOAD_ATTR                9 (NULL|self + group)
+            126 LOAD_CONST               3 (1)
+            128 CALL                     1
+            136 LOAD_CONST               0 (None)
+            138 LOAD_CONST               4 (2)
+            140 BINARY_SLICE
+            142 LOAD_FAST                1 (match)
+            144 LOAD_ATTR                9 (NULL|self + group)
+            164 LOAD_CONST               3 (1)
+            166 CALL                     1
+            174 LOAD_CONST               4 (2)
+            176 LOAD_CONST               5 (4)
+            178 BINARY_SLICE
+            180 LOAD_FAST                1 (match)
+            182 LOAD_ATTR                9 (NULL|self + group)
+            202 LOAD_CONST               3 (1)
+            204 CALL                     1
+            212 LOAD_CONST               5 (4)
+            214 LOAD_CONST               0 (None)
+            216 BINARY_SLICE
+            218 STORE_FAST               4 (day)
+            220 STORE_FAST               3 (month)
+            222 STORE_FAST               2 (year)
+
+ 36         224 NOP
+
+ 37         226 LOAD_GLOBAL             11 (NULL + datetime)
+            236 LOAD_CONST               6 (2000)
+            238 LOAD_GLOBAL             13 (NULL + int)
+            248 LOAD_FAST                2 (year)
+            250 CALL                     1
+            258 BINARY_OP                0 (+)
+            262 LOAD_GLOBAL             13 (NULL + int)
+            272 LOAD_FAST                3 (month)
+            274 CALL                     1
+            282 LOAD_GLOBAL             13 (NULL + int)
+            292 LOAD_FAST                4 (day)
+            294 CALL                     1
+            302 CALL                     3
+            310 LOAD_ATTR               15 (NULL|self + strftime)
+            330 LOAD_CONST               7 ('%Y-%m-%d')
+            332 CALL                     1
+            340 STORE_FAST               5 (date_text)
+
+ 40         342 LOAD_FAST                5 (date_text)
+            344 LOAD_CONST               8 ('filename_date:original_shoot_date')
+            346 BUILD_TUPLE              2
+            348 SWAP                     2
+            350 POP_TOP
+            352 RETURN_VALUE
+
+ 34     >>  354 END_FOR
+
+ 41         356 LOAD_GLOBAL              1 (NULL + re)
+            366 LOAD_ATTR                2 (finditer)
+            386 LOAD_CONST               9 ('(?<!\\d)((?:19|20)\\d{2})(\\d{2})(\\d{2})(?!\\d)')
+            388 LOAD_FAST                0 (path)
+            390 LOAD_ATTR                4 (stem)
+            410 CALL                     2
+            418 GET_ITER
+        >>  420 FOR_ITER                63 (to 550)
+            424 STORE_FAST               1 (match)
+
+ 42         426 LOAD_CONST              10 (<code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 42>)
+            428 MAKE_FUNCTION            0
+            430 LOAD_FAST                1 (match)
+            432 LOAD_ATTR               19 (NULL|self + groups)
+            452 CALL                     0
+            460 GET_ITER
+            462 CALL                     0
+            470 UNPACK_SEQUENCE          3
+            474 STORE_FAST               2 (year)
+            476 STORE_FAST               3 (month)
+            478 STORE_FAST               4 (day)
+
+ 43         480 NOP
+
+ 44         482 LOAD_GLOBAL             11 (NULL + datetime)
+            492 LOAD_FAST                2 (year)
+            494 LOAD_FAST                3 (month)
+            496 LOAD_FAST                4 (day)
+            498 CALL                     3
+            506 LOAD_ATTR               15 (NULL|self + strftime)
+            526 LOAD_CONST               7 ('%Y-%m-%d')
+            528 CALL                     1
+            536 STORE_FAST               5 (date_text)
+
+ 47         538 LOAD_FAST                5 (date_text)
+            540 LOAD_CONST              11 ('filename_date')
+            542 BUILD_TUPLE              2
+            544 SWAP                     2
+            546 POP_TOP
+            548 RETURN_VALUE
+
+ 41     >>  550 END_FOR
+
+ 48         552 RETURN_CONST             0 (None)
+        >>  554 PUSH_EXC_INFO
+
+ 38         556 LOAD_GLOBAL             16 (ValueError)
+            566 CHECK_EXC_MATCH
+            568 POP_JUMP_IF_FALSE        3 (to 576)
+            570 POP_TOP
+
+ 39         572 POP_EXCEPT
+            574 JUMP_BACKWARD          239 (to 98)
+
+ 38     >>  576 RERAISE                  0
+        >>  578 COPY                     3
+            580 POP_EXCEPT
+            582 RERAISE                  1
+        >>  584 PUSH_EXC_INFO
+
+ 45         586 LOAD_GLOBAL             16 (ValueError)
+            596 CHECK_EXC_MATCH
+            598 POP_JUMP_IF_FALSE        3 (to 606)
+            600 POP_TOP
+
+ 46         602 POP_EXCEPT
+            604 JUMP_BACKWARD           93 (to 420)
+
+ 45     >>  606 RERAISE                  0
+        >>  608 COPY                     3
+            610 POP_EXCEPT
+            612 RERAISE                  1
+ExceptionTable:
+  226 to 340 -> 554 [1]
+  482 to 536 -> 584 [1]
+  554 to 570 -> 578 [2] lasti
+  576 to 576 -> 578 [2] lasti
+  584 to 600 -> 608 [2] lasti
+  606 to 606 -> 608 [2] lasti
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 42>:
+ 42           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                15 (to 42)
+             12 STORE_FAST               1 (part)
+             14 LOAD_GLOBAL              1 (NULL + int)
+             24 LOAD_FAST                1 (part)
+             26 CALL                     1
+             34 YIELD_VALUE              1
+             36 RESUME                   1
+             38 POP_TOP
+             40 JUMP_BACKWARD           17 (to 8)
+        >>   42 END_FOR
+             44 RETURN_CONST             0 (None)
+        >>   46 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             48 RERAISE                  1
+ExceptionTable:
+  4 to 44 -> 46 [0] lasti
+
+Disassembly of <code object _video_metadata_date at <address>, file "xiaoguan_classifier\media.py", line 51>:
+ 51           0 RESUME                   0
+
+ 52           2 LOAD_CONST               1 (0)
+              4 LOAD_CONST               0 (None)
+              6 IMPORT_NAME              0 (imageio_ffmpeg)
+              8 STORE_FAST               1 (imageio_ffmpeg)
+
+ 54          10 LOAD_FAST                1 (imageio_ffmpeg)
+             12 LOAD_ATTR                3 (NULL|self + get_ffmpeg_exe)
+             32 CALL                     0
+             40 STORE_FAST               2 (ffmpeg)
+
+ 55          42 BUILD_MAP                0
+             44 STORE_FAST               3 (kwargs)
+
+ 56          46 LOAD_GLOBAL              4 (sys)
+             56 LOAD_ATTR                6 (platform)
+             76 LOAD_CONST               2 ('win32')
+             78 COMPARE_OP              40 (==)
+             82 POP_JUMP_IF_FALSE       19 (to 122)
+
+ 57          84 LOAD_GLOBAL              8 (subprocess)
+             94 LOAD_ATTR               10 (CREATE_NO_WINDOW)
+            114 LOAD_FAST                3 (kwargs)
+            116 LOAD_CONST               3 ('creationflags')
+            118 STORE_SUBSCR
+
+ 58     >>  122 LOAD_GLOBAL              9 (NULL + subprocess)
+            132 LOAD_ATTR               12 (run)
+
+ 59         152 LOAD_FAST                2 (ffmpeg)
+            154 LOAD_CONST               4 ('-hide_banner')
+            156 LOAD_CONST               5 ('-i')
+            158 LOAD_GLOBAL             15 (NULL + str)
+            168 LOAD_FAST                0 (path)
+            170 CALL                     1
+            178 BUILD_LIST               4
+
+ 58         180 BUILD_TUPLE              1
+
+ 60         182 LOAD_CONST               6 (True)
+
+ 61         184 LOAD_CONST               6 (True)
+
+ 62         186 LOAD_CONST               7 ('utf-8')
+
+ 63         188 LOAD_CONST               8 ('ignore')
+
+ 58         190 LOAD_CONST               9 (('capture_output', 'text', 'encoding', 'errors'))
+            192 BUILD_CONST_KEY_MAP      4
+
+ 64         194 LOAD_FAST                3 (kwargs)
+
+ 58         196 DICT_MERGE               1
+            198 CALL_FUNCTION_EX         1
+            200 STORE_FAST               4 (result)
+
+ 66         202 LOAD_CONST              10 ('\n')
+            204 LOAD_ATTR               17 (NULL|self + join)
+            224 LOAD_FAST                4 (result)
+            226 LOAD_ATTR               18 (stdout)
+            246 COPY                     1
+            248 POP_JUMP_IF_TRUE         2 (to 254)
+            250 POP_TOP
+            252 LOAD_CONST              11 ('')
+        >>  254 LOAD_FAST                4 (result)
+            256 LOAD_ATTR               20 (stderr)
+            276 COPY                     1
+            278 POP_JUMP_IF_TRUE         2 (to 284)
+            280 POP_TOP
+            282 LOAD_CONST              11 ('')
+        >>  284 BUILD_LIST               2
+            286 CALL                     1
+            294 STORE_FAST               5 (metadata_text)
+
+ 67         296 LOAD_CONST              12 (('creation_time', 'com.apple.quicktime.creationdate', 'date'))
+            298 GET_ITER
+        >>  300 FOR_ITER               108 (to 520)
+            304 STORE_FAST               6 (key)
+
+ 68         306 LOAD_GLOBAL             23 (NULL + re)
+            316 LOAD_ATTR               24 (escape)
+            336 LOAD_FAST                6 (key)
+            338 CALL                     1
+            346 FORMAT_VALUE             0
+            348 LOAD_CONST              13 ('\\s*:\\s*([^\\r\\n]+)')
+            350 BUILD_STRING             2
+            352 STORE_FAST               7 (pattern)
+
+ 69         354 LOAD_GLOBAL             23 (NULL + re)
+            364 LOAD_ATTR               26 (finditer)
+            384 LOAD_FAST                7 (pattern)
+            386 LOAD_FAST                5 (metadata_text)
+            388 LOAD_GLOBAL             22 (re)
+            398 LOAD_ATTR               28 (IGNORECASE)
+            418 KW_NAMES                14 (('flags',))
+            420 CALL                     3
+            428 GET_ITER
+        >>  430 FOR_ITER                41 (to 516)
+            434 STORE_FAST               8 (match)
+
+ 70         436 LOAD_GLOBAL             31 (NULL + _parse_date_text)
+            446 LOAD_FAST                8 (match)
+            448 LOAD_ATTR               33 (NULL|self + group)
+            468 LOAD_CONST              15 (1)
+            470 CALL                     1
+            478 CALL                     1
+            486 STORE_FAST               9 (date_text)
+
+ 71         488 LOAD_FAST                9 (date_text)
+            490 POP_JUMP_IF_TRUE         1 (to 494)
+            492 JUMP_BACKWARD           32 (to 430)
+
+ 72     >>  494 LOAD_FAST                9 (date_text)
+            496 LOAD_CONST              16 ('video_metadata:')
+            498 LOAD_FAST                6 (key)
+            500 FORMAT_VALUE             0
+            502 BUILD_STRING             2
+            504 BUILD_TUPLE              2
+            506 SWAP                     2
+            508 POP_TOP
+            510 SWAP                     2
+            512 POP_TOP
+            514 RETURN_VALUE
+
+ 69     >>  516 END_FOR
+            518 JUMP_BACKWARD          110 (to 300)
+
+ 67     >>  520 END_FOR
+
+ 73         522 RETURN_CONST             0 (None)
+
+Disassembly of <code object _image_exif_date at <address>, file "xiaoguan_classifier\media.py", line 76>:
+ 76           0 RESUME                   0
+
+ 77           2 LOAD_GLOBAL              1 (NULL + Image)
+             12 LOAD_ATTR                2 (open)
+             32 LOAD_FAST                0 (path)
+             34 CALL                     1
+             42 BEFORE_WITH
+             44 STORE_FAST               1 (image)
+
+ 78          46 LOAD_FAST                1 (image)
+             48 LOAD_ATTR                5 (NULL|self + getexif)
+             68 CALL                     0
+             76 STORE_FAST               2 (exif)
+
+ 79          78 LOAD_CONST               1 ((36867, 36868, 306))
+             80 GET_ITER
+        >>   82 FOR_ITER                63 (to 212)
+             86 STORE_FAST               3 (tag)
+
+ 80          88 LOAD_FAST                2 (exif)
+             90 LOAD_ATTR                7 (NULL|self + get)
+            110 LOAD_FAST                3 (tag)
+            112 CALL                     1
+            120 STORE_FAST               4 (raw_value)
+
+ 81         122 LOAD_GLOBAL              9 (NULL + _parse_date_text)
+            132 LOAD_GLOBAL             11 (NULL + str)
+            142 LOAD_FAST                4 (raw_value)
+            144 COPY                     1
+            146 POP_JUMP_IF_TRUE         2 (to 152)
+            148 POP_TOP
+            150 LOAD_CONST               2 ('')
+        >>  152 CALL                     1
+            160 CALL                     1
+            168 STORE_FAST               5 (date_text)
+
+ 82         170 LOAD_FAST                5 (date_text)
+            172 POP_JUMP_IF_TRUE         1 (to 176)
+            174 JUMP_BACKWARD           47 (to 82)
+
+ 83     >>  176 LOAD_FAST                5 (date_text)
+            178 LOAD_CONST               3 ('image_exif:')
+            180 LOAD_FAST                3 (tag)
+            182 FORMAT_VALUE             0
+            184 BUILD_STRING             2
+            186 BUILD_TUPLE              2
+            188 SWAP                     2
+            190 POP_TOP
+
+ 77         192 SWAP                     2
+            194 LOAD_CONST               0 (None)
+            196 LOAD_CONST               0 (None)
+            198 LOAD_CONST               0 (None)
+            200 CALL                     2
+            208 POP_TOP
+            210 RETURN_VALUE
+
+ 79     >>  212 END_FOR
+            214 NOP
+
+ 77         216 LOAD_CONST               0 (None)
+            218 LOAD_CONST               0 (None)
+            220 LOAD_CONST               0 (None)
+            222 CALL                     2
+            230 POP_TOP
+
+ 84         232 RETURN_CONST             0 (None)
+
+ 77     >>  234 PUSH_EXC_INFO
+            236 WITH_EXCEPT_START
+            238 POP_JUMP_IF_TRUE         1 (to 242)
+            240 RERAISE                  2
+        >>  242 POP_TOP
+            244 POP_EXCEPT
+            246 POP_TOP
+            248 POP_TOP
+
+ 84         250 RETURN_CONST             0 (None)
+        >>  252 COPY                     3
+            254 POP_EXCEPT
+            256 RERAISE                  1
+ExceptionTable:
+  44 to 172 -> 234 [1] lasti
+  176 to 190 -> 234 [1] lasti
+  212 to 212 -> 234 [1] lasti
+  234 to 242 -> 252 [3] lasti
+
+Disassembly of <code object material_shoot_date at <address>, file "xiaoguan_classifier\media.py", line 87>:
+ 87           0 RESUME                   0
+
+ 89           2 NOP
+
+ 90           4 LOAD_FAST                0 (path)
+              6 LOAD_ATTR                0 (suffix)
+             26 LOAD_ATTR                3 (NULL|self + lower)
+             46 CALL                     0
+             54 LOAD_GLOBAL              4 (VIDEO_EXTS)
+             64 CONTAINS_OP              0
+             66 POP_JUMP_IF_FALSE       12 (to 92)
+
+ 91          68 LOAD_GLOBAL              7 (NULL + _video_metadata_date)
+             78 LOAD_FAST                0 (path)
+             80 CALL                     1
+             88 STORE_FAST               1 (detected)
+             90 JUMP_FORWARD            46 (to 184)
+
+ 92     >>   92 LOAD_FAST                0 (path)
+             94 LOAD_ATTR                0 (suffix)
+            114 LOAD_ATTR                3 (NULL|self + lower)
+            134 CALL                     0
+            142 LOAD_GLOBAL              8 (IMAGE_EXTS)
+            152 CONTAINS_OP              0
+            154 POP_JUMP_IF_FALSE       12 (to 180)
+
+ 93         156 LOAD_GLOBAL             11 (NULL + _image_exif_date)
+            166 LOAD_FAST                0 (path)
+            168 CALL                     1
+            176 STORE_FAST               1 (detected)
+            178 JUMP_FORWARD             2 (to 184)
+
+ 95     >>  180 LOAD_CONST               1 (None)
+            182 STORE_FAST               1 (detected)
+
+ 96     >>  184 LOAD_FAST                1 (detected)
+            186 POP_JUMP_IF_FALSE       45 (to 278)
+
+ 97         188 LOAD_FAST                1 (detected)
+            190 UNPACK_SEQUENCE          2
+            194 STORE_FAST               2 (date_text)
+            196 STORE_FAST               3 (source)
+
+ 98         198 LOAD_GLOBAL             13 (NULL + datetime)
+            208 LOAD_ATTR               14 (strptime)
+            228 LOAD_FAST                2 (date_text)
+            230 LOAD_CONST               2 ('%Y-%m-%d')
+            232 CALL                     2
+            240 LOAD_ATTR               17 (NULL|self + strftime)
+            260 LOAD_CONST               3 ('%y%m%d')
+            262 CALL                     1
+            270 LOAD_FAST                2 (date_text)
+            272 LOAD_FAST                3 (source)
+            274 BUILD_TUPLE              3
+            276 RETURN_VALUE
+
+ 96     >>  278 NOP
+
+102     >>  280 LOAD_GLOBAL             21 (NULL + _filename_date)
+            290 LOAD_FAST                0 (path)
+            292 CALL                     1
+            300 STORE_FAST               1 (detected)
+
+103         302 LOAD_FAST                1 (detected)
+            304 POP_JUMP_IF_FALSE       45 (to 396)
+
+104         306 LOAD_FAST                1 (detected)
+            308 UNPACK_SEQUENCE          2
+            312 STORE_FAST               2 (date_text)
+            314 STORE_FAST               3 (source)
+
+105         316 LOAD_GLOBAL             13 (NULL + datetime)
+            326 LOAD_ATTR               14 (strptime)
+            346 LOAD_FAST                2 (date_text)
+            348 LOAD_CONST               2 ('%Y-%m-%d')
+            350 CALL                     2
+            358 LOAD_ATTR               17 (NULL|self + strftime)
+            378 LOAD_CONST               3 ('%y%m%d')
+            380 CALL                     1
+            388 LOAD_FAST                2 (date_text)
+            390 LOAD_FAST                3 (source)
+            392 BUILD_TUPLE              3
+            394 RETURN_VALUE
+
+107     >>  396 LOAD_GLOBAL             13 (NULL + datetime)
+            406 LOAD_ATTR               22 (fromtimestamp)
+            426 LOAD_FAST                0 (path)
+            428 LOAD_ATTR               25 (NULL|self + stat)
+            448 CALL                     0
+            456 LOAD_ATTR               26 (st_mtime)
+            476 CALL                     1
+            484 STORE_FAST               4 (modified)
+
+108         486 LOAD_FAST                4 (modified)
+            488 LOAD_ATTR               17 (NULL|self + strftime)
+            508 LOAD_CONST               3 ('%y%m%d')
+            510 CALL                     1
+            518 LOAD_FAST                4 (modified)
+            520 LOAD_ATTR               17 (NULL|self + strftime)
+            540 LOAD_CONST               2 ('%Y-%m-%d')
+            542 CALL                     1
+            550 LOAD_CONST               4 ('file_modified_time_fallback')
+            552 BUILD_TUPLE              3
+            554 RETURN_VALUE
+        >>  556 PUSH_EXC_INFO
+
+ 99         558 LOAD_GLOBAL             18 (Exception)
+            568 CHECK_EXC_MATCH
+            570 POP_JUMP_IF_FALSE        3 (to 578)
+            572 POP_TOP
+
+100         574 POP_EXCEPT
+            576 JUMP_BACKWARD          149 (to 280)
+
+ 99     >>  578 RERAISE                  0
+        >>  580 COPY                     3
+            582 POP_EXCEPT
+            584 RERAISE                  1
+ExceptionTable:
+  4 to 274 -> 556 [0]
+  556 to 572 -> 580 [1] lasti
+  578 to 578 -> 580 [1] lasti
+
+Disassembly of <code object scan_materials at <address>, file "xiaoguan_classifier\media.py", line 111>:
+111           0 RESUME                   0
+
+112           2 LOAD_FAST                0 (folder)
+              4 LOAD_ATTR                1 (NULL|self + resolve)
+             24 CALL                     0
+             32 STORE_FAST               0 (folder)
+
+113          34 BUILD_LIST               0
+             36 STORE_FAST               1 (materials)
+
+114          38 LOAD_FAST                0 (folder)
+             40 LOAD_ATTR                3 (NULL|self + rglob)
+             60 LOAD_CONST               1 ('*')
+             62 CALL                     1
+             70 GET_ITER
+        >>   72 FOR_ITER               114 (to 304)
+             76 STORE_FAST               2 (path)
+
+115          78 LOAD_FAST                2 (path)
+             80 LOAD_ATTR                5 (NULL|self + is_file)
+            100 CALL                     0
+            108 POP_JUMP_IF_FALSE       32 (to 174)
+            110 LOAD_FAST                2 (path)
+            112 LOAD_ATTR                6 (suffix)
+            132 LOAD_ATTR                9 (NULL|self + lower)
+            152 CALL                     0
+            160 LOAD_GLOBAL             10 (MEDIA_EXTS)
+            170 CONTAINS_OP              1
+            172 POP_JUMP_IF_FALSE        1 (to 176)
+
+116     >>  174 JUMP_BACKWARD           52 (to 72)
+
+117     >>  176 LOAD_FAST                2 (path)
+            178 LOAD_ATTR               13 (NULL|self + relative_to)
+            198 LOAD_FAST                0 (folder)
+            200 CALL                     1
+            208 LOAD_ATTR               14 (parts)
+            228 STORE_FAST               3 (relative_parts)
+
+118         230 LOAD_GLOBAL             17 (NULL + any)
+            240 LOAD_CONST               2 (<code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 118>)
+            242 MAKE_FUNCTION            0
+            244 LOAD_FAST                3 (relative_parts)
+            246 GET_ITER
+            248 CALL                     0
+            256 CALL                     1
+            264 POP_JUMP_IF_FALSE        1 (to 268)
+
+119         266 JUMP_BACKWARD           98 (to 72)
+
+120     >>  268 LOAD_FAST                1 (materials)
+            270 LOAD_ATTR               19 (NULL|self + append)
+            290 LOAD_FAST                2 (path)
+            292 CALL                     1
+            300 POP_TOP
+            302 JUMP_BACKWARD          116 (to 72)
+
+114     >>  304 END_FOR
+
+121         306 LOAD_GLOBAL             21 (NULL + sorted)
+            316 LOAD_FAST                1 (materials)
+            318 LOAD_CONST               3 (<code object <lambda> at <address>, file "xiaoguan_classifier\media.py", line 121>)
+            320 MAKE_FUNCTION            0
+            322 KW_NAMES                 4 (('key',))
+            324 CALL                     2
+            332 RETURN_VALUE
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 118>:
+118           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                27 (to 66)
+             12 STORE_FAST               1 (part)
+             14 LOAD_FAST                1 (part)
+             16 LOAD_CONST               0 (frozenset({'work', 'outputs', '分类结果'}))
+             18 CONTAINS_OP              0
+             20 COPY                     1
+             22 POP_JUMP_IF_TRUE        17 (to 58)
+             24 POP_TOP
+             26 LOAD_FAST                1 (part)
+             28 LOAD_ATTR                1 (NULL|self + startswith)
+             48 LOAD_CONST               1 ('work_')
+             50 CALL                     1
+        >>   58 YIELD_VALUE              1
+             60 RESUME                   1
+             62 POP_TOP
+             64 JUMP_BACKWARD           29 (to 8)
+        >>   66 END_FOR
+             68 RETURN_CONST             2 (None)
+        >>   70 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             72 RERAISE                  1
+ExceptionTable:
+  4 to 68 -> 70 [0] lasti
+
+Disassembly of <code object <lambda> at <address>, file "xiaoguan_classifier\media.py", line 121>:
+121           0 RESUME                   0
+              2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (item)
+             14 CALL                     1
+             22 LOAD_ATTR                3 (NULL|self + lower)
+             42 CALL                     0
+             50 RETURN_VALUE
+
+Disassembly of <code object _save_compact_jpeg at <address>, file "xiaoguan_classifier\media.py", line 124>:
+124           0 RESUME                   0
+
+125           2 LOAD_FAST                0 (image)
+              4 LOAD_ATTR                1 (NULL|self + convert)
+             24 LOAD_CONST               1 ('RGB')
+             26 CALL                     1
+             34 STORE_FAST               0 (image)
+
+126          36 LOAD_FAST                0 (image)
+             38 LOAD_ATTR                3 (NULL|self + thumbnail)
+             58 LOAD_FAST                2 (max_side)
+             60 LOAD_FAST                2 (max_side)
+             62 BUILD_TUPLE              2
+             64 LOAD_GLOBAL              4 (Image)
+             74 LOAD_ATTR                6 (Resampling)
+             94 LOAD_ATTR                8 (LANCZOS)
+            114 CALL                     2
+            122 POP_TOP
+
+127         124 LOAD_FAST                1 (output)
+            126 LOAD_ATTR               10 (parent)
+            146 LOAD_ATTR               13 (NULL|self + mkdir)
+            166 LOAD_CONST               2 (True)
+            168 LOAD_CONST               2 (True)
+            170 KW_NAMES                 3 (('parents', 'exist_ok'))
+            172 CALL                     2
+            180 POP_TOP
+
+128         182 LOAD_FAST                0 (image)
+            184 LOAD_ATTR               15 (NULL|self + save)
+            204 LOAD_FAST                1 (output)
+            206 LOAD_CONST               4 ('JPEG')
+            208 LOAD_CONST               5 (82)
+            210 LOAD_CONST               2 (True)
+            212 KW_NAMES                 6 (('quality', 'optimize'))
+            214 CALL                     4
+            222 POP_TOP
+
+129         224 LOAD_FAST                1 (output)
+            226 RETURN_VALUE
+
+Disassembly of <code object _save_contact_sheet at <address>, file "xiaoguan_classifier\media.py", line 132>:
+132           0 RESUME                   0
+
+133           2 BUILD_LIST               0
+              4 STORE_FAST               4 (compact)
+
+134           6 LOAD_FAST                0 (images)
+              8 GET_ITER
+        >>   10 FOR_ITER               161 (to 336)
+             14 STORE_FAST               5 (image)
+
+135          16 LOAD_FAST                5 (image)
+             18 LOAD_ATTR                1 (NULL|self + convert)
+             38 LOAD_CONST               1 ('RGB')
+             40 CALL                     1
+             48 STORE_FAST               6 (item)
+
+136          50 LOAD_FAST                6 (item)
+             52 LOAD_ATTR                3 (NULL|self + thumbnail)
+             72 LOAD_FAST                2 (cell_size)
+             74 LOAD_FAST                2 (cell_size)
+             76 BUILD_TUPLE              2
+             78 LOAD_GLOBAL              4 (Image)
+             88 LOAD_ATTR                6 (Resampling)
+            108 LOAD_ATTR                8 (LANCZOS)
+            128 CALL                     2
+            136 POP_TOP
+
+137         138 LOAD_GLOBAL              5 (NULL + Image)
+            148 LOAD_ATTR               10 (new)
+            168 LOAD_CONST               1 ('RGB')
+            170 LOAD_FAST                2 (cell_size)
+            172 LOAD_FAST                2 (cell_size)
+            174 BUILD_TUPLE              2
+            176 LOAD_CONST               2 ('white')
+            178 CALL                     3
+            186 STORE_FAST               7 (canvas)
+
+138         188 LOAD_FAST                2 (cell_size)
+            190 LOAD_FAST                6 (item)
+            192 LOAD_ATTR               12 (width)
+            212 BINARY_OP               10 (-)
+            216 LOAD_CONST               3 (2)
+            218 BINARY_OP                2 (//)
+            222 STORE_FAST               8 (left)
+
+139         224 LOAD_FAST                2 (cell_size)
+            226 LOAD_FAST                6 (item)
+            228 LOAD_ATTR               14 (height)
+            248 BINARY_OP               10 (-)
+            252 LOAD_CONST               3 (2)
+            254 BINARY_OP                2 (//)
+            258 STORE_FAST               9 (top)
+
+140         260 LOAD_FAST                7 (canvas)
+            262 LOAD_ATTR               17 (NULL|self + paste)
+            282 LOAD_FAST                6 (item)
+            284 LOAD_FAST                8 (left)
+            286 LOAD_FAST                9 (top)
+            288 BUILD_TUPLE              2
+            290 CALL                     2
+            298 POP_TOP
+
+141         300 LOAD_FAST                4 (compact)
+            302 LOAD_ATTR               19 (NULL|self + append)
+            322 LOAD_FAST                7 (canvas)
+            324 CALL                     1
+            332 POP_TOP
+            334 JUMP_BACKWARD          163 (to 10)
+
+134     >>  336 END_FOR
+
+142         338 LOAD_FAST                4 (compact)
+            340 POP_JUMP_IF_TRUE        11 (to 364)
+
+143         342 LOAD_GLOBAL             21 (NULL + ValueError)
+            352 LOAD_CONST               4 ('没有可用抽帧')
+            354 CALL                     1
+            362 RAISE_VARARGS            1
+
+145     >>  364 LOAD_GLOBAL             23 (NULL + max)
+            374 LOAD_CONST               5 (1)
+            376 LOAD_GLOBAL             25 (NULL + min)
+            386 LOAD_FAST                3 (columns)
+            388 LOAD_GLOBAL             27 (NULL + len)
+            398 LOAD_FAST                4 (compact)
+            400 CALL                     1
+            408 CALL                     2
+            416 CALL                     2
+            424 STORE_FAST               3 (columns)
+
+146         426 LOAD_GLOBAL             29 (NULL + math)
+            436 LOAD_ATTR               30 (ceil)
+            456 LOAD_GLOBAL             27 (NULL + len)
+            466 LOAD_FAST                4 (compact)
+            468 CALL                     1
+            476 LOAD_FAST                3 (columns)
+            478 BINARY_OP               11 (/)
+            482 CALL                     1
+            490 STORE_FAST              10 (rows)
+
+147         492 LOAD_CONST               6 (34)
+            494 STORE_FAST              11 (label_height)
+
+148         496 LOAD_FAST                3 (columns)
+            498 LOAD_FAST                2 (cell_size)
+            500 BINARY_OP                5 (*)
+            504 STORE_FAST              12 (width)
+
+149         506 LOAD_FAST               10 (rows)
+            508 LOAD_FAST                2 (cell_size)
+            510 LOAD_FAST               11 (label_height)
+            512 BINARY_OP                0 (+)
+            516 BINARY_OP                5 (*)
+            520 STORE_FAST              13 (height)
+
+150         522 LOAD_GLOBAL              5 (NULL + Image)
+            532 LOAD_ATTR               10 (new)
+            552 LOAD_CONST               1 ('RGB')
+            554 LOAD_FAST               12 (width)
+            556 LOAD_FAST               13 (height)
+            558 BUILD_TUPLE              2
+            560 LOAD_CONST               2 ('white')
+            562 CALL                     3
+            570 STORE_FAST              14 (sheet)
+
+151         572 LOAD_GLOBAL             33 (NULL + ImageDraw)
+            582 LOAD_ATTR               34 (Draw)
+            602 LOAD_FAST               14 (sheet)
+            604 CALL                     1
+            612 STORE_FAST              15 (draw)
+
+152         614 NOP
+
+153         616 LOAD_GLOBAL             37 (NULL + ImageFont)
+            626 LOAD_ATTR               38 (truetype)
+            646 LOAD_CONST               7 ('arial.ttf')
+            648 LOAD_CONST               8 (18)
+            650 CALL                     2
+            658 STORE_FAST              16 (font)
+
+156     >>  660 LOAD_GLOBAL             45 (NULL + enumerate)
+            670 LOAD_FAST                4 (compact)
+            672 LOAD_CONST               5 (1)
+            674 KW_NAMES                 9 (('start',))
+            676 CALL                     2
+            684 GET_ITER
+        >>  686 FOR_ITER               124 (to 938)
+            690 UNPACK_SEQUENCE          2
+            694 STORE_FAST              17 (index)
+            696 STORE_FAST               5 (image)
+
+157         698 LOAD_FAST               17 (index)
+            700 LOAD_CONST               5 (1)
+            702 BINARY_OP               10 (-)
+            706 LOAD_FAST                3 (columns)
+            708 BINARY_OP                2 (//)
+            712 STORE_FAST              18 (row)
+
+158         714 LOAD_FAST               17 (index)
+            716 LOAD_CONST               5 (1)
+            718 BINARY_OP               10 (-)
+            722 LOAD_FAST                3 (columns)
+            724 BINARY_OP                6 (%)
+            728 STORE_FAST              19 (col)
+
+159         730 LOAD_FAST               19 (col)
+            732 LOAD_FAST                2 (cell_size)
+            734 BINARY_OP                5 (*)
+            738 STORE_FAST               8 (left)
+
+160         740 LOAD_FAST               18 (row)
+            742 LOAD_FAST                2 (cell_size)
+            744 LOAD_FAST               11 (label_height)
+            746 BINARY_OP                0 (+)
+            750 BINARY_OP                5 (*)
+            754 STORE_FAST               9 (top)
+
+161         756 LOAD_FAST               14 (sheet)
+            758 LOAD_ATTR               17 (NULL|self + paste)
+            778 LOAD_FAST                5 (image)
+            780 LOAD_FAST                8 (left)
+            782 LOAD_FAST                9 (top)
+            784 LOAD_FAST               11 (label_height)
+            786 BINARY_OP                0 (+)
+            790 BUILD_TUPLE              2
+            792 CALL                     2
+            800 POP_TOP
+
+162         802 LOAD_FAST               15 (draw)
+            804 LOAD_ATTR               47 (NULL|self + rectangle)
+            824 LOAD_FAST                8 (left)
+            826 LOAD_FAST                9 (top)
+            828 LOAD_FAST                8 (left)
+            830 LOAD_FAST                2 (cell_size)
+            832 BINARY_OP                0 (+)
+            836 LOAD_CONST               5 (1)
+            838 BINARY_OP               10 (-)
+            842 LOAD_FAST                9 (top)
+            844 LOAD_FAST               11 (label_height)
+            846 BINARY_OP                0 (+)
+            850 LOAD_CONST               5 (1)
+            852 BINARY_OP               10 (-)
+            856 BUILD_TUPLE              4
+            858 LOAD_CONST              10 ('#f1f5f9')
+            860 KW_NAMES                11 (('fill',))
+            862 CALL                     2
+            870 POP_TOP
+
+163         872 LOAD_FAST               15 (draw)
+            874 LOAD_ATTR               49 (NULL|self + text)
+            894 LOAD_FAST                8 (left)
+            896 LOAD_CONST              12 (12)
+            898 BINARY_OP                0 (+)
+            902 LOAD_FAST                9 (top)
+            904 LOAD_CONST              13 (7)
+            906 BINARY_OP                0 (+)
+            910 BUILD_TUPLE              2
+            912 LOAD_CONST              14 ('Frame ')
+            914 LOAD_FAST               17 (index)
+            916 FORMAT_VALUE             0
+            918 BUILD_STRING             2
+            920 LOAD_CONST              15 ('#0f172a')
+            922 LOAD_FAST               16 (font)
+            924 KW_NAMES                16 (('fill', 'font'))
+            926 CALL                     4
+            934 POP_TOP
+            936 JUMP_BACKWARD          126 (to 686)
+
+156     >>  938 END_FOR
+
+165         940 LOAD_FAST                1 (output)
+            942 LOAD_ATTR               50 (parent)
+            962 LOAD_ATTR               53 (NULL|self + mkdir)
+            982 LOAD_CONST              17 (True)
+            984 LOAD_CONST              17 (True)
+            986 KW_NAMES                18 (('parents', 'exist_ok'))
+            988 CALL                     2
+            996 POP_TOP
+
+166         998 LOAD_FAST               14 (sheet)
+           1000 LOAD_ATTR               55 (NULL|self + save)
+           1020 LOAD_FAST                1 (output)
+           1022 LOAD_CONST              19 ('JPEG')
+           1024 LOAD_CONST              20 (82)
+           1026 LOAD_CONST              17 (True)
+           1028 KW_NAMES                21 (('quality', 'optimize'))
+           1030 CALL                     4
+           1038 POP_TOP
+
+167        1040 LOAD_FAST                1 (output)
+           1042 RETURN_VALUE
+        >> 1044 PUSH_EXC_INFO
+
+154        1046 LOAD_GLOBAL             40 (Exception)
+           1056 CHECK_EXC_MATCH
+           1058 POP_JUMP_IF_FALSE       23 (to 1106)
+           1060 POP_TOP
+
+155        1062 LOAD_GLOBAL             37 (NULL + ImageFont)
+           1072 LOAD_ATTR               42 (load_default)
+           1092 CALL                     0
+           1100 STORE_FAST              16 (font)
+           1102 POP_EXCEPT
+           1104 JUMP_BACKWARD          223 (to 660)
+
+154     >> 1106 RERAISE                  0
+        >> 1108 COPY                     3
+           1110 POP_EXCEPT
+           1112 RERAISE                  1
+ExceptionTable:
+  616 to 658 -> 1044 [0]
+  1044 to 1100 -> 1108 [1] lasti
+  1106 to 1106 -> 1108 [1] lasti
+
+Disassembly of <code object _frame_indices at <address>, file "xiaoguan_classifier\media.py", line 170>:
+170           0 RESUME                   0
+
+171           2 LOAD_GLOBAL              1 (NULL + max)
+             12 LOAD_CONST               1 (1)
+             14 LOAD_FAST                2 (frame_count)
+             16 CALL                     2
+             24 STORE_FAST               2 (frame_count)
+
+172          26 LOAD_FAST                1 (duration)
+             28 POP_JUMP_IF_FALSE       91 (to 212)
+             30 LOAD_FAST                1 (duration)
+             32 LOAD_CONST               2 (10000)
+             34 COMPARE_OP               2 (<)
+             38 POP_JUMP_IF_FALSE       86 (to 212)
+
+173          40 LOAD_FAST                2 (frame_count)
+             42 LOAD_CONST               1 (1)
+             44 COMPARE_OP              40 (==)
+             48 POP_JUMP_IF_FALSE        4 (to 58)
+
+174          50 LOAD_CONST               3 (0.5)
+             52 BUILD_LIST               1
+             54 STORE_FAST               3 (positions)
+             56 JUMP_FORWARD            36 (to 130)
+
+176     >>   58 LOAD_GLOBAL              3 (NULL + range)
+             68 LOAD_FAST                2 (frame_count)
+             70 CALL                     1
+             78 GET_ITER
+             80 LOAD_FAST_AND_CLEAR      4 (index)
+             82 SWAP                     2
+             84 BUILD_LIST               0
+             86 SWAP                     2
+        >>   88 FOR_ITER                16 (to 124)
+             92 STORE_FAST               4 (index)
+             94 LOAD_CONST               4 (0.04)
+             96 LOAD_CONST               5 (0.92)
+             98 LOAD_FAST                4 (index)
+            100 BINARY_OP                5 (*)
+            104 LOAD_FAST                2 (frame_count)
+            106 LOAD_CONST               1 (1)
+            108 BINARY_OP               10 (-)
+            112 BINARY_OP               11 (/)
+            116 BINARY_OP                0 (+)
+            120 LIST_APPEND              2
+            122 JUMP_BACKWARD           18 (to 88)
+        >>  124 END_FOR
+            126 STORE_FAST               3 (positions)
+            128 STORE_FAST               4 (index)
+
+177     >>  130 LOAD_FAST                3 (positions)
+            132 GET_ITER
+            134 LOAD_FAST_AND_CLEAR      5 (pos)
+            136 SWAP                     2
+            138 BUILD_LIST               0
+            140 SWAP                     2
+        >>  142 FOR_ITER                29 (to 204)
+            146 STORE_FAST               5 (pos)
+            148 LOAD_GLOBAL              1 (NULL + max)
+            158 LOAD_CONST               6 (0)
+            160 LOAD_GLOBAL              5 (NULL + int)
+            170 LOAD_FAST                0 (fps)
+            172 LOAD_FAST                1 (duration)
+            174 BINARY_OP                5 (*)
+            178 LOAD_FAST                5 (pos)
+            180 BINARY_OP                5 (*)
+            184 CALL                     1
+            192 CALL                     2
+            200 LIST_APPEND              2
+            202 JUMP_BACKWARD           31 (to 142)
+        >>  204 END_FOR
+            206 SWAP                     2
+            208 STORE_FAST               5 (pos)
+            210 RETURN_VALUE
+
+178     >>  212 LOAD_GLOBAL              3 (NULL + range)
+            222 LOAD_FAST                2 (frame_count)
+            224 CALL                     1
+            232 GET_ITER
+            234 LOAD_FAST_AND_CLEAR      4 (index)
+            236 SWAP                     2
+            238 BUILD_LIST               0
+            240 SWAP                     2
+        >>  242 FOR_ITER                 7 (to 260)
+            246 STORE_FAST               4 (index)
+            248 LOAD_FAST                4 (index)
+            250 LOAD_CONST               7 (30)
+            252 BINARY_OP                5 (*)
+            256 LIST_APPEND              2
+            258 JUMP_BACKWARD            9 (to 242)
+        >>  260 END_FOR
+            262 SWAP                     2
+            264 STORE_FAST               4 (index)
+            266 RETURN_VALUE
+        >>  268 SWAP                     2
+            270 POP_TOP
+
+176         272 SWAP                     2
+            274 STORE_FAST               4 (index)
+            276 RERAISE                  0
+        >>  278 SWAP                     2
+            280 POP_TOP
+
+177         282 SWAP                     2
+            284 STORE_FAST               5 (pos)
+            286 RERAISE                  0
+        >>  288 SWAP                     2
+            290 POP_TOP
+
+178         292 SWAP                     2
+            294 STORE_FAST               4 (index)
+            296 RERAISE                  0
+ExceptionTable:
+  84 to 124 -> 268 [2]
+  138 to 204 -> 278 [2]
+  238 to 260 -> 288 [2]
+
+Disassembly of <code object _unique_sorted_indices at <address>, file "xiaoguan_classifier\media.py", line 181>:
+181           0 RESUME                   0
+
+182           2 BUILD_LIST               0
+              4 STORE_FAST               2 (result)
+
+183           6 LOAD_GLOBAL              1 (NULL + set)
+             16 CALL                     0
+             24 STORE_FAST               3 (seen)
+
+184          26 LOAD_GLOBAL              3 (NULL + sorted)
+             36 LOAD_CONST               1 (<code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 184>)
+             38 MAKE_FUNCTION            0
+             40 LOAD_FAST                0 (values)
+             42 GET_ITER
+             44 CALL                     0
+             52 CALL                     1
+             60 GET_ITER
+        >>   62 FOR_ITER                58 (to 182)
+             66 STORE_FAST               4 (value)
+
+185          68 LOAD_FAST                4 (value)
+             70 LOAD_FAST                3 (seen)
+             72 CONTAINS_OP              0
+             74 POP_JUMP_IF_FALSE        1 (to 78)
+
+186          76 JUMP_BACKWARD            8 (to 62)
+
+187     >>   78 LOAD_FAST                3 (seen)
+             80 LOAD_ATTR                5 (NULL|self + add)
+            100 LOAD_FAST                4 (value)
+            102 CALL                     1
+            110 POP_TOP
+
+188         112 LOAD_FAST                2 (result)
+            114 LOAD_ATTR                7 (NULL|self + append)
+            134 LOAD_FAST                4 (value)
+            136 CALL                     1
+            144 POP_TOP
+
+189         146 LOAD_GLOBAL              9 (NULL + len)
+            156 LOAD_FAST                2 (result)
+            158 CALL                     1
+            166 LOAD_FAST                1 (limit)
+            168 COMPARE_OP              92 (>=)
+            172 POP_JUMP_IF_TRUE         1 (to 176)
+            174 JUMP_BACKWARD           57 (to 62)
+
+190     >>  176 POP_TOP
+
+191         178 LOAD_FAST                2 (result)
+            180 RETURN_VALUE
+
+184     >>  182 END_FOR
+
+191         184 LOAD_FAST                2 (result)
+            186 RETURN_VALUE
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\media.py", line 184>:
+184           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                25 (to 62)
+             12 STORE_FAST               1 (item)
+             14 LOAD_GLOBAL              1 (NULL + max)
+             24 LOAD_CONST               0 (0)
+             26 LOAD_GLOBAL              3 (NULL + int)
+             36 LOAD_FAST                1 (item)
+             38 CALL                     1
+             46 CALL                     2
+             54 YIELD_VALUE              1
+             56 RESUME                   1
+             58 POP_TOP
+             60 JUMP_BACKWARD           27 (to 8)
+        >>   62 END_FOR
+             64 RETURN_CONST             1 (None)
+        >>   66 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             68 RERAISE                  1
+ExceptionTable:
+  4 to 64 -> 66 [0] lasti
+
+Disassembly of <code object _image_difference_score at <address>, file "xiaoguan_classifier\media.py", line 194>:
+194           0 RESUME                   0
+
+195           2 LOAD_FAST                0 (previous)
+              4 LOAD_ATTR                1 (NULL|self + convert)
+             24 LOAD_CONST               1 ('L')
+             26 CALL                     1
+             34 LOAD_ATTR                3 (NULL|self + resize)
+             54 LOAD_CONST               2 ((96, 96))
+             56 CALL                     1
+             64 STORE_FAST               2 (prev)
+
+196          66 LOAD_FAST                1 (current)
+             68 LOAD_ATTR                1 (NULL|self + convert)
+             88 LOAD_CONST               1 ('L')
+             90 CALL                     1
+             98 LOAD_ATTR                3 (NULL|self + resize)
+            118 LOAD_CONST               2 ((96, 96))
+            120 CALL                     1
+            128 STORE_FAST               3 (cur)
+
+197         130 LOAD_GLOBAL              5 (NULL + ImageChops)
+            140 LOAD_ATTR                6 (difference)
+            160 LOAD_FAST                2 (prev)
+            162 LOAD_FAST                3 (cur)
+            164 CALL                     2
+            172 STORE_FAST               4 (diff)
+
+198         174 LOAD_GLOBAL              9 (NULL + float)
+            184 LOAD_GLOBAL             11 (NULL + ImageStat)
+            194 LOAD_ATTR               12 (Stat)
+            214 LOAD_FAST                4 (diff)
+            216 CALL                     1
+            224 LOAD_ATTR               14 (mean)
+            244 LOAD_CONST               3 (0)
+            246 BINARY_SUBSCR
+            250 CALL                     1
+            258 RETURN_VALUE
+
+Disassembly of <code object extract_video_frames at <address>, file "xiaoguan_classifier\media.py", line 201>:
+201           0 RESUME                   0
+
+202           2 LOAD_CONST               1 (0)
+              4 LOAD_CONST               0 (None)
+              6 IMPORT_NAME              0 (imageio.v2)
+              8 IMPORT_FROM              1 (v2)
+             10 STORE_FAST               3 (imageio)
+             12 POP_TOP
+
+204          14 LOAD_FAST                1 (work_dir)
+             16 LOAD_CONST               2 ('frames')
+             18 BINARY_OP               11 (/)
+             22 LOAD_FAST                0 (path)
+             24 LOAD_ATTR                4 (stem)
+             44 BINARY_OP               11 (/)
+             48 STORE_FAST               4 (output_dir)
+
+205          50 LOAD_FAST                4 (output_dir)
+             52 LOAD_ATTR                7 (NULL|self + mkdir)
+             72 LOAD_CONST               3 (True)
+             74 LOAD_CONST               3 (True)
+             76 KW_NAMES                 4 (('parents', 'exist_ok'))
+             78 CALL                     2
+             86 POP_TOP
+
+206          88 LOAD_FAST                3 (imageio)
+             90 LOAD_ATTR                9 (NULL|self + get_reader)
+            110 LOAD_GLOBAL             11 (NULL + str)
+            120 LOAD_FAST                0 (path)
+            122 CALL                     1
+            130 LOAD_CONST               5 ('ffmpeg')
+            132 CALL                     2
+            140 STORE_FAST               5 (reader)
+
+207         142 NOP
+
+208         144 LOAD_FAST                5 (reader)
+            146 LOAD_ATTR               13 (NULL|self + get_meta_data)
+            166 CALL                     0
+            174 STORE_FAST               6 (meta)
+
+209         176 LOAD_GLOBAL             15 (NULL + float)
+            186 LOAD_FAST                6 (meta)
+            188 LOAD_ATTR               17 (NULL|self + get)
+            208 LOAD_CONST               6 ('fps')
+            210 CALL                     1
+            218 COPY                     1
+            220 POP_JUMP_IF_TRUE         2 (to 226)
+            222 POP_TOP
+            224 LOAD_CONST               7 (25)
+        >>  226 CALL                     1
+            234 STORE_FAST               7 (fps)
+
+210         236 LOAD_GLOBAL             15 (NULL + float)
+            246 LOAD_FAST                6 (meta)
+            248 LOAD_ATTR               17 (NULL|self + get)
+            268 LOAD_CONST               8 ('duration')
+            270 CALL                     1
+            278 COPY                     1
+            280 POP_JUMP_IF_TRUE         2 (to 286)
+            282 POP_TOP
+            284 LOAD_CONST               1 (0)
+        >>  286 CALL                     1
+            294 STORE_FAST               8 (duration)
+
+211         296 LOAD_GLOBAL             19 (NULL + _frame_indices)
+            306 LOAD_FAST                7 (fps)
+            308 LOAD_FAST                8 (duration)
+            310 LOAD_FAST                2 (frame_count)
+            312 CALL                     3
+            320 STORE_FAST               9 (frame_indices)
+
+212         322 BUILD_LIST               0
+            324 STORE_FAST              10 (outputs)
+
+213         326 LOAD_GLOBAL             21 (NULL + enumerate)
+            336 LOAD_FAST                9 (frame_indices)
+            338 LOAD_CONST               9 (1)
+            340 KW_NAMES                10 (('start',))
+            342 CALL                     2
+            350 GET_ITER
+        >>  352 FOR_ITER                78 (to 512)
+            356 UNPACK_SEQUENCE          2
+            360 STORE_FAST              11 (idx)
+            362 STORE_FAST              12 (frame_index)
+
+214         364 NOP
+
+215         366 LOAD_FAST                5 (reader)
+            368 LOAD_ATTR               23 (NULL|self + get_data)
+            388 LOAD_FAST               12 (frame_index)
+            390 CALL                     1
+            398 STORE_FAST              13 (array)
+
+218     >>  400 LOAD_GLOBAL             27 (NULL + Image)
+            410 LOAD_ATTR               28 (fromarray)
+            430 LOAD_FAST               13 (array)
+            432 CALL                     1
+            440 STORE_FAST              14 (image)
+
+219         442 LOAD_FAST               10 (outputs)
+            444 LOAD_ATTR               31 (NULL|self + append)
+            464 LOAD_GLOBAL             33 (NULL + _save_compact_jpeg)
+            474 LOAD_FAST               14 (image)
+            476 LOAD_FAST                4 (output_dir)
+            478 LOAD_CONST              11 ('frame_')
+            480 LOAD_FAST               11 (idx)
+            482 FORMAT_VALUE             0
+            484 LOAD_CONST              12 ('.jpg')
+            486 BUILD_STRING             3
+            488 BINARY_OP               11 (/)
+            492 CALL                     2
+            500 CALL                     1
+            508 POP_TOP
+            510 JUMP_BACKWARD           80 (to 352)
+
+213     >>  512 END_FOR
+
+220         514 LOAD_FAST               10 (outputs)
+
+222         516 LOAD_FAST                5 (reader)
+            518 LOAD_ATTR               35 (NULL|self + close)
+            538 CALL                     0
+            546 POP_TOP
+            548 RETURN_VALUE
+        >>  550 PUSH_EXC_INFO
+
+216         552 LOAD_GLOBAL             24 (Exception)
+            562 CHECK_EXC_MATCH
+            564 POP_JUMP_IF_FALSE       20 (to 606)
+            566 POP_TOP
+
+217         568 LOAD_FAST                5 (reader)
+            570 LOAD_ATTR               23 (NULL|self + get_data)
+            590 LOAD_CONST               1 (0)
+            592 CALL                     1
+            600 STORE_FAST              13 (array)
+            602 POP_EXCEPT
+            604 JUMP_BACKWARD          103 (to 400)
+
+216     >>  606 RERAISE                  0
+        >>  608 COPY                     3
+            610 POP_EXCEPT
+            612 RERAISE                  1
+        >>  614 PUSH_EXC_INFO
+
+222         616 LOAD_FAST                5 (reader)
+            618 LOAD_ATTR               35 (NULL|self + close)
+            638 CALL                     0
+            646 POP_TOP
+            648 RERAISE                  0
+        >>  650 COPY                     3
+            652 POP_EXCEPT
+            654 RERAISE                  1
+ExceptionTable:
+  144 to 362 -> 614 [0]
+  366 to 398 -> 550 [1]
+  400 to 514 -> 614 [0]
+  550 to 600 -> 608 [2] lasti
+  602 to 604 -> 614 [0]
+  606 to 606 -> 608 [2] lasti
+  608 to 612 -> 614 [0]
+  614 to 648 -> 650 [1] lasti
+
+Disassembly of <code object _smart_video_frames at <address>, file "xiaoguan_classifier\media.py", line 225>:
+225           0 RESUME                   0
+
+226           2 LOAD_FAST                3 (frame_count)
+              4 LOAD_CONST               1 (4)
+              6 COMPARE_OP              26 (<=)
+             10 POP_JUMP_IF_FALSE       13 (to 38)
+
+227          12 LOAD_GLOBAL              1 (NULL + max)
+             22 LOAD_FAST                3 (frame_count)
+             24 LOAD_CONST               1 (4)
+             26 CALL                     2
+             34 STORE_FAST               4 (sample_count)
+             36 JUMP_FORWARD            15 (to 68)
+
+229     >>   38 LOAD_GLOBAL              1 (NULL + max)
+             48 LOAD_FAST                3 (frame_count)
+             50 LOAD_CONST               2 (3)
+             52 BINARY_OP                5 (*)
+             56 LOAD_CONST               3 (12)
+             58 CALL                     2
+             66 STORE_FAST               4 (sample_count)
+
+230     >>   68 LOAD_GLOBAL              3 (NULL + min)
+             78 LOAD_FAST                4 (sample_count)
+             80 LOAD_CONST               4 (24)
+             82 CALL                     2
+             90 STORE_FAST               4 (sample_count)
+
+231          92 LOAD_GLOBAL              5 (NULL + _frame_indices)
+            102 LOAD_FAST                1 (fps)
+            104 LOAD_FAST                2 (duration)
+            106 LOAD_FAST                4 (sample_count)
+            108 CALL                     3
+            116 STORE_FAST               5 (candidates)
+
+232         118 BUILD_LIST               0
+            120 STORE_FAST               6 (scored)
+
+233         122 LOAD_CONST               0 (None)
+            124 STORE_FAST               7 (previous)
+
+234         126 LOAD_CONST               0 (None)
+            128 STORE_FAST               8 (fallback)
+
+235         130 LOAD_FAST                5 (candidates)
+            132 GET_ITER
+        >>  134 FOR_ITER                85 (to 308)
+            138 STORE_FAST               9 (frame_index)
+
+236         140 NOP
+
+237         142 LOAD_FAST                0 (reader)
+            144 LOAD_ATTR                7 (NULL|self + get_data)
+            164 LOAD_FAST                9 (frame_index)
+            166 CALL                     1
+            174 STORE_FAST              10 (array)
+
+240     >>  176 LOAD_GLOBAL             11 (NULL + Image)
+            186 LOAD_ATTR               12 (fromarray)
+            206 LOAD_FAST               10 (array)
+            208 CALL                     1
+            216 STORE_FAST              11 (image)
+
+241         218 LOAD_FAST                8 (fallback)
+            220 COPY                     1
+            222 POP_JUMP_IF_TRUE         2 (to 228)
+            224 POP_TOP
+            226 LOAD_FAST               11 (image)
+        >>  228 STORE_FAST               8 (fallback)
+
+242         230 LOAD_FAST                7 (previous)
+            232 POP_JUMP_IF_NOT_NONE     2 (to 238)
+            234 LOAD_CONST               6 (0.0)
+            236 JUMP_FORWARD            11 (to 260)
+        >>  238 LOAD_GLOBAL             15 (NULL + _image_difference_score)
+            248 LOAD_FAST                7 (previous)
+            250 LOAD_FAST               11 (image)
+            252 CALL                     2
+        >>  260 STORE_FAST              12 (score)
+
+243         262 LOAD_FAST                6 (scored)
+            264 LOAD_ATTR               17 (NULL|self + append)
+            284 LOAD_FAST               12 (score)
+            286 LOAD_FAST                9 (frame_index)
+            288 LOAD_FAST               11 (image)
+            290 BUILD_TUPLE              3
+            292 CALL                     1
+            300 POP_TOP
+
+244         302 LOAD_FAST               11 (image)
+            304 STORE_FAST               7 (previous)
+            306 JUMP_BACKWARD           87 (to 134)
+
+235     >>  308 END_FOR
+
+246         310 LOAD_FAST                6 (scored)
+            312 POP_JUMP_IF_TRUE        16 (to 346)
+
+247         314 LOAD_FAST                8 (fallback)
+            316 POP_JUMP_IF_NOT_NONE    11 (to 340)
+
+248         318 LOAD_GLOBAL             19 (NULL + ValueError)
+            328 LOAD_CONST               7 ('没有可用抽帧')
+            330 CALL                     1
+            338 RAISE_VARARGS            1
+
+249     >>  340 LOAD_FAST                8 (fallback)
+            342 BUILD_LIST               1
+            344 RETURN_VALUE
+
+251     >>  346 LOAD_GLOBAL              5 (NULL + _frame_indices)
+            356 LOAD_FAST                1 (fps)
+            358 LOAD_FAST                2 (duration)
+            360 LOAD_GLOBAL              3 (NULL + min)
+            370 LOAD_FAST                3 (frame_count)
+            372 LOAD_CONST               1 (4)
+            374 CALL                     2
+            382 CALL                     3
+            390 STORE_FAST              13 (anchor_indices)
+
+252         392 LOAD_GLOBAL             21 (NULL + set)
+            402 LOAD_FAST               13 (anchor_indices)
+            404 CALL                     1
+            412 STORE_FAST              14 (selected_indices)
+
+253         414 LOAD_GLOBAL             23 (NULL + sorted)
+            424 LOAD_FAST                6 (scored)
+            426 LOAD_CONST               8 (<code object <lambda> at <address>, file "xiaoguan_classifier\media.py", line 253>)
+            428 MAKE_FUNCTION            0
+            430 LOAD_CONST               9 (True)
+            432 KW_NAMES                10 (('key', 'reverse'))
+            434 CALL                     3
+            442 GET_ITER
+        >>  444 FOR_ITER                39 (to 526)
+            448 UNPACK_SEQUENCE          3
+            452 STORE_FAST              15 (_score)
+            454 STORE_FAST               9 (frame_index)
+            456 STORE_FAST              16 (_image)
+
+254         458 LOAD_FAST               14 (selected_indices)
+            460 LOAD_ATTR               25 (NULL|self + add)
+            480 LOAD_FAST                9 (frame_index)
+            482 CALL                     1
+            490 POP_TOP
+
+255         492 LOAD_GLOBAL             27 (NULL + len)
+            502 LOAD_FAST               14 (selected_indices)
+            504 CALL                     1
+            512 LOAD_FAST                3 (frame_count)
+            514 COMPARE_OP              92 (>=)
+            518 POP_JUMP_IF_TRUE         1 (to 522)
+            520 JUMP_BACKWARD           39 (to 444)
+
+256     >>  522 POP_TOP
+            524 JUMP_FORWARD             1 (to 528)
+
+253     >>  526 END_FOR
+
+257     >>  528 LOAD_GLOBAL             29 (NULL + _unique_sorted_indices)
+            538 LOAD_GLOBAL             31 (NULL + list)
+            548 LOAD_FAST               14 (selected_indices)
+            550 CALL                     1
+            558 LOAD_FAST                3 (frame_count)
+            560 CALL                     2
+            568 STORE_FAST              17 (selected)
+
+258         570 LOAD_FAST                6 (scored)
+            572 GET_ITER
+            574 LOAD_FAST_AND_CLEAR     15 (_score)
+            576 LOAD_FAST_AND_CLEAR      9 (frame_index)
+            578 LOAD_FAST_AND_CLEAR     11 (image)
+            580 SWAP                     4
+            582 BUILD_MAP                0
+            584 SWAP                     2
+        >>  586 FOR_ITER                 9 (to 608)
+            590 UNPACK_SEQUENCE          3
+            594 STORE_FAST              15 (_score)
+            596 STORE_FAST               9 (frame_index)
+            598 STORE_FAST              11 (image)
+            600 LOAD_FAST                9 (frame_index)
+            602 LOAD_FAST               11 (image)
+            604 MAP_ADD                  2
+            606 JUMP_BACKWARD           11 (to 586)
+        >>  608 END_FOR
+            610 STORE_FAST              18 (frames_by_index)
+            612 STORE_FAST               9 (frame_index)
+            614 STORE_FAST              15 (_score)
+            616 STORE_FAST              11 (image)
+
+259         618 LOAD_FAST               17 (selected)
+            620 GET_ITER
+            622 LOAD_FAST_AND_CLEAR     19 (index)
+            624 SWAP                     2
+            626 BUILD_LIST               0
+            628 SWAP                     2
+        >>  630 FOR_ITER                29 (to 692)
+            634 STORE_FAST              19 (index)
+            636 LOAD_FAST               18 (frames_by_index)
+            638 LOAD_ATTR               33 (NULL|self + get)
+            658 LOAD_FAST               19 (index)
+            660 CALL                     1
+            668 COPY                     1
+            670 POP_JUMP_IF_TRUE         8 (to 688)
+            672 POP_TOP
+            674 LOAD_FAST                6 (scored)
+            676 LOAD_CONST               5 (0)
+            678 BINARY_SUBSCR
+            682 LOAD_CONST              11 (2)
+            684 BINARY_SUBSCR
+        >>  688 LIST_APPEND              2
+            690 JUMP_BACKWARD           31 (to 630)
+        >>  692 END_FOR
+            694 SWAP                     2
+            696 STORE_FAST              19 (index)
+            698 RETURN_VALUE
+        >>  700 PUSH_EXC_INFO
+
+238         702 LOAD_GLOBAL              8 (Exception)
+            712 CHECK_EXC_MATCH
+            714 POP_JUMP_IF_FALSE       21 (to 758)
+            716 POP_TOP
+
+239         718 LOAD_FAST                0 (reader)
+            720 LOAD_ATTR                7 (NULL|self + get_data)
+            740 LOAD_CONST               5 (0)
+            742 CALL                     1
+            750 STORE_FAST              10 (array)
+            752 POP_EXCEPT
+            754 EXTENDED_ARG             1
+            756 JUMP_BACKWARD          291 (to 176)
+
+238     >>  758 RERAISE                  0
+        >>  760 COPY                     3
+            762 POP_EXCEPT
+            764 RERAISE                  1
+        >>  766 SWAP                     2
+            768 POP_TOP
+
+258         770 SWAP                     4
+            772 STORE_FAST              11 (image)
+            774 STORE_FAST               9 (frame_index)
+            776 STORE_FAST              15 (_score)
+            778 RERAISE                  0
+        >>  780 SWAP                     2
+            782 POP_TOP
+
+259         784 SWAP                     2
+            786 STORE_FAST              19 (index)
+            788 RERAISE                  0
+ExceptionTable:
+  142 to 174 -> 700 [1]
+  582 to 608 -> 766 [4]
+  626 to 692 -> 780 [2]
+  700 to 750 -> 760 [2] lasti
+  758 to 758 -> 760 [2] lasti
+
+Disassembly of <code object <lambda> at <address>, file "xiaoguan_classifier\media.py", line 253>:
+253           0 RESUME                   0
+              2 LOAD_FAST                0 (item)
+              4 LOAD_CONST               1 (0)
+              6 BINARY_SUBSCR
+             10 RETURN_VALUE
+
+Disassembly of <code object extract_video_contact_sheet at <address>, file "xiaoguan_classifier\media.py", line 262>:
+262           0 RESUME                   0
+
+263           2 LOAD_CONST               1 (0)
+              4 LOAD_CONST               0 (None)
+              6 IMPORT_NAME              0 (imageio.v2)
+              8 IMPORT_FROM              1 (v2)
+             10 STORE_FAST               4 (imageio)
+             12 POP_TOP
+
+265          14 LOAD_FAST                1 (work_dir)
+             16 LOAD_CONST               2 ('sheets')
+             18 BINARY_OP               11 (/)
+             22 LOAD_FAST                0 (path)
+             24 LOAD_ATTR                4 (stem)
+             44 BINARY_OP               11 (/)
+             48 STORE_FAST               5 (output_dir)
+
+266          50 LOAD_FAST                5 (output_dir)
+             52 LOAD_ATTR                7 (NULL|self + mkdir)
+             72 LOAD_CONST               3 (True)
+             74 LOAD_CONST               3 (True)
+             76 KW_NAMES                 4 (('parents', 'exist_ok'))
+             78 CALL                     2
+             86 POP_TOP
+
+267          88 LOAD_FAST                5 (output_dir)
+             90 LOAD_CONST               5 ('frames_sheet.jpg')
+             92 BINARY_OP               11 (/)
+             96 STORE_FAST               6 (output)
+
+268          98 LOAD_FAST                4 (imageio)
+            100 LOAD_ATTR                9 (NULL|self + get_reader)
+            120 LOAD_GLOBAL             11 (NULL + str)
+            130 LOAD_FAST                0 (path)
+            132 CALL                     1
+            140 LOAD_CONST               6 ('ffmpeg')
+            142 CALL                     2
+            150 STORE_FAST               7 (reader)
+
+269         152 NOP
+
+270         154 LOAD_FAST                7 (reader)
+            156 LOAD_ATTR               13 (NULL|self + get_meta_data)
+            176 CALL                     0
+            184 STORE_FAST               8 (meta)
+
+271         186 LOAD_GLOBAL             15 (NULL + float)
+            196 LOAD_FAST                8 (meta)
+            198 LOAD_ATTR               17 (NULL|self + get)
+            218 LOAD_CONST               7 ('fps')
+            220 CALL                     1
+            228 COPY                     1
+            230 POP_JUMP_IF_TRUE         2 (to 236)
+            232 POP_TOP
+            234 LOAD_CONST               8 (25)
+        >>  236 CALL                     1
+            244 STORE_FAST               9 (fps)
+
+272         246 LOAD_GLOBAL             15 (NULL + float)
+            256 LOAD_FAST                8 (meta)
+            258 LOAD_ATTR               17 (NULL|self + get)
+            278 LOAD_CONST               9 ('duration')
+            280 CALL                     1
+            288 COPY                     1
+            290 POP_JUMP_IF_TRUE         2 (to 296)
+            292 POP_TOP
+            294 LOAD_CONST               1 (0)
+        >>  296 CALL                     1
+            304 STORE_FAST              10 (duration)
+
+273         306 LOAD_FAST                3 (smart)
+            308 POP_JUMP_IF_FALSE       15 (to 340)
+
+274         310 LOAD_GLOBAL             19 (NULL + _smart_video_frames)
+            320 LOAD_FAST                7 (reader)
+            322 LOAD_FAST                9 (fps)
+            324 LOAD_FAST               10 (duration)
+            326 LOAD_FAST                2 (frame_count)
+            328 CALL                     4
+            336 STORE_FAST              11 (frames)
+            338 JUMP_FORWARD            76 (to 492)
+
+276     >>  340 LOAD_GLOBAL             21 (NULL + _frame_indices)
+            350 LOAD_FAST                9 (fps)
+            352 LOAD_FAST               10 (duration)
+            354 LOAD_FAST                2 (frame_count)
+            356 CALL                     3
+            364 STORE_FAST              12 (frame_indices)
+
+277         366 BUILD_LIST               0
+            368 STORE_FAST              11 (frames)
+
+278         370 LOAD_FAST               12 (frame_indices)
+            372 GET_ITER
+        >>  374 FOR_ITER                56 (to 490)
+            378 STORE_FAST              13 (frame_index)
+
+279         380 NOP
+
+280         382 LOAD_FAST                7 (reader)
+            384 LOAD_ATTR               23 (NULL|self + get_data)
+            404 LOAD_FAST               13 (frame_index)
+            406 CALL                     1
+            414 STORE_FAST              14 (array)
+
+283     >>  416 LOAD_FAST               11 (frames)
+            418 LOAD_ATTR               27 (NULL|self + append)
+            438 LOAD_GLOBAL             29 (NULL + Image)
+            448 LOAD_ATTR               30 (fromarray)
+            468 LOAD_FAST               14 (array)
+            470 CALL                     1
+            478 CALL                     1
+            486 POP_TOP
+            488 JUMP_BACKWARD           58 (to 374)
+
+278     >>  490 END_FOR
+
+284     >>  492 LOAD_GLOBAL             33 (NULL + _save_contact_sheet)
+            502 LOAD_FAST               11 (frames)
+            504 LOAD_FAST                6 (output)
+            506 CALL                     2
+            514 BUILD_LIST               1
+
+286         516 LOAD_FAST                7 (reader)
+            518 LOAD_ATTR               35 (NULL|self + close)
+            538 CALL                     0
+            546 POP_TOP
+            548 RETURN_VALUE
+        >>  550 PUSH_EXC_INFO
+
+281         552 LOAD_GLOBAL             24 (Exception)
+            562 CHECK_EXC_MATCH
+            564 POP_JUMP_IF_FALSE       20 (to 606)
+            566 POP_TOP
+
+282         568 LOAD_FAST                7 (reader)
+            570 LOAD_ATTR               23 (NULL|self + get_data)
+            590 LOAD_CONST               1 (0)
+            592 CALL                     1
+            600 STORE_FAST              14 (array)
+            602 POP_EXCEPT
+            604 JUMP_BACKWARD           95 (to 416)
+
+281     >>  606 RERAISE                  0
+        >>  608 COPY                     3
+            610 POP_EXCEPT
+            612 RERAISE                  1
+        >>  614 PUSH_EXC_INFO
+
+286         616 LOAD_FAST                7 (reader)
+            618 LOAD_ATTR               35 (NULL|self + close)
+            638 CALL                     0
+            646 POP_TOP
+            648 RERAISE                  0
+        >>  650 COPY                     3
+            652 POP_EXCEPT
+            654 RERAISE                  1
+ExceptionTable:
+  154 to 378 -> 614 [0]
+  382 to 414 -> 550 [1]
+  416 to 514 -> 614 [0]
+  550 to 600 -> 608 [2] lasti
+  602 to 604 -> 614 [0]
+  606 to 606 -> 608 [2] lasti
+  608 to 612 -> 614 [0]
+  614 to 648 -> 650 [1] lasti
+
+Disassembly of <code object prepare_image_payloads at <address>, file "xiaoguan_classifier\media.py", line 289>:
+289           0 RESUME                   0
+
+290           2 LOAD_FAST                1 (work_dir)
+              4 LOAD_CONST               1 ('images')
+              6 BINARY_OP               11 (/)
+             10 LOAD_FAST                0 (path)
+             12 LOAD_ATTR                0 (stem)
+             32 BINARY_OP               11 (/)
+             36 STORE_FAST               2 (output_dir)
+
+291          38 LOAD_FAST                2 (output_dir)
+             40 LOAD_CONST               2 ('image.jpg')
+             42 BINARY_OP               11 (/)
+             46 STORE_FAST               3 (output)
+
+292          48 LOAD_GLOBAL              3 (NULL + Image)
+             58 LOAD_ATTR                4 (open)
+             78 LOAD_FAST                0 (path)
+             80 CALL                     1
+             88 BEFORE_WITH
+             90 STORE_FAST               4 (image)
+
+293          92 LOAD_GLOBAL              7 (NULL + _save_compact_jpeg)
+            102 LOAD_FAST                4 (image)
+            104 LOAD_FAST                3 (output)
+            106 CALL                     2
+            114 BUILD_LIST               1
+
+292         116 SWAP                     2
+            118 LOAD_CONST               0 (None)
+            120 LOAD_CONST               0 (None)
+            122 LOAD_CONST               0 (None)
+            124 CALL                     2
+            132 POP_TOP
+            134 RETURN_VALUE
+        >>  136 PUSH_EXC_INFO
+            138 WITH_EXCEPT_START
+            140 POP_JUMP_IF_TRUE         1 (to 144)
+            142 RERAISE                  2
+        >>  144 POP_TOP
+            146 POP_EXCEPT
+            148 POP_TOP
+            150 POP_TOP
+            152 RETURN_CONST             0 (None)
+        >>  154 COPY                     3
+            156 POP_EXCEPT
+            158 RERAISE                  1
+ExceptionTable:
+  90 to 114 -> 136 [1] lasti
+  136 to 144 -> 154 [3] lasti
+
+Disassembly of <code object prepare_media_payloads at <address>, file "xiaoguan_classifier\media.py", line 296>:
+296           0 RESUME                   0
+
+297           2 LOAD_FAST                0 (path)
+              4 LOAD_ATTR                0 (suffix)
+             24 LOAD_ATTR                3 (NULL|self + lower)
+             44 CALL                     0
+             52 LOAD_GLOBAL              4 (VIDEO_EXTS)
+             62 CONTAINS_OP              0
+             64 POP_JUMP_IF_FALSE       31 (to 128)
+
+298          66 LOAD_FAST                3 (contact_sheet)
+             68 POP_JUMP_IF_FALSE       15 (to 100)
+
+299          70 LOAD_GLOBAL              7 (NULL + extract_video_contact_sheet)
+             80 LOAD_FAST                0 (path)
+             82 LOAD_FAST                1 (work_dir)
+             84 LOAD_FAST                2 (frame_count)
+             86 LOAD_FAST                4 (smart_frames)
+             88 KW_NAMES                 1 (('frame_count', 'smart'))
+             90 CALL                     4
+             98 RETURN_VALUE
+
+300     >>  100 LOAD_GLOBAL              9 (NULL + extract_video_frames)
+            110 LOAD_FAST                0 (path)
+            112 LOAD_FAST                1 (work_dir)
+            114 LOAD_FAST                2 (frame_count)
+            116 KW_NAMES                 2 (('frame_count',))
+            118 CALL                     3
+            126 RETURN_VALUE
+
+301     >>  128 LOAD_GLOBAL             11 (NULL + prepare_image_payloads)
+            138 LOAD_FAST                0 (path)
+            140 LOAD_FAST                1 (work_dir)
+            142 CALL                     2
+            150 RETURN_VALUE
+
+Disassembly of <code object encode_images_as_data_urls at <address>, file "xiaoguan_classifier\media.py", line 304>:
+304           0 RESUME                   0
+
+305           2 BUILD_LIST               0
+              4 STORE_FAST               1 (urls)
+
+306           6 LOAD_FAST                0 (paths)
+              8 GET_ITER
+        >>   10 FOR_ITER                72 (to 158)
+             14 STORE_FAST               2 (path)
+
+307          16 LOAD_GLOBAL              1 (NULL + base64)
+             26 LOAD_ATTR                2 (b64encode)
+             46 LOAD_FAST                2 (path)
+             48 LOAD_ATTR                5 (NULL|self + read_bytes)
+             68 CALL                     0
+             76 CALL                     1
+             84 LOAD_ATTR                7 (NULL|self + decode)
+            104 LOAD_CONST               1 ('ascii')
+            106 CALL                     1
+            114 STORE_FAST               3 (payload)
+
+308         116 LOAD_FAST                1 (urls)
+            118 LOAD_ATTR                9 (NULL|self + append)
+            138 LOAD_CONST               2 ('data:image/jpeg;base64,')
+            140 LOAD_FAST                3 (payload)
+            142 FORMAT_VALUE             0
+            144 BUILD_STRING             2
+            146 CALL                     1
+            154 POP_TOP
+            156 JUMP_BACKWARD           74 (to 10)
+
+306     >>  158 END_FOR
+
+309         160 LOAD_FAST                1 (urls)
+            162 RETURN_VALUE

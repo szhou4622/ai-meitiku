@@ -1,0 +1,2471 @@
+module: xiaoguan_classifier.shot_splitter
+bytecode: src/xiaoguan_classifier/shot_splitter.pyc
+sha256: 513e744d3244f6b09c392705820bbbabb8b3872bb001098d2e2820569958e2e7
+python: 3.12.14
+source_filename: xiaoguan_classifier\shot_splitter.py
+
+  0           0 RESUME                   0
+
+  1           2 LOAD_CONST               0 (0)
+              4 LOAD_CONST               1 (('annotations',))
+              6 IMPORT_NAME              0 (__future__)
+              8 IMPORT_FROM              1 (annotations)
+             10 STORE_NAME               1 (annotations)
+             12 POP_TOP
+
+  3          14 LOAD_CONST               0 (0)
+             16 LOAD_CONST               2 (None)
+             18 IMPORT_NAME              2 (re)
+             20 STORE_NAME               2 (re)
+
+  4          22 LOAD_CONST               0 (0)
+             24 LOAD_CONST               2 (None)
+             26 IMPORT_NAME              3 (os)
+             28 STORE_NAME               3 (os)
+
+  5          30 LOAD_CONST               0 (0)
+             32 LOAD_CONST               2 (None)
+             34 IMPORT_NAME              4 (csv)
+             36 STORE_NAME               4 (csv)
+
+  6          38 LOAD_CONST               0 (0)
+             40 LOAD_CONST               2 (None)
+             42 IMPORT_NAME              5 (subprocess)
+             44 STORE_NAME               5 (subprocess)
+
+  7          46 LOAD_CONST               0 (0)
+             48 LOAD_CONST               2 (None)
+             50 IMPORT_NAME              6 (sys)
+             52 STORE_NAME               6 (sys)
+
+  8          54 LOAD_CONST               0 (0)
+             56 LOAD_CONST               3 (('ThreadPoolExecutor', 'as_completed'))
+             58 IMPORT_NAME              7 (concurrent.futures)
+             60 IMPORT_FROM              8 (ThreadPoolExecutor)
+             62 STORE_NAME               8 (ThreadPoolExecutor)
+             64 IMPORT_FROM              9 (as_completed)
+             66 STORE_NAME               9 (as_completed)
+             68 POP_TOP
+
+  9          70 LOAD_CONST               0 (0)
+             72 LOAD_CONST               4 (('dataclass',))
+             74 IMPORT_NAME             10 (dataclasses)
+             76 IMPORT_FROM             11 (dataclass)
+             78 STORE_NAME              11 (dataclass)
+             80 POP_TOP
+
+ 10          82 LOAD_CONST               0 (0)
+             84 LOAD_CONST               5 (('datetime',))
+             86 IMPORT_NAME             12 (datetime)
+             88 IMPORT_FROM             12 (datetime)
+             90 STORE_NAME              12 (datetime)
+             92 POP_TOP
+
+ 11          94 LOAD_CONST               0 (0)
+             96 LOAD_CONST               6 (('Path',))
+             98 IMPORT_NAME             13 (pathlib)
+            100 IMPORT_FROM             14 (Path)
+            102 STORE_NAME              14 (Path)
+            104 POP_TOP
+
+ 12         106 LOAD_CONST               0 (0)
+            108 LOAD_CONST               7 (('Event',))
+            110 IMPORT_NAME             15 (threading)
+            112 IMPORT_FROM             16 (Event)
+            114 STORE_NAME              16 (Event)
+            116 POP_TOP
+
+ 13         118 LOAD_CONST               0 (0)
+            120 LOAD_CONST               8 (('Callable',))
+            122 IMPORT_NAME             17 (typing)
+            124 IMPORT_FROM             18 (Callable)
+            126 STORE_NAME              18 (Callable)
+            128 POP_TOP
+
+ 15         130 LOAD_CONST               0 (0)
+            132 LOAD_CONST               2 (None)
+            134 IMPORT_NAME             19 (imageio.v2)
+            136 IMPORT_FROM             20 (v2)
+            138 STORE_NAME              21 (imageio)
+            140 POP_TOP
+
+ 16         142 LOAD_CONST               0 (0)
+            144 LOAD_CONST               2 (None)
+            146 IMPORT_NAME             22 (imageio_ffmpeg)
+            148 STORE_NAME              22 (imageio_ffmpeg)
+
+ 18         150 LOAD_CONST               9 (1)
+            152 LOAD_CONST              10 (('material_shoot_date',))
+            154 IMPORT_NAME             23 (media)
+            156 IMPORT_FROM             24 (material_shoot_date)
+            158 STORE_NAME              24 (material_shoot_date)
+            160 POP_TOP
+
+ 21         162 BUILD_SET                0
+            164 LOAD_CONST              11 (frozenset({'.mov', '.m4v', '.mp4', '.avi'}))
+            166 SET_UPDATE               1
+            168 STORE_NAME              25 (VIDEO_EXTS)
+
+ 22         170 LOAD_CONST              12 (0.24)
+            172 STORE_NAME              26 (STABLE_SCENE_THRESHOLD)
+
+ 23         174 LOAD_CONST              13 (0.8)
+            176 STORE_NAME              27 (STABLE_MIN_SEGMENT_SECONDS)
+
+ 24         178 PUSH_NULL
+            180 LOAD_NAME               28 (max)
+            182 LOAD_CONST               9 (1)
+            184 PUSH_NULL
+            186 LOAD_NAME               29 (min)
+            188 LOAD_CONST              14 (2)
+            190 PUSH_NULL
+            192 LOAD_NAME                3 (os)
+            194 LOAD_ATTR               60 (cpu_count)
+            214 CALL                     0
+            222 COPY                     1
+            224 POP_JUMP_IF_TRUE         2 (to 230)
+            226 POP_TOP
+            228 LOAD_CONST              14 (2)
+        >>  230 CALL                     2
+            238 CALL                     2
+            246 STORE_NAME              31 (SPLIT_EXPORT_WORKERS)
+
+ 25         248 PUSH_NULL
+            250 LOAD_NAME               28 (max)
+            252 LOAD_CONST               9 (1)
+            254 PUSH_NULL
+            256 LOAD_NAME               29 (min)
+            258 LOAD_CONST              14 (2)
+            260 PUSH_NULL
+            262 LOAD_NAME                3 (os)
+            264 LOAD_ATTR               60 (cpu_count)
+            284 CALL                     0
+            292 COPY                     1
+            294 POP_JUMP_IF_TRUE         2 (to 300)
+            296 POP_TOP
+            298 LOAD_CONST              14 (2)
+        >>  300 CALL                     2
+            308 CALL                     2
+            316 STORE_NAME              32 (BATCH_VIDEO_WORKERS)
+
+ 27         318 LOAD_NAME               18 (Callable)
+            320 LOAD_NAME               33 (str)
+            322 BUILD_LIST               1
+            324 LOAD_CONST               2 (None)
+            326 BUILD_TUPLE              2
+            328 BINARY_SUBSCR
+            332 STORE_NAME              34 (ProgressCallback)
+
+ 30         334 LOAD_CONST              38 (('return', 'dict[str, object]'))
+            336 LOAD_CONST              15 (<code object _hidden_subprocess_kwargs at <address>, file "xiaoguan_classifier\shot_splitter.py", line 30>)
+            338 MAKE_FUNCTION            4 (annotations)
+            340 STORE_NAME              35 (_hidden_subprocess_kwargs)
+
+ 41         342 PUSH_NULL
+            344 LOAD_NAME               11 (dataclass)
+            346 LOAD_CONST              16 (True)
+            348 KW_NAMES                17 (('frozen',))
+            350 CALL                     1
+
+ 42         358 PUSH_NULL
+            360 LOAD_BUILD_CLASS
+            362 LOAD_CONST              18 (<code object SplitResult at <address>, file "xiaoguan_classifier\shot_splitter.py", line 41>)
+            364 MAKE_FUNCTION            0
+            366 LOAD_CONST              19 ('SplitResult')
+            368 CALL                     2
+
+ 41         376 CALL                     0
+
+ 42         384 STORE_NAME              36 (SplitResult)
+
+ 48         386 PUSH_NULL
+            388 LOAD_NAME               11 (dataclass)
+            390 LOAD_CONST              16 (True)
+            392 KW_NAMES                17 (('frozen',))
+            394 CALL                     1
+
+ 49         402 PUSH_NULL
+            404 LOAD_BUILD_CLASS
+            406 LOAD_CONST              20 (<code object SplitFailure at <address>, file "xiaoguan_classifier\shot_splitter.py", line 48>)
+            408 MAKE_FUNCTION            0
+            410 LOAD_CONST              21 ('SplitFailure')
+            412 CALL                     2
+
+ 48         420 CALL                     0
+
+ 49         428 STORE_NAME              37 (SplitFailure)
+
+ 55         430 PUSH_NULL
+            432 LOAD_BUILD_CLASS
+            434 LOAD_CONST              22 (<code object BatchSplitError at <address>, file "xiaoguan_classifier\shot_splitter.py", line 55>)
+            436 MAKE_FUNCTION            0
+            438 LOAD_CONST              23 ('BatchSplitError')
+            440 LOAD_NAME               38 (RuntimeError)
+            442 CALL                     3
+            450 STORE_NAME              39 (BatchSplitError)
+
+ 65         452 LOAD_CONST              39 ((None,))
+            454 LOAD_CONST              40 (('pause_event', 'Event | None', 'progress_callback', 'ProgressCallback | None', 'return', 'None'))
+            456 LOAD_CONST              24 (<code object _wait_if_paused at <address>, file "xiaoguan_classifier\shot_splitter.py", line 65>)
+            458 MAKE_FUNCTION            5 (defaults, annotations)
+            460 STORE_NAME              40 (_wait_if_paused)
+
+ 75         462 LOAD_CONST              41 (('folder', 'Path', 'return', 'list[Path]'))
+            464 LOAD_CONST              25 (<code object scan_videos at <address>, file "xiaoguan_classifier\shot_splitter.py", line 75>)
+            466 MAKE_FUNCTION            4 (annotations)
+            468 STORE_NAME              41 (scan_videos)
+
+ 88         470 LOAD_CONST              42 (('path', 'Path', 'return', 'float'))
+            472 LOAD_CONST              26 (<code object get_video_duration at <address>, file "xiaoguan_classifier\shot_splitter.py", line 88>)
+            474 MAKE_FUNCTION            4 (annotations)
+            476 STORE_NAME              42 (get_video_duration)
+
+ 96         478 LOAD_NAME               26 (STABLE_SCENE_THRESHOLD)
+            480 BUILD_TUPLE              1
+            482 LOAD_CONST              43 (('path', 'Path', 'threshold', 'float', 'return', 'list[float]'))
+            484 LOAD_CONST              27 (<code object detect_scene_cuts at <address>, file "xiaoguan_classifier\shot_splitter.py", line 96>)
+            486 MAKE_FUNCTION            5 (defaults, annotations)
+            488 STORE_NAME              43 (detect_scene_cuts)
+
+116         490 LOAD_NAME               27 (STABLE_MIN_SEGMENT_SECONDS)
+            492 BUILD_TUPLE              1
+            494 LOAD_CONST              44 (('cuts', 'list[float]', 'duration', 'float', 'min_segment_seconds', 'float', 'return', 'list[tuple[float, float]]'))
+            496 LOAD_CONST              28 (<code object build_segments at <address>, file "xiaoguan_classifier\shot_splitter.py", line 116>)
+            498 MAKE_FUNCTION            5 (defaults, annotations)
+            500 STORE_NAME              44 (build_segments)
+
+142         502 LOAD_CONST              45 (('seconds', 'float', 'return', 'str'))
+            504 LOAD_CONST              29 (<code object _safe_stamp at <address>, file "xiaoguan_classifier\shot_splitter.py", line 142>)
+            506 MAKE_FUNCTION            4 (annotations)
+            508 STORE_NAME              45 (_safe_stamp)
+
+153         510 LOAD_CONST              46 (('command', 'list[str]', 'return', 'None'))
+            512 LOAD_CONST              30 (<code object _run_ffmpeg at <address>, file "xiaoguan_classifier\shot_splitter.py", line 153>)
+            514 MAKE_FUNCTION            4 (annotations)
+            516 STORE_NAME              46 (_run_ffmpeg)
+
+159         518 LOAD_CONST              47 (('stderr', 'str', 'return', 'str'))
+            520 LOAD_CONST              31 (<code object _friendly_ffmpeg_error at <address>, file "xiaoguan_classifier\shot_splitter.py", line 159>)
+            522 MAKE_FUNCTION            4 (annotations)
+            524 STORE_NAME              47 (_friendly_ffmpeg_error)
+
+179         526 LOAD_CONST              48 (('output_root', 'Path', 'failures', 'list[SplitFailure]', 'return', 'Path | None'))
+            528 LOAD_CONST              32 (<code object _write_failure_csv at <address>, file "xiaoguan_classifier\shot_splitter.py", line 179>)
+            530 MAKE_FUNCTION            4 (annotations)
+            532 STORE_NAME              48 (_write_failure_csv)
+
+191         534 LOAD_CONST              49 (('path', 'Path', 'folder', 'Path', 'return', 'bool'))
+            536 LOAD_CONST              33 (<code object _is_same_or_inside_folder at <address>, file "xiaoguan_classifier\shot_splitter.py", line 191>)
+            538 MAKE_FUNCTION            4 (annotations)
+            540 STORE_NAME              49 (_is_same_or_inside_folder)
+
+199         542 LOAD_CONST              50 (('folder', 'Path', 'output_root', 'Path | None', 'return', 'Path'))
+            544 LOAD_CONST              34 (<code object _resolve_outputs_root at <address>, file "xiaoguan_classifier\shot_splitter.py", line 199>)
+            546 MAKE_FUNCTION            4 (annotations)
+            548 STORE_NAME              50 (_resolve_outputs_root)
+
+212         550 LOAD_CONST              51 (('input_path', 'Path', 'output_path', 'Path', 'start', 'float', 'end', 'float', 'return', 'None'))
+            552 LOAD_CONST              35 (<code object split_clip at <address>, file "xiaoguan_classifier\shot_splitter.py", line 212>)
+            554 MAKE_FUNCTION            4 (annotations)
+            556 STORE_NAME              51 (split_clip)
+
+245         558 LOAD_CONST               2 (None)
+
+246         560 LOAD_CONST               2 (None)
+
+247         562 LOAD_NAME               31 (SPLIT_EXPORT_WORKERS)
+
+242         564 BUILD_TUPLE              3
+
+243         566 NOP
+
+242         568 NOP
+
+244         570 NOP
+
+242         572 NOP
+
+245         574 NOP
+
+242         576 NOP
+
+246         578 NOP
+
+242         580 NOP
+
+247         582 NOP
+
+242         584 NOP
+
+248         586 NOP
+
+242         588 LOAD_CONST              52 (('input_path', 'Path', 'output_root', 'Path', 'progress_callback', 'ProgressCallback | None', 'pause_event', 'Event | None', 'export_workers', 'int', 'return', 'SplitResult'))
+            590 LOAD_CONST              36 (<code object split_video_stable at <address>, file "xiaoguan_classifier\shot_splitter.py", line 242>)
+            592 MAKE_FUNCTION            5 (defaults, annotations)
+            594 STORE_NAME              52 (split_video_stable)
+
+307         596 LOAD_CONST               2 (None)
+
+308         598 LOAD_CONST               2 (None)
+
+309         600 LOAD_CONST               2 (None)
+
+310         602 LOAD_NAME               32 (BATCH_VIDEO_WORKERS)
+
+305         604 BUILD_TUPLE              4
+
+306         606 NOP
+
+305         608 NOP
+
+307         610 NOP
+
+305         612 NOP
+
+308         614 NOP
+
+305         616 NOP
+
+309         618 NOP
+
+305         620 NOP
+
+310         622 NOP
+
+305         624 NOP
+
+311         626 NOP
+
+305         628 LOAD_CONST              53 (('folder', 'Path', 'progress_callback', 'ProgressCallback | None', 'output_root', 'Path | None', 'pause_event', 'Event | None', 'video_workers', 'int', 'return', 'list[SplitResult]'))
+            630 LOAD_CONST              37 (<code object split_folder_stable at <address>, file "xiaoguan_classifier\shot_splitter.py", line 305>)
+            632 MAKE_FUNCTION            5 (defaults, annotations)
+            634 STORE_NAME              53 (split_folder_stable)
+            636 RETURN_CONST             2 (None)
+
+Disassembly of <code object _hidden_subprocess_kwargs at <address>, file "xiaoguan_classifier\shot_splitter.py", line 30>:
+ 30           0 RESUME                   0
+
+ 31           2 LOAD_GLOBAL              0 (sys)
+             12 LOAD_ATTR                2 (platform)
+             32 LOAD_CONST               1 ('win32')
+             34 COMPARE_OP              55 (!=)
+             38 POP_JUMP_IF_FALSE        2 (to 44)
+
+ 32          40 BUILD_MAP                0
+             42 RETURN_VALUE
+
+ 33     >>   44 LOAD_GLOBAL              5 (NULL + subprocess)
+             54 LOAD_ATTR                6 (STARTUPINFO)
+             74 CALL                     0
+             82 STORE_FAST               0 (startupinfo)
+
+ 34          84 LOAD_FAST                0 (startupinfo)
+             86 COPY                     1
+             88 LOAD_ATTR                8 (dwFlags)
+            108 LOAD_GLOBAL              4 (subprocess)
+            118 LOAD_ATTR               10 (STARTF_USESHOWWINDOW)
+            138 BINARY_OP               20 (|=)
+            142 SWAP                     2
+            144 STORE_ATTR               4 (dwFlags)
+
+ 36         154 LOAD_GLOBAL              4 (subprocess)
+            164 LOAD_ATTR               12 (CREATE_NO_WINDOW)
+
+ 37         184 LOAD_FAST                0 (startupinfo)
+
+ 35         186 LOAD_CONST               2 (('creationflags', 'startupinfo'))
+            188 BUILD_CONST_KEY_MAP      2
+            190 RETURN_VALUE
+
+Disassembly of <code object SplitResult at <address>, file "xiaoguan_classifier\shot_splitter.py", line 41>:
+ 41           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('SplitResult')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 43          12 LOAD_CONST               1 ('Path')
+             14 LOAD_NAME                3 (__annotations__)
+             16 LOAD_CONST               2 ('source')
+             18 STORE_SUBSCR
+
+ 44          22 LOAD_CONST               1 ('Path')
+             24 LOAD_NAME                3 (__annotations__)
+             26 LOAD_CONST               3 ('output_dir')
+             28 STORE_SUBSCR
+
+ 45          32 LOAD_CONST               4 ('int')
+             34 LOAD_NAME                3 (__annotations__)
+             36 LOAD_CONST               5 ('segment_count')
+             38 STORE_SUBSCR
+             42 RETURN_CONST             6 (None)
+
+Disassembly of <code object SplitFailure at <address>, file "xiaoguan_classifier\shot_splitter.py", line 48>:
+ 48           0 RESUME                   0
+              2 LOAD_NAME                0 (__name__)
+              4 STORE_NAME               1 (__module__)
+              6 LOAD_CONST               0 ('SplitFailure')
+              8 STORE_NAME               2 (__qualname__)
+             10 SETUP_ANNOTATIONS
+
+ 50          12 LOAD_CONST               1 ('Path')
+             14 LOAD_NAME                3 (__annotations__)
+             16 LOAD_CONST               2 ('source')
+             18 STORE_SUBSCR
+
+ 51          22 LOAD_CONST               3 ('str')
+             24 LOAD_NAME                3 (__annotations__)
+             26 LOAD_CONST               4 ('reason')
+             28 STORE_SUBSCR
+
+ 52          32 LOAD_CONST               3 ('str')
+             34 LOAD_NAME                3 (__annotations__)
+             36 LOAD_CONST               5 ('detail')
+             38 STORE_SUBSCR
+             42 RETURN_CONST             6 (None)
+
+Disassembly of <code object BatchSplitError at <address>, file "xiaoguan_classifier\shot_splitter.py", line 55>:
+              0 MAKE_CELL                0 (__class__)
+
+ 55           2 RESUME                   0
+              4 LOAD_NAME                0 (__name__)
+              6 STORE_NAME               1 (__module__)
+              8 LOAD_CONST               0 ('BatchSplitError')
+             10 STORE_NAME               2 (__qualname__)
+
+ 56          12 LOAD_CONST               2 ((None,))
+             14 LOAD_CONST               3 (('failures', 'list[SplitFailure]', 'failure_csv', 'Path | None'))
+             16 LOAD_CLOSURE             0 (__class__)
+             18 BUILD_TUPLE              1
+             20 LOAD_CONST               1 (<code object __init__ at <address>, file "xiaoguan_classifier\shot_splitter.py", line 56>)
+             22 MAKE_FUNCTION           13 (defaults, annotations, closure)
+             24 STORE_NAME               3 (__init__)
+             26 LOAD_CLOSURE             0 (__class__)
+             28 COPY                     1
+             30 STORE_NAME               4 (__classcell__)
+             32 RETURN_VALUE
+
+Disassembly of <code object __init__ at <address>, file "xiaoguan_classifier\shot_splitter.py", line 56>:
+              0 COPY_FREE_VARS           1
+
+ 56           2 RESUME                   0
+
+ 57           4 LOAD_FAST                1 (failures)
+              6 LOAD_FAST                0 (self)
+              8 STORE_ATTR               0 (failures)
+
+ 58          18 LOAD_FAST                2 (failure_csv)
+             20 LOAD_FAST                0 (self)
+             22 STORE_ATTR               1 (failure_csv)
+
+ 59          32 LOAD_CONST               1 ('共有 ')
+             34 LOAD_GLOBAL              5 (NULL + len)
+             44 LOAD_FAST                1 (failures)
+             46 CALL                     1
+             54 FORMAT_VALUE             0
+             56 LOAD_CONST               2 (' 条视频拆解失败')
+             58 BUILD_STRING             3
+             60 STORE_FAST               3 (message)
+
+ 60          62 LOAD_FAST                2 (failure_csv)
+             64 POP_JUMP_IF_FALSE        8 (to 82)
+
+ 61          66 LOAD_FAST                3 (message)
+             68 LOAD_CONST               3 ('，失败清单：')
+             70 LOAD_FAST                2 (failure_csv)
+             72 FORMAT_VALUE             0
+             74 BUILD_STRING             2
+             76 BINARY_OP               13 (+=)
+             80 STORE_FAST               3 (message)
+
+ 62     >>   82 LOAD_GLOBAL              6 (super)
+             92 LOAD_DEREF               4 (__class__)
+             94 LOAD_FAST                0 (self)
+             96 LOAD_SUPER_ATTR         17 (NULL|self + __init__)
+            100 LOAD_FAST                3 (message)
+            102 CALL                     1
+            110 POP_TOP
+            112 RETURN_CONST             0 (None)
+
+Disassembly of <code object _wait_if_paused at <address>, file "xiaoguan_classifier\shot_splitter.py", line 65>:
+ 65           0 RESUME                   0
+
+ 66           2 LOAD_FAST                0 (pause_event)
+              4 POP_JUMP_IF_NONE        16 (to 38)
+              6 LOAD_FAST                0 (pause_event)
+              8 LOAD_ATTR                1 (NULL|self + is_set)
+             28 CALL                     0
+             36 POP_JUMP_IF_FALSE        1 (to 40)
+
+ 67     >>   38 RETURN_CONST             0 (None)
+
+ 68     >>   40 LOAD_FAST                1 (progress_callback)
+             42 POP_JUMP_IF_FALSE        8 (to 60)
+
+ 69          44 PUSH_NULL
+             46 LOAD_FAST                1 (progress_callback)
+             48 LOAD_CONST               1 ('已暂停，等待继续...')
+             50 CALL                     1
+             58 POP_TOP
+
+ 70     >>   60 LOAD_FAST                0 (pause_event)
+             62 LOAD_ATTR                3 (NULL|self + wait)
+             82 CALL                     0
+             90 POP_TOP
+
+ 71          92 LOAD_FAST                1 (progress_callback)
+             94 POP_JUMP_IF_FALSE        9 (to 114)
+
+ 72          96 PUSH_NULL
+             98 LOAD_FAST                1 (progress_callback)
+            100 LOAD_CONST               2 ('继续运行。')
+            102 CALL                     1
+            110 POP_TOP
+            112 RETURN_CONST             0 (None)
+
+ 71     >>  114 RETURN_CONST             0 (None)
+
+Disassembly of <code object scan_videos at <address>, file "xiaoguan_classifier\shot_splitter.py", line 75>:
+ 75           0 RESUME                   0
+
+ 76           2 LOAD_FAST                0 (folder)
+              4 LOAD_ATTR                1 (NULL|self + resolve)
+             24 CALL                     0
+             32 STORE_FAST               0 (folder)
+
+ 77          34 BUILD_LIST               0
+             36 STORE_FAST               1 (videos)
+
+ 78          38 LOAD_FAST                0 (folder)
+             40 LOAD_ATTR                3 (NULL|self + rglob)
+             60 LOAD_CONST               1 ('*')
+             62 CALL                     1
+             70 GET_ITER
+        >>   72 FOR_ITER               128 (to 332)
+             76 STORE_FAST               2 (path)
+
+ 79          78 LOAD_FAST                2 (path)
+             80 LOAD_ATTR                5 (NULL|self + is_file)
+            100 CALL                     0
+            108 POP_JUMP_IF_FALSE       32 (to 174)
+            110 LOAD_FAST                2 (path)
+            112 LOAD_ATTR                6 (suffix)
+            132 LOAD_ATTR                9 (NULL|self + lower)
+            152 CALL                     0
+            160 LOAD_GLOBAL             10 (VIDEO_EXTS)
+            170 CONTAINS_OP              1
+            172 POP_JUMP_IF_FALSE        1 (to 176)
+
+ 80     >>  174 JUMP_BACKWARD           52 (to 72)
+
+ 81     >>  176 LOAD_FAST                2 (path)
+            178 LOAD_ATTR               13 (NULL|self + relative_to)
+            198 LOAD_FAST                0 (folder)
+            200 CALL                     1
+            208 LOAD_ATTR               14 (parts)
+            228 STORE_FAST               3 (relative_parts)
+
+ 82         230 LOAD_GLOBAL             17 (NULL + any)
+            240 LOAD_CONST               2 (<code object <genexpr> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 82>)
+            242 MAKE_FUNCTION            0
+            244 LOAD_FAST                3 (relative_parts)
+            246 GET_ITER
+            248 CALL                     0
+            256 CALL                     1
+            264 POP_JUMP_IF_FALSE        1 (to 268)
+
+ 83         266 JUMP_BACKWARD           98 (to 72)
+
+ 84     >>  268 LOAD_FAST                1 (videos)
+            270 LOAD_ATTR               19 (NULL|self + append)
+            290 LOAD_FAST                2 (path)
+            292 LOAD_ATTR                1 (NULL|self + resolve)
+            312 CALL                     0
+            320 CALL                     1
+            328 POP_TOP
+            330 JUMP_BACKWARD          130 (to 72)
+
+ 78     >>  332 END_FOR
+
+ 85         334 LOAD_GLOBAL             21 (NULL + sorted)
+            344 LOAD_FAST                1 (videos)
+            346 LOAD_CONST               3 (<code object <lambda> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 85>)
+            348 MAKE_FUNCTION            0
+            350 KW_NAMES                 4 (('key',))
+            352 CALL                     2
+            360 RETURN_VALUE
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 82>:
+ 82           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                 8 (to 28)
+             12 STORE_FAST               1 (part)
+             14 LOAD_FAST                1 (part)
+             16 LOAD_CONST               0 (frozenset({'outputs', 'work'}))
+             18 CONTAINS_OP              0
+             20 YIELD_VALUE              1
+             22 RESUME                   1
+             24 POP_TOP
+             26 JUMP_BACKWARD           10 (to 8)
+        >>   28 END_FOR
+             30 RETURN_CONST             1 (None)
+        >>   32 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             34 RERAISE                  1
+ExceptionTable:
+  4 to 30 -> 32 [0] lasti
+
+Disassembly of <code object <lambda> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 85>:
+ 85           0 RESUME                   0
+              2 LOAD_GLOBAL              1 (NULL + str)
+             12 LOAD_FAST                0 (item)
+             14 CALL                     1
+             22 LOAD_ATTR                3 (NULL|self + lower)
+             42 CALL                     0
+             50 RETURN_VALUE
+
+Disassembly of <code object get_video_duration at <address>, file "xiaoguan_classifier\shot_splitter.py", line 88>:
+ 88           0 RESUME                   0
+
+ 89           2 LOAD_GLOBAL              1 (NULL + imageio)
+             12 LOAD_ATTR                2 (get_reader)
+             32 LOAD_GLOBAL              5 (NULL + str)
+             42 LOAD_FAST                0 (path)
+             44 CALL                     1
+             52 LOAD_CONST               1 ('ffmpeg')
+             54 CALL                     2
+             62 STORE_FAST               1 (reader)
+
+ 90          64 NOP
+
+ 91          66 LOAD_GLOBAL              7 (NULL + float)
+             76 LOAD_FAST                1 (reader)
+             78 LOAD_ATTR                9 (NULL|self + get_meta_data)
+             98 CALL                     0
+            106 LOAD_CONST               2 ('duration')
+            108 BINARY_SUBSCR
+            112 CALL                     1
+
+ 93         120 LOAD_FAST                1 (reader)
+            122 LOAD_ATTR               11 (NULL|self + close)
+            142 CALL                     0
+            150 POP_TOP
+            152 RETURN_VALUE
+        >>  154 PUSH_EXC_INFO
+            156 LOAD_FAST                1 (reader)
+            158 LOAD_ATTR               11 (NULL|self + close)
+            178 CALL                     0
+            186 POP_TOP
+            188 RERAISE                  0
+        >>  190 COPY                     3
+            192 POP_EXCEPT
+            194 RERAISE                  1
+ExceptionTable:
+  66 to 118 -> 154 [0]
+  154 to 188 -> 190 [1] lasti
+
+Disassembly of <code object detect_scene_cuts at <address>, file "xiaoguan_classifier\shot_splitter.py", line 96>:
+ 96           0 RESUME                   0
+
+ 97           2 LOAD_GLOBAL              1 (NULL + imageio_ffmpeg)
+             12 LOAD_ATTR                2 (get_ffmpeg_exe)
+             32 CALL                     0
+             40 STORE_FAST               2 (ffmpeg)
+
+ 99          42 LOAD_FAST                2 (ffmpeg)
+
+100          44 LOAD_CONST               1 ('-hide_banner')
+
+101          46 LOAD_CONST               2 ('-i')
+
+102          48 LOAD_GLOBAL              5 (NULL + str)
+             58 LOAD_FAST                0 (path)
+             60 CALL                     1
+
+103          68 LOAD_CONST               3 ('-vf')
+
+104          70 LOAD_CONST               4 ("select='gt(scene,")
+             72 LOAD_FAST                1 (threshold)
+             74 FORMAT_VALUE             0
+             76 LOAD_CONST               5 (")',showinfo")
+             78 BUILD_STRING             3
+
+105          80 LOAD_CONST               6 ('-an')
+
+106          82 LOAD_CONST               7 ('-f')
+
+107          84 LOAD_CONST               8 ('null')
+
+108          86 LOAD_CONST               9 ('-')
+
+ 98          88 BUILD_LIST              10
+             90 STORE_FAST               3 (command)
+
+110          92 LOAD_GLOBAL              7 (NULL + subprocess)
+            102 LOAD_ATTR                8 (run)
+            122 LOAD_FAST                3 (command)
+            124 BUILD_TUPLE              1
+            126 LOAD_CONST              10 (True)
+            128 LOAD_CONST              10 (True)
+            130 LOAD_CONST              11 ('utf-8')
+            132 LOAD_CONST              12 ('ignore')
+            134 LOAD_CONST              13 (('capture_output', 'text', 'encoding', 'errors'))
+            136 BUILD_CONST_KEY_MAP      4
+            138 LOAD_GLOBAL             11 (NULL + _hidden_subprocess_kwargs)
+            148 CALL                     0
+            156 DICT_MERGE               1
+            158 CALL_FUNCTION_EX         1
+            160 STORE_FAST               4 (result)
+
+111         162 LOAD_FAST                4 (result)
+            164 LOAD_ATTR               12 (returncode)
+            184 LOAD_CONST              14 (frozenset({0, 1}))
+            186 CONTAINS_OP              1
+            188 POP_JUMP_IF_FALSE       30 (to 250)
+
+112         190 LOAD_GLOBAL             15 (NULL + RuntimeError)
+            200 LOAD_GLOBAL             17 (NULL + _friendly_ffmpeg_error)
+            210 LOAD_FAST                4 (result)
+            212 LOAD_ATTR               18 (stderr)
+            232 CALL                     1
+            240 CALL                     1
+            248 RAISE_VARARGS            1
+
+113     >>  250 LOAD_GLOBAL             21 (NULL + re)
+            260 LOAD_ATTR               22 (finditer)
+            280 LOAD_CONST              15 ('pts_time:([0-9.]+)')
+            282 LOAD_FAST                4 (result)
+            284 LOAD_ATTR               18 (stderr)
+            304 CALL                     2
+            312 GET_ITER
+            314 LOAD_FAST_AND_CLEAR      5 (match)
+            316 SWAP                     2
+            318 BUILD_LIST               0
+            320 SWAP                     2
+        >>  322 FOR_ITER                28 (to 382)
+            326 STORE_FAST               5 (match)
+            328 LOAD_GLOBAL             25 (NULL + float)
+            338 LOAD_FAST                5 (match)
+            340 LOAD_ATTR               27 (NULL|self + group)
+            360 LOAD_CONST              16 (1)
+            362 CALL                     1
+            370 CALL                     1
+            378 LIST_APPEND              2
+            380 JUMP_BACKWARD           30 (to 322)
+        >>  382 END_FOR
+            384 SWAP                     2
+            386 STORE_FAST               5 (match)
+            388 RETURN_VALUE
+        >>  390 SWAP                     2
+            392 POP_TOP
+            394 SWAP                     2
+            396 STORE_FAST               5 (match)
+            398 RERAISE                  0
+ExceptionTable:
+  318 to 382 -> 390 [2]
+
+Disassembly of <code object build_segments at <address>, file "xiaoguan_classifier\shot_splitter.py", line 116>:
+116           0 RESUME                   0
+
+117           2 BUILD_LIST               0
+              4 STORE_FAST               3 (clean)
+
+118           6 LOAD_GLOBAL              1 (NULL + sorted)
+             16 LOAD_GLOBAL              3 (NULL + set)
+             26 LOAD_CONST               1 (<code object <genexpr> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 118>)
+             28 MAKE_FUNCTION            0
+             30 LOAD_FAST                0 (cuts)
+             32 GET_ITER
+             34 CALL                     0
+             42 CALL                     1
+             50 CALL                     1
+             58 GET_ITER
+        >>   60 FOR_ITER                47 (to 158)
+             64 STORE_FAST               4 (time)
+
+119          66 LOAD_FAST                4 (time)
+             68 LOAD_CONST               2 (0.5)
+             70 COMPARE_OP               2 (<)
+             74 POP_JUMP_IF_TRUE         8 (to 92)
+             76 LOAD_FAST                1 (duration)
+             78 LOAD_FAST                4 (time)
+             80 BINARY_OP               10 (-)
+             84 LOAD_CONST               2 (0.5)
+             86 COMPARE_OP               2 (<)
+             90 POP_JUMP_IF_FALSE        1 (to 94)
+
+120     >>   92 JUMP_BACKWARD           17 (to 60)
+
+121     >>   94 LOAD_FAST                3 (clean)
+             96 POP_JUMP_IF_FALSE       12 (to 122)
+             98 LOAD_FAST                4 (time)
+            100 LOAD_FAST                3 (clean)
+            102 LOAD_CONST               3 (-1)
+            104 BINARY_SUBSCR
+            108 BINARY_OP               10 (-)
+            112 LOAD_FAST                2 (min_segment_seconds)
+            114 COMPARE_OP               2 (<)
+            118 POP_JUMP_IF_FALSE        1 (to 122)
+
+122         120 JUMP_BACKWARD           31 (to 60)
+
+123     >>  122 LOAD_FAST                3 (clean)
+            124 LOAD_ATTR                5 (NULL|self + append)
+            144 LOAD_FAST                4 (time)
+            146 CALL                     1
+            154 POP_TOP
+            156 JUMP_BACKWARD           49 (to 60)
+
+118     >>  158 END_FOR
+
+125         160 LOAD_CONST               4 (0.0)
+            162 BUILD_LIST               1
+            164 LOAD_FAST                3 (clean)
+            166 BINARY_OP                0 (+)
+            170 LOAD_GLOBAL              7 (NULL + round)
+            180 LOAD_FAST                1 (duration)
+            182 LOAD_CONST               5 (3)
+            184 CALL                     2
+            192 BUILD_LIST               1
+            194 BINARY_OP                0 (+)
+            198 STORE_FAST               5 (bounds)
+
+126         200 LOAD_GLOBAL              9 (NULL + range)
+            210 LOAD_GLOBAL             11 (NULL + len)
+            220 LOAD_FAST                5 (bounds)
+            222 CALL                     1
+            230 LOAD_CONST               6 (1)
+            232 BINARY_OP               10 (-)
+            236 CALL                     1
+            244 GET_ITER
+            246 LOAD_FAST_AND_CLEAR      6 (i)
+            248 SWAP                     2
+            250 BUILD_LIST               0
+            252 SWAP                     2
+        >>  254 FOR_ITER                15 (to 288)
+            258 STORE_FAST               6 (i)
+            260 LOAD_FAST                5 (bounds)
+            262 LOAD_FAST                6 (i)
+            264 BINARY_SUBSCR
+            268 LOAD_FAST                5 (bounds)
+            270 LOAD_FAST                6 (i)
+            272 LOAD_CONST               6 (1)
+            274 BINARY_OP                0 (+)
+            278 BINARY_SUBSCR
+            282 BUILD_TUPLE              2
+            284 LIST_APPEND              2
+            286 JUMP_BACKWARD           17 (to 254)
+        >>  288 END_FOR
+            290 STORE_FAST               7 (segments)
+            292 STORE_FAST               6 (i)
+
+127         294 BUILD_LIST               0
+            296 STORE_FAST               8 (merged)
+
+128         298 LOAD_FAST                7 (segments)
+            300 GET_ITER
+        >>  302 FOR_ITER                50 (to 406)
+            306 UNPACK_SEQUENCE          2
+            310 STORE_FAST               9 (start)
+            312 STORE_FAST              10 (end)
+
+129         314 LOAD_FAST               10 (end)
+            316 LOAD_FAST                9 (start)
+            318 BINARY_OP               10 (-)
+            322 LOAD_FAST                2 (min_segment_seconds)
+            324 COMPARE_OP               2 (<)
+            328 POP_JUMP_IF_FALSE       18 (to 366)
+            330 LOAD_FAST                8 (merged)
+            332 POP_JUMP_IF_FALSE       16 (to 366)
+
+130         334 LOAD_FAST                8 (merged)
+            336 LOAD_CONST               3 (-1)
+            338 BINARY_SUBSCR
+            342 UNPACK_SEQUENCE          2
+            346 STORE_FAST              11 (old_start)
+            348 STORE_FAST              12 (_old_end)
+
+131         350 LOAD_FAST               11 (old_start)
+            352 LOAD_FAST               10 (end)
+            354 BUILD_TUPLE              2
+            356 LOAD_FAST                8 (merged)
+            358 LOAD_CONST               3 (-1)
+            360 STORE_SUBSCR
+            364 JUMP_BACKWARD           32 (to 302)
+
+133     >>  366 LOAD_FAST                8 (merged)
+            368 LOAD_ATTR                5 (NULL|self + append)
+            388 LOAD_FAST                9 (start)
+            390 LOAD_FAST               10 (end)
+            392 BUILD_TUPLE              2
+            394 CALL                     1
+            402 POP_TOP
+            404 JUMP_BACKWARD           52 (to 302)
+
+128     >>  406 END_FOR
+
+134         408 LOAD_GLOBAL             11 (NULL + len)
+            418 LOAD_FAST                8 (merged)
+            420 CALL                     1
+            428 LOAD_CONST               7 (2)
+            430 COMPARE_OP              92 (>=)
+            434 POP_JUMP_IF_FALSE       59 (to 554)
+            436 LOAD_FAST                8 (merged)
+            438 LOAD_CONST               3 (-1)
+            440 BINARY_SUBSCR
+            444 LOAD_CONST               6 (1)
+            446 BINARY_SUBSCR
+            450 LOAD_FAST                8 (merged)
+            452 LOAD_CONST               3 (-1)
+            454 BINARY_SUBSCR
+            458 LOAD_CONST               8 (0)
+            460 BINARY_SUBSCR
+            464 BINARY_OP               10 (-)
+            468 LOAD_FAST                2 (min_segment_seconds)
+            470 COMPARE_OP               2 (<)
+            474 POP_JUMP_IF_FALSE       39 (to 554)
+
+135         476 LOAD_FAST                8 (merged)
+            478 LOAD_CONST               9 (-2)
+            480 BINARY_SUBSCR
+            484 UNPACK_SEQUENCE          2
+            488 STORE_FAST              13 (prev_start)
+            490 STORE_FAST              14 (_prev_end)
+
+136         492 LOAD_FAST                8 (merged)
+            494 LOAD_CONST               3 (-1)
+            496 BINARY_SUBSCR
+            500 UNPACK_SEQUENCE          2
+            504 STORE_FAST              15 (_last_start)
+            506 STORE_FAST              16 (last_end)
+
+137         508 LOAD_FAST               13 (prev_start)
+            510 LOAD_FAST               16 (last_end)
+            512 BUILD_TUPLE              2
+            514 LOAD_FAST                8 (merged)
+            516 LOAD_CONST               9 (-2)
+            518 STORE_SUBSCR
+
+138         522 LOAD_FAST                8 (merged)
+            524 LOAD_ATTR               13 (NULL|self + pop)
+            544 CALL                     0
+            552 POP_TOP
+
+139     >>  554 LOAD_FAST                8 (merged)
+            556 RETURN_VALUE
+        >>  558 SWAP                     2
+            560 POP_TOP
+
+126         562 SWAP                     2
+            564 STORE_FAST               6 (i)
+            566 RERAISE                  0
+ExceptionTable:
+  250 to 288 -> 558 [2]
+
+Disassembly of <code object <genexpr> at <address>, file "xiaoguan_classifier\shot_splitter.py", line 118>:
+118           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                16 (to 44)
+             12 STORE_FAST               1 (cut)
+             14 LOAD_GLOBAL              1 (NULL + round)
+             24 LOAD_FAST                1 (cut)
+             26 LOAD_CONST               0 (3)
+             28 CALL                     2
+             36 YIELD_VALUE              1
+             38 RESUME                   1
+             40 POP_TOP
+             42 JUMP_BACKWARD           18 (to 8)
+        >>   44 END_FOR
+             46 RETURN_CONST             1 (None)
+        >>   48 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             50 RERAISE                  1
+ExceptionTable:
+  4 to 46 -> 48 [0] lasti
+
+Disassembly of <code object _safe_stamp at <address>, file "xiaoguan_classifier\shot_splitter.py", line 142>:
+142           0 RESUME                   0
+
+143           2 LOAD_GLOBAL              1 (NULL + int)
+             12 LOAD_GLOBAL              3 (NULL + round)
+             22 LOAD_FAST                0 (seconds)
+             24 LOAD_CONST               1 (1000)
+             26 BINARY_OP                5 (*)
+             30 CALL                     1
+             38 CALL                     1
+             46 STORE_FAST               1 (total_ms)
+
+144          48 LOAD_FAST                1 (total_ms)
+             50 LOAD_CONST               1 (1000)
+             52 BINARY_OP                6 (%)
+             56 STORE_FAST               2 (ms)
+
+145          58 LOAD_FAST                1 (total_ms)
+             60 LOAD_CONST               1 (1000)
+             62 BINARY_OP                2 (//)
+             66 STORE_FAST               3 (total_s)
+
+146          68 LOAD_FAST                3 (total_s)
+             70 LOAD_CONST               2 (60)
+             72 BINARY_OP                6 (%)
+             76 STORE_FAST               4 (s)
+
+147          78 LOAD_FAST                3 (total_s)
+             80 LOAD_CONST               2 (60)
+             82 BINARY_OP                2 (//)
+             86 STORE_FAST               5 (total_m)
+
+148          88 LOAD_FAST                5 (total_m)
+             90 LOAD_CONST               2 (60)
+             92 BINARY_OP                6 (%)
+             96 STORE_FAST               6 (m)
+
+149          98 LOAD_FAST                5 (total_m)
+            100 LOAD_CONST               2 (60)
+            102 BINARY_OP                2 (//)
+            106 STORE_FAST               7 (h)
+
+150         108 LOAD_FAST                7 (h)
+            110 LOAD_CONST               3 ('02d')
+            112 FORMAT_VALUE             4 (with format)
+            114 LOAD_FAST                6 (m)
+            116 LOAD_CONST               3 ('02d')
+            118 FORMAT_VALUE             4 (with format)
+            120 LOAD_FAST                4 (s)
+            122 LOAD_CONST               3 ('02d')
+            124 FORMAT_VALUE             4 (with format)
+            126 LOAD_FAST                2 (ms)
+            128 LOAD_CONST               4 ('03d')
+            130 FORMAT_VALUE             4 (with format)
+            132 BUILD_STRING             4
+            134 RETURN_VALUE
+
+Disassembly of <code object _run_ffmpeg at <address>, file "xiaoguan_classifier\shot_splitter.py", line 153>:
+153           0 RESUME                   0
+
+154           2 LOAD_GLOBAL              1 (NULL + subprocess)
+             12 LOAD_ATTR                2 (run)
+             32 LOAD_FAST                0 (command)
+             34 BUILD_TUPLE              1
+             36 LOAD_CONST               1 (True)
+             38 LOAD_CONST               1 (True)
+             40 LOAD_CONST               2 ('utf-8')
+             42 LOAD_CONST               3 ('ignore')
+             44 LOAD_CONST               4 (('capture_output', 'text', 'encoding', 'errors'))
+             46 BUILD_CONST_KEY_MAP      4
+             48 LOAD_GLOBAL              5 (NULL + _hidden_subprocess_kwargs)
+             58 CALL                     0
+             66 DICT_MERGE               1
+             68 CALL_FUNCTION_EX         1
+             70 STORE_FAST               1 (result)
+
+155          72 LOAD_FAST                1 (result)
+             74 LOAD_ATTR                6 (returncode)
+             94 LOAD_CONST               5 (0)
+             96 COMPARE_OP              55 (!=)
+            100 POP_JUMP_IF_FALSE       30 (to 162)
+
+156         102 LOAD_GLOBAL              9 (NULL + RuntimeError)
+            112 LOAD_GLOBAL             11 (NULL + _friendly_ffmpeg_error)
+            122 LOAD_FAST                1 (result)
+            124 LOAD_ATTR               12 (stderr)
+            144 CALL                     1
+            152 CALL                     1
+            160 RAISE_VARARGS            1
+
+155     >>  162 RETURN_CONST             0 (None)
+
+Disassembly of <code object _friendly_ffmpeg_error at <address>, file "xiaoguan_classifier\shot_splitter.py", line 159>:
+159           0 RESUME                   0
+
+160           2 LOAD_FAST                0 (stderr)
+              4 LOAD_ATTR                1 (NULL|self + strip)
+             24 CALL                     0
+             32 LOAD_CONST               1 (-1200)
+             34 LOAD_CONST               0 (None)
+             36 BINARY_SLICE
+             38 COPY                     1
+             40 POP_JUMP_IF_TRUE         2 (to 46)
+             42 POP_TOP
+             44 LOAD_CONST               2 ('ffmpeg 没有返回详细错误。')
+        >>   46 STORE_FAST               1 (detail)
+
+161          48 LOAD_FAST                1 (detail)
+             50 LOAD_ATTR                3 (NULL|self + lower)
+             70 CALL                     0
+             78 STORE_FAST               2 (lower)
+
+162          80 LOAD_CONST               3 ('no such file or directory')
+             82 LOAD_FAST                2 (lower)
+             84 CONTAINS_OP              0
+             86 POP_JUMP_IF_FALSE        3 (to 94)
+
+163          88 LOAD_CONST               4 ('找不到视频文件或输出路径不存在，可能是文件被移动、路径太长，或文件名含特殊字符。')
+             90 STORE_FAST               3 (reason)
+             92 JUMP_FORWARD            45 (to 184)
+
+164     >>   94 LOAD_CONST               5 ('permission denied')
+             96 LOAD_FAST                2 (lower)
+             98 CONTAINS_OP              0
+            100 POP_JUMP_IF_FALSE        3 (to 108)
+
+165         102 LOAD_CONST               6 ('没有权限读写该文件，可能是视频正在被别的软件占用，或输出目录没有写入权限。')
+            104 STORE_FAST               3 (reason)
+            106 JUMP_FORWARD            38 (to 184)
+
+166     >>  108 LOAD_CONST               7 ('invalid data found')
+            110 LOAD_FAST                2 (lower)
+            112 CONTAINS_OP              0
+            114 POP_JUMP_IF_TRUE         4 (to 124)
+            116 LOAD_CONST               8 ('moov atom not found')
+            118 LOAD_FAST                2 (lower)
+            120 CONTAINS_OP              0
+            122 POP_JUMP_IF_FALSE        3 (to 130)
+
+167     >>  124 LOAD_CONST               9 ('视频文件可能损坏，或不是标准视频格式。')
+            126 STORE_FAST               3 (reason)
+            128 JUMP_FORWARD            27 (to 184)
+
+168     >>  130 LOAD_CONST              10 ('no space left')
+            132 LOAD_FAST                2 (lower)
+            134 CONTAINS_OP              0
+            136 POP_JUMP_IF_FALSE        3 (to 144)
+
+169         138 LOAD_CONST              11 ('磁盘空间不足，无法继续导出切片。')
+            140 STORE_FAST               3 (reason)
+            142 JUMP_FORWARD            20 (to 184)
+
+170     >>  144 LOAD_CONST              12 ('error opening output')
+            146 LOAD_FAST                2 (lower)
+            148 CONTAINS_OP              0
+            150 POP_JUMP_IF_TRUE         4 (to 160)
+            152 LOAD_CONST              13 ('unable to choose an output format')
+            154 LOAD_FAST                2 (lower)
+            156 CONTAINS_OP              0
+            158 POP_JUMP_IF_FALSE        3 (to 166)
+
+171     >>  160 LOAD_CONST              14 ('输出文件创建失败，可能是输出路径过长、文件名异常，或目录不可写。')
+            162 STORE_FAST               3 (reason)
+            164 JUMP_FORWARD             9 (to 184)
+
+172     >>  166 LOAD_CONST              15 ('could not find codec parameters')
+            168 LOAD_FAST                2 (lower)
+            170 CONTAINS_OP              0
+            172 POP_JUMP_IF_FALSE        3 (to 180)
+
+173         174 LOAD_CONST              16 ('视频编码信息读取失败，可能是素材编码不标准或文件不完整。')
+            176 STORE_FAST               3 (reason)
+            178 JUMP_FORWARD             2 (to 184)
+
+175     >>  180 LOAD_CONST              17 ('视频拆解失败，可能是视频编码不兼容、文件损坏、路径异常，或电脑资源临时不足。')
+            182 STORE_FAST               3 (reason)
+
+176     >>  184 LOAD_FAST                3 (reason)
+            186 FORMAT_VALUE             0
+            188 LOAD_CONST              18 ('\n原始信息：')
+            190 LOAD_FAST                1 (detail)
+            192 FORMAT_VALUE             0
+            194 BUILD_STRING             3
+            196 RETURN_VALUE
+
+Disassembly of <code object _write_failure_csv at <address>, file "xiaoguan_classifier\shot_splitter.py", line 179>:
+179           0 RESUME                   0
+
+180           2 LOAD_FAST                1 (failures)
+              4 POP_JUMP_IF_TRUE         1 (to 8)
+
+181           6 RETURN_CONST             0 (None)
+
+182     >>    8 LOAD_FAST                0 (output_root)
+             10 LOAD_CONST               1 ('拆镜头失败清单_')
+             12 LOAD_GLOBAL              1 (NULL + datetime)
+             22 LOAD_ATTR                2 (now)
+             42 CALL                     0
+             50 LOAD_ATTR                5 (NULL|self + strftime)
+             70 LOAD_CONST               2 ('%y%m%d_%H%M%S')
+             72 CALL                     1
+             80 FORMAT_VALUE             0
+             82 LOAD_CONST               3 ('.csv')
+             84 BUILD_STRING             3
+             86 BINARY_OP               11 (/)
+             90 STORE_FAST               2 (path)
+
+183          92 LOAD_FAST                2 (path)
+             94 LOAD_ATTR                7 (NULL|self + open)
+            114 LOAD_CONST               4 ('w')
+            116 LOAD_CONST               5 ('')
+            118 LOAD_CONST               6 ('utf-8-sig')
+            120 KW_NAMES                 7 (('newline', 'encoding'))
+            122 CALL                     3
+            130 BEFORE_WITH
+            132 STORE_FAST               3 (file)
+
+184         134 LOAD_GLOBAL              9 (NULL + csv)
+            144 LOAD_ATTR               10 (writer)
+            164 LOAD_FAST                3 (file)
+            166 CALL                     1
+            174 STORE_FAST               4 (writer)
+
+185         176 LOAD_FAST                4 (writer)
+            178 LOAD_ATTR               13 (NULL|self + writerow)
+            198 BUILD_LIST               0
+            200 LOAD_CONST               8 (('源视频', '失败原因', '原始错误'))
+            202 LIST_EXTEND              1
+            204 CALL                     1
+            212 POP_TOP
+
+186         214 LOAD_FAST                1 (failures)
+            216 GET_ITER
+        >>  218 FOR_ITER                61 (to 344)
+            222 STORE_FAST               5 (failure)
+
+187         224 LOAD_FAST                4 (writer)
+            226 LOAD_ATTR               13 (NULL|self + writerow)
+            246 LOAD_GLOBAL             15 (NULL + str)
+            256 LOAD_FAST                5 (failure)
+            258 LOAD_ATTR               16 (source)
+            278 CALL                     1
+            286 LOAD_FAST                5 (failure)
+            288 LOAD_ATTR               18 (reason)
+            308 LOAD_FAST                5 (failure)
+            310 LOAD_ATTR               20 (detail)
+            330 BUILD_LIST               3
+            332 CALL                     1
+            340 POP_TOP
+            342 JUMP_BACKWARD           63 (to 218)
+
+186     >>  344 END_FOR
+            346 NOP
+
+183         348 LOAD_CONST               0 (None)
+            350 LOAD_CONST               0 (None)
+            352 LOAD_CONST               0 (None)
+            354 CALL                     2
+            362 POP_TOP
+
+188         364 LOAD_FAST                2 (path)
+            366 RETURN_VALUE
+
+183     >>  368 PUSH_EXC_INFO
+            370 WITH_EXCEPT_START
+            372 POP_JUMP_IF_TRUE         1 (to 376)
+            374 RERAISE                  2
+        >>  376 POP_TOP
+            378 POP_EXCEPT
+            380 POP_TOP
+            382 POP_TOP
+
+188         384 LOAD_FAST                2 (path)
+            386 RETURN_VALUE
+        >>  388 COPY                     3
+            390 POP_EXCEPT
+            392 RERAISE                  1
+ExceptionTable:
+  132 to 344 -> 368 [1] lasti
+  368 to 376 -> 388 [3] lasti
+
+Disassembly of <code object _is_same_or_inside_folder at <address>, file "xiaoguan_classifier\shot_splitter.py", line 191>:
+191           0 RESUME                   0
+
+192           2 NOP
+
+193           4 LOAD_FAST                0 (path)
+              6 LOAD_ATTR                1 (NULL|self + resolve)
+             26 CALL                     0
+             34 LOAD_ATTR                3 (NULL|self + relative_to)
+             54 LOAD_FAST                1 (folder)
+             56 LOAD_ATTR                1 (NULL|self + resolve)
+             76 CALL                     0
+             84 CALL                     1
+             92 POP_TOP
+
+196          94 RETURN_CONST             2 (True)
+        >>   96 PUSH_EXC_INFO
+
+194          98 LOAD_GLOBAL              4 (ValueError)
+            108 CHECK_EXC_MATCH
+            110 POP_JUMP_IF_FALSE        3 (to 118)
+            112 POP_TOP
+
+195         114 POP_EXCEPT
+            116 RETURN_CONST             1 (False)
+
+194     >>  118 RERAISE                  0
+        >>  120 COPY                     3
+            122 POP_EXCEPT
+            124 RERAISE                  1
+ExceptionTable:
+  4 to 92 -> 96 [0]
+  96 to 112 -> 120 [1] lasti
+  118 to 118 -> 120 [1] lasti
+
+Disassembly of <code object _resolve_outputs_root at <address>, file "xiaoguan_classifier\shot_splitter.py", line 199>:
+199           0 RESUME                   0
+
+200           2 LOAD_FAST                1 (output_root)
+              4 POP_JUMP_IF_NOT_NONE    19 (to 44)
+
+201           6 LOAD_FAST                0 (folder)
+              8 LOAD_CONST               1 ('outputs')
+             10 BINARY_OP               11 (/)
+             14 LOAD_ATTR                1 (NULL|self + resolve)
+             34 CALL                     0
+             42 RETURN_VALUE
+
+202     >>   44 LOAD_FAST                1 (output_root)
+             46 LOAD_ATTR                1 (NULL|self + resolve)
+             66 CALL                     0
+             74 STORE_FAST               2 (selected)
+
+203          76 LOAD_GLOBAL              3 (NULL + _is_same_or_inside_folder)
+             86 LOAD_FAST                2 (selected)
+             88 LOAD_FAST                0 (folder)
+             90 CALL                     2
+             98 POP_JUMP_IF_FALSE       19 (to 138)
+
+204         100 LOAD_FAST                0 (folder)
+            102 LOAD_CONST               1 ('outputs')
+            104 BINARY_OP               11 (/)
+            108 LOAD_ATTR                1 (NULL|self + resolve)
+            128 CALL                     0
+            136 RETURN_VALUE
+
+205     >>  138 LOAD_FAST                2 (selected)
+            140 LOAD_ATTR                4 (name)
+            160 LOAD_ATTR                7 (NULL|self + lower)
+            180 CALL                     0
+            188 LOAD_CONST               1 ('outputs')
+            190 COMPARE_OP              40 (==)
+            194 POP_JUMP_IF_FALSE        2 (to 200)
+
+206         196 LOAD_FAST                2 (selected)
+            198 RETURN_VALUE
+
+207     >>  200 LOAD_FAST                2 (selected)
+            202 LOAD_ATTR                4 (name)
+            222 LOAD_CONST               2 ('分类结果')
+            224 COMPARE_OP              40 (==)
+            228 POP_JUMP_IF_FALSE       29 (to 288)
+
+208         230 LOAD_FAST                2 (selected)
+            232 LOAD_ATTR                8 (parent)
+            252 LOAD_CONST               1 ('outputs')
+            254 BINARY_OP               11 (/)
+            258 LOAD_ATTR                1 (NULL|self + resolve)
+            278 CALL                     0
+            286 RETURN_VALUE
+
+209     >>  288 LOAD_FAST                2 (selected)
+            290 LOAD_CONST               1 ('outputs')
+            292 BINARY_OP               11 (/)
+            296 LOAD_ATTR                1 (NULL|self + resolve)
+            316 CALL                     0
+            324 RETURN_VALUE
+
+Disassembly of <code object split_clip at <address>, file "xiaoguan_classifier\shot_splitter.py", line 212>:
+212           0 RESUME                   0
+
+213           2 LOAD_GLOBAL              1 (NULL + imageio_ffmpeg)
+             12 LOAD_ATTR                2 (get_ffmpeg_exe)
+             32 CALL                     0
+             40 STORE_FAST               4 (ffmpeg)
+
+214          42 LOAD_GLOBAL              5 (NULL + _run_ffmpeg)
+
+215          52 LOAD_FAST                4 (ffmpeg)
+
+216          54 LOAD_CONST               1 ('-hide_banner')
+
+217          56 LOAD_CONST               2 ('-y')
+
+218          58 LOAD_CONST               3 ('-ss')
+
+219          60 LOAD_FAST                2 (start)
+             62 LOAD_CONST               4 ('.3f')
+             64 FORMAT_VALUE             4 (with format)
+
+220          66 LOAD_CONST               5 ('-to')
+
+221          68 LOAD_FAST                3 (end)
+             70 LOAD_CONST               4 ('.3f')
+             72 FORMAT_VALUE             4 (with format)
+
+222          74 LOAD_CONST               6 ('-i')
+
+223          76 LOAD_GLOBAL              7 (NULL + str)
+             86 LOAD_FAST                0 (input_path)
+             88 CALL                     1
+
+224          96 LOAD_CONST               7 ('-c:v')
+
+225          98 LOAD_CONST               8 ('libx264')
+
+226         100 LOAD_CONST               9 ('-preset')
+
+227         102 LOAD_CONST              10 ('veryfast')
+
+228         104 LOAD_CONST              11 ('-crf')
+
+229         106 LOAD_CONST              12 ('18')
+
+230         108 LOAD_CONST              13 ('-c:a')
+
+231         110 LOAD_CONST              14 ('aac')
+
+232         112 LOAD_CONST              15 ('-b:a')
+
+233         114 LOAD_CONST              16 ('128k')
+
+234         116 LOAD_CONST              17 ('-map_metadata')
+
+235         118 LOAD_CONST              18 ('0')
+
+236         120 LOAD_CONST              19 ('-movflags')
+
+237         122 LOAD_CONST              20 ('+faststart')
+
+238         124 LOAD_GLOBAL              7 (NULL + str)
+            134 LOAD_FAST                1 (output_path)
+            136 CALL                     1
+
+214         144 BUILD_LIST              24
+            146 CALL                     1
+            154 POP_TOP
+            156 RETURN_CONST             0 (None)
+
+Disassembly of <code object split_video_stable at <address>, file "xiaoguan_classifier\shot_splitter.py", line 242>:
+              0 MAKE_CELL                0 (input_path)
+              2 MAKE_CELL               21 (output_dir)
+              4 MAKE_CELL               22 (shoot_date_code)
+
+242           6 RESUME                   0
+
+249           8 LOAD_DEREF               0 (input_path)
+             10 LOAD_ATTR                1 (NULL|self + resolve)
+             30 CALL                     0
+             38 STORE_DEREF              0 (input_path)
+
+250          40 LOAD_GLOBAL              3 (NULL + get_video_duration)
+             50 LOAD_DEREF               0 (input_path)
+             52 CALL                     1
+             60 STORE_FAST               5 (duration)
+
+251          62 LOAD_GLOBAL              5 (NULL + detect_scene_cuts)
+             72 LOAD_DEREF               0 (input_path)
+             74 LOAD_GLOBAL              6 (STABLE_SCENE_THRESHOLD)
+             84 CALL                     2
+             92 STORE_FAST               6 (cuts)
+
+252          94 LOAD_GLOBAL              9 (NULL + build_segments)
+            104 LOAD_FAST                6 (cuts)
+            106 LOAD_FAST                5 (duration)
+            108 LOAD_GLOBAL             10 (STABLE_MIN_SEGMENT_SECONDS)
+            118 CALL                     3
+            126 STORE_FAST               7 (segments)
+
+253         128 LOAD_GLOBAL             13 (NULL + material_shoot_date)
+            138 LOAD_DEREF               0 (input_path)
+            140 CALL                     1
+            148 UNPACK_SEQUENCE          3
+            152 STORE_DEREF             22 (shoot_date_code)
+            154 STORE_FAST               8 (_shoot_date_text)
+            156 STORE_FAST               9 (_date_source)
+
+255         158 LOAD_FAST                1 (output_root)
+            160 LOAD_DEREF               0 (input_path)
+            162 LOAD_ATTR               14 (stem)
+            182 FORMAT_VALUE             0
+            184 LOAD_CONST               1 ('_镜头拆解_')
+            186 LOAD_GLOBAL             17 (NULL + datetime)
+            196 LOAD_ATTR               18 (now)
+            216 CALL                     0
+            224 LOAD_ATTR               21 (NULL|self + strftime)
+            244 LOAD_CONST               2 ('%y%m%d_%H%M%S')
+            246 CALL                     1
+            254 FORMAT_VALUE             0
+            256 BUILD_STRING             3
+            258 BINARY_OP               11 (/)
+            262 LOAD_CONST               3 ('segments')
+            264 BINARY_OP               11 (/)
+            268 STORE_DEREF             21 (output_dir)
+
+256         270 LOAD_DEREF              21 (output_dir)
+            272 LOAD_ATTR               23 (NULL|self + mkdir)
+            292 LOAD_CONST               4 (True)
+            294 LOAD_CONST               4 (True)
+            296 KW_NAMES                 5 (('parents', 'exist_ok'))
+            298 CALL                     2
+            306 POP_TOP
+
+258         308 LOAD_GLOBAL             25 (NULL + max)
+            318 LOAD_CONST               6 (1)
+            320 LOAD_GLOBAL             27 (NULL + min)
+            330 LOAD_FAST                4 (export_workers)
+            332 LOAD_GLOBAL             29 (NULL + len)
+            342 LOAD_FAST                7 (segments)
+            344 CALL                     1
+            352 CALL                     2
+            360 CALL                     2
+            368 STORE_FAST              10 (worker_count)
+
+259         370 LOAD_FAST                2 (progress_callback)
+            372 POP_JUMP_IF_FALSE       38 (to 450)
+            374 LOAD_GLOBAL             29 (NULL + len)
+            384 LOAD_FAST                7 (segments)
+            386 CALL                     1
+            394 LOAD_CONST               6 (1)
+            396 COMPARE_OP              68 (>)
+            400 POP_JUMP_IF_FALSE       24 (to 450)
+
+260         402 PUSH_NULL
+            404 LOAD_FAST                2 (progress_callback)
+            406 LOAD_CONST               7 ('  检测到 ')
+            408 LOAD_GLOBAL             29 (NULL + len)
+            418 LOAD_FAST                7 (segments)
+            420 CALL                     1
+            428 FORMAT_VALUE             0
+            430 LOAD_CONST               8 (' 个镜头，并行导出 ')
+            432 LOAD_FAST               10 (worker_count)
+            434 FORMAT_VALUE             0
+            436 LOAD_CONST               9 (' 路')
+            438 BUILD_STRING             5
+            440 CALL                     1
+            448 POP_TOP
+
+262     >>  450 LOAD_GLOBAL             31 (NULL + list)
+            460 LOAD_GLOBAL             33 (NULL + enumerate)
+            470 LOAD_FAST                7 (segments)
+            472 LOAD_CONST               6 (1)
+            474 KW_NAMES                10 (('start',))
+            476 CALL                     2
+            484 CALL                     1
+            492 STORE_FAST              11 (segment_jobs)
+
+264         494 LOAD_CONST              16 (('index', 'int', 'start', 'float', 'end', 'float', 'return', 'Path'))
+            496 LOAD_CLOSURE             0 (input_path)
+            498 LOAD_CLOSURE            21 (output_dir)
+            500 LOAD_CLOSURE            22 (shoot_date_code)
+            502 BUILD_TUPLE              3
+            504 LOAD_CONST              11 (<code object export_segment at <address>, file "xiaoguan_classifier\shot_splitter.py", line 264>)
+            506 MAKE_FUNCTION           12 (annotations, closure)
+            508 STORE_FAST              12 (export_segment)
+
+270         510 LOAD_FAST               10 (worker_count)
+            512 LOAD_CONST               6 (1)
+            514 COMPARE_OP              26 (<=)
+            518 POP_JUMP_IF_FALSE       82 (to 684)
+
+271         520 LOAD_FAST               11 (segment_jobs)
+            522 GET_ITER
+        >>  524 FOR_ITER                55 (to 638)
+            528 UNPACK_SEQUENCE          2
+            532 STORE_FAST              13 (index)
+            534 UNPACK_SEQUENCE          2
+            538 STORE_FAST              14 (start)
+            540 STORE_FAST              15 (end)
+
+272         542 LOAD_GLOBAL             35 (NULL + _wait_if_paused)
+            552 LOAD_FAST                3 (pause_event)
+            554 LOAD_FAST                2 (progress_callback)
+            556 CALL                     2
+            564 POP_TOP
+
+273         566 LOAD_FAST                2 (progress_callback)
+            568 POP_JUMP_IF_FALSE       23 (to 616)
+
+274         570 PUSH_NULL
+            572 LOAD_FAST                2 (progress_callback)
+            574 LOAD_CONST              12 ('  镜头 ')
+            576 LOAD_FAST               13 (index)
+            578 FORMAT_VALUE             0
+            580 LOAD_CONST              13 ('/')
+            582 LOAD_GLOBAL             29 (NULL + len)
+            592 LOAD_FAST                7 (segments)
+            594 CALL                     1
+            602 FORMAT_VALUE             0
+            604 BUILD_STRING             4
+            606 CALL                     1
+            614 POP_TOP
+
+275     >>  616 PUSH_NULL
+            618 LOAD_FAST               12 (export_segment)
+            620 LOAD_FAST               13 (index)
+            622 LOAD_FAST               14 (start)
+            624 LOAD_FAST               15 (end)
+            626 CALL                     3
+            634 POP_TOP
+            636 JUMP_BACKWARD           57 (to 524)
+
+271     >>  638 END_FOR
+
+276         640 LOAD_GLOBAL             37 (NULL + SplitResult)
+            650 LOAD_DEREF               0 (input_path)
+            652 LOAD_DEREF              21 (output_dir)
+            654 LOAD_GLOBAL             29 (NULL + len)
+            664 LOAD_FAST                7 (segments)
+            666 CALL                     1
+            674 CALL                     3
+            682 RETURN_VALUE
+
+278     >>  684 LOAD_CONST              14 (0)
+            686 STORE_FAST              16 (next_submit)
+
+279         688 LOAD_CONST              14 (0)
+            690 STORE_FAST              17 (completed)
+
+280         692 LOAD_GLOBAL             39 (NULL + ThreadPoolExecutor)
+            702 LOAD_FAST               10 (worker_count)
+            704 KW_NAMES                15 (('max_workers',))
+            706 CALL                     1
+            714 BEFORE_WITH
+            716 STORE_FAST              18 (executor)
+
+281         718 BUILD_MAP                0
+            720 STORE_FAST              19 (futures)
+
+282         722 LOAD_FAST               16 (next_submit)
+            724 LOAD_GLOBAL             29 (NULL + len)
+            734 LOAD_FAST               11 (segment_jobs)
+            736 CALL                     1
+            744 COMPARE_OP               2 (<)
+            748 POP_JUMP_IF_FALSE       94 (to 938)
+            750 LOAD_GLOBAL             29 (NULL + len)
+            760 LOAD_FAST               19 (futures)
+            762 CALL                     1
+            770 LOAD_FAST               10 (worker_count)
+            772 COMPARE_OP               2 (<)
+            776 POP_JUMP_IF_FALSE       80 (to 938)
+
+283     >>  778 LOAD_GLOBAL             35 (NULL + _wait_if_paused)
+            788 LOAD_FAST                3 (pause_event)
+            790 LOAD_FAST                2 (progress_callback)
+            792 CALL                     2
+            800 POP_TOP
+
+284         802 LOAD_FAST               11 (segment_jobs)
+            804 LOAD_FAST               16 (next_submit)
+            806 BINARY_SUBSCR
+            810 UNPACK_SEQUENCE          2
+            814 STORE_FAST              13 (index)
+            816 UNPACK_SEQUENCE          2
+            820 STORE_FAST              14 (start)
+            822 STORE_FAST              15 (end)
+
+285         824 LOAD_FAST               13 (index)
+            826 LOAD_FAST               19 (futures)
+            828 LOAD_FAST               18 (executor)
+            830 LOAD_ATTR               41 (NULL|self + submit)
+            850 LOAD_FAST               12 (export_segment)
+            852 LOAD_FAST               13 (index)
+            854 LOAD_FAST               14 (start)
+            856 LOAD_FAST               15 (end)
+            858 CALL                     4
+            866 STORE_SUBSCR
+
+286         870 LOAD_FAST               16 (next_submit)
+            872 LOAD_CONST               6 (1)
+            874 BINARY_OP               13 (+=)
+            878 STORE_FAST              16 (next_submit)
+
+282         880 LOAD_FAST               16 (next_submit)
+            882 LOAD_GLOBAL             29 (NULL + len)
+            892 LOAD_FAST               11 (segment_jobs)
+            894 CALL                     1
+            902 COMPARE_OP               2 (<)
+            906 POP_JUMP_IF_FALSE       15 (to 938)
+            908 LOAD_GLOBAL             29 (NULL + len)
+            918 LOAD_FAST               19 (futures)
+            920 CALL                     1
+            928 LOAD_FAST               10 (worker_count)
+            930 COMPARE_OP               2 (<)
+            934 POP_JUMP_IF_FALSE        1 (to 938)
+            936 JUMP_BACKWARD           80 (to 778)
+
+288     >>  938 LOAD_FAST               19 (futures)
+            940 POP_JUMP_IF_FALSE      148 (to 1238)
+
+289     >>  942 LOAD_GLOBAL             43 (NULL + as_completed)
+            952 LOAD_FAST               19 (futures)
+            954 CALL                     1
+            962 GET_ITER
+            964 FOR_ITER                20 (to 1008)
+            968 STORE_FAST              20 (future)
+
+290         970 LOAD_FAST               19 (futures)
+            972 LOAD_ATTR               45 (NULL|self + pop)
+            992 LOAD_FAST               20 (future)
+            994 CALL                     1
+           1002 POP_TOP
+
+291        1004 POP_TOP
+           1006 JUMP_FORWARD             1 (to 1010)
+
+289     >> 1008 END_FOR
+
+292     >> 1010 LOAD_FAST_CHECK         20 (future)
+           1012 LOAD_ATTR               47 (NULL|self + result)
+           1032 CALL                     0
+           1040 POP_TOP
+
+293        1042 LOAD_FAST               17 (completed)
+           1044 LOAD_CONST               6 (1)
+           1046 BINARY_OP               13 (+=)
+           1050 STORE_FAST              17 (completed)
+
+294        1052 LOAD_FAST                2 (progress_callback)
+           1054 POP_JUMP_IF_FALSE       23 (to 1102)
+
+295        1056 PUSH_NULL
+           1058 LOAD_FAST                2 (progress_callback)
+           1060 LOAD_CONST              12 ('  镜头 ')
+           1062 LOAD_FAST               17 (completed)
+           1064 FORMAT_VALUE             0
+           1066 LOAD_CONST              13 ('/')
+           1068 LOAD_GLOBAL             29 (NULL + len)
+           1078 LOAD_FAST                7 (segments)
+           1080 CALL                     1
+           1088 FORMAT_VALUE             0
+           1090 BUILD_STRING             4
+           1092 CALL                     1
+           1100 POP_TOP
+
+296     >> 1102 LOAD_FAST               16 (next_submit)
+           1104 LOAD_GLOBAL             29 (NULL + len)
+           1114 LOAD_FAST               11 (segment_jobs)
+           1116 CALL                     1
+           1124 COMPARE_OP               2 (<)
+           1128 POP_JUMP_IF_FALSE       51 (to 1232)
+
+297        1130 LOAD_GLOBAL             35 (NULL + _wait_if_paused)
+           1140 LOAD_FAST                3 (pause_event)
+           1142 LOAD_FAST                2 (progress_callback)
+           1144 CALL                     2
+           1152 POP_TOP
+
+298        1154 LOAD_FAST               11 (segment_jobs)
+           1156 LOAD_FAST               16 (next_submit)
+           1158 BINARY_SUBSCR
+           1162 UNPACK_SEQUENCE          2
+           1166 STORE_FAST              13 (index)
+           1168 UNPACK_SEQUENCE          2
+           1172 STORE_FAST              14 (start)
+           1174 STORE_FAST              15 (end)
+
+299        1176 LOAD_FAST               13 (index)
+           1178 LOAD_FAST               19 (futures)
+           1180 LOAD_FAST               18 (executor)
+           1182 LOAD_ATTR               41 (NULL|self + submit)
+           1202 LOAD_FAST               12 (export_segment)
+           1204 LOAD_FAST               13 (index)
+           1206 LOAD_FAST               14 (start)
+           1208 LOAD_FAST               15 (end)
+           1210 CALL                     4
+           1218 STORE_SUBSCR
+
+300        1222 LOAD_FAST               16 (next_submit)
+           1224 LOAD_CONST               6 (1)
+           1226 BINARY_OP               13 (+=)
+           1230 STORE_FAST              16 (next_submit)
+
+288     >> 1232 LOAD_FAST               19 (futures)
+           1234 POP_JUMP_IF_FALSE        1 (to 1238)
+           1236 JUMP_BACKWARD          148 (to 942)
+
+280     >> 1238 LOAD_CONST               0 (None)
+           1240 LOAD_CONST               0 (None)
+           1242 LOAD_CONST               0 (None)
+           1244 CALL                     2
+           1252 POP_TOP
+
+302     >> 1254 LOAD_GLOBAL             37 (NULL + SplitResult)
+           1264 LOAD_DEREF               0 (input_path)
+           1266 LOAD_DEREF              21 (output_dir)
+           1268 LOAD_GLOBAL             29 (NULL + len)
+           1278 LOAD_FAST                7 (segments)
+           1280 CALL                     1
+           1288 CALL                     3
+           1296 RETURN_VALUE
+
+280     >> 1298 PUSH_EXC_INFO
+           1300 WITH_EXCEPT_START
+           1302 POP_JUMP_IF_TRUE         1 (to 1306)
+           1304 RERAISE                  2
+        >> 1306 POP_TOP
+           1308 POP_EXCEPT
+           1310 POP_TOP
+           1312 POP_TOP
+           1314 JUMP_BACKWARD           31 (to 1254)
+        >> 1316 COPY                     3
+           1318 POP_EXCEPT
+           1320 RERAISE                  1
+ExceptionTable:
+  716 to 934 -> 1298 [1] lasti
+  938 to 1234 -> 1298 [1] lasti
+  1298 to 1306 -> 1316 [3] lasti
+
+Disassembly of <code object export_segment at <address>, file "xiaoguan_classifier\shot_splitter.py", line 264>:
+              0 COPY_FREE_VARS           3
+
+264           2 RESUME                   0
+
+265           4 LOAD_DEREF               5 (input_path)
+              6 LOAD_ATTR                0 (stem)
+             26 FORMAT_VALUE             0
+             28 LOAD_CONST               1 ('_原拍摄日期')
+             30 LOAD_DEREF               7 (shoot_date_code)
+             32 FORMAT_VALUE             0
+             34 LOAD_CONST               2 ('_镜头')
+             36 LOAD_FAST                0 (index)
+             38 LOAD_CONST               3 ('02d')
+             40 FORMAT_VALUE             4 (with format)
+             42 LOAD_CONST               4 ('_')
+             44 LOAD_GLOBAL              3 (NULL + _safe_stamp)
+             54 LOAD_FAST                1 (start)
+             56 CALL                     1
+             64 FORMAT_VALUE             0
+             66 LOAD_CONST               5 ('-')
+             68 LOAD_GLOBAL              3 (NULL + _safe_stamp)
+             78 LOAD_FAST                2 (end)
+             80 CALL                     1
+             88 FORMAT_VALUE             0
+             90 LOAD_DEREF               5 (input_path)
+             92 LOAD_ATTR                4 (suffix)
+            112 LOAD_ATTR                7 (NULL|self + lower)
+            132 CALL                     0
+            140 FORMAT_VALUE             0
+            142 BUILD_STRING            10
+            144 STORE_FAST               3 (clip_name)
+
+266         146 LOAD_DEREF               6 (output_dir)
+            148 LOAD_FAST                3 (clip_name)
+            150 BINARY_OP               11 (/)
+            154 STORE_FAST               4 (output_path)
+
+267         156 LOAD_GLOBAL              9 (NULL + split_clip)
+            166 LOAD_DEREF               5 (input_path)
+            168 LOAD_FAST                4 (output_path)
+            170 LOAD_FAST                1 (start)
+            172 LOAD_FAST                2 (end)
+            174 CALL                     4
+            182 POP_TOP
+
+268         184 LOAD_FAST                4 (output_path)
+            186 RETURN_VALUE
+
+Disassembly of <code object split_folder_stable at <address>, file "xiaoguan_classifier\shot_splitter.py", line 305>:
+              0 MAKE_CELL                1 (progress_callback)
+              2 MAKE_CELL                3 (pause_event)
+              4 MAKE_CELL               20 (outputs)
+              6 MAKE_CELL               21 (videos)
+              8 MAKE_CELL               22 (worker_count)
+
+305          10 RESUME                   0
+
+312          12 LOAD_FAST                0 (folder)
+             14 LOAD_ATTR                1 (NULL|self + resolve)
+             34 CALL                     0
+             42 STORE_FAST               0 (folder)
+
+313          44 LOAD_FAST                0 (folder)
+             46 LOAD_ATTR                3 (NULL|self + exists)
+             66 CALL                     0
+             74 POP_JUMP_IF_FALSE       16 (to 108)
+             76 LOAD_FAST                0 (folder)
+             78 LOAD_ATTR                5 (NULL|self + is_dir)
+             98 CALL                     0
+            106 POP_JUMP_IF_TRUE        11 (to 130)
+
+314     >>  108 LOAD_GLOBAL              7 (NULL + ValueError)
+            118 LOAD_CONST               1 ('素材文件夹不存在')
+            120 CALL                     1
+            128 RAISE_VARARGS            1
+
+315     >>  130 LOAD_GLOBAL              9 (NULL + scan_videos)
+            140 LOAD_FAST                0 (folder)
+            142 CALL                     1
+            150 STORE_DEREF             21 (videos)
+
+316         152 LOAD_DEREF              21 (videos)
+            154 POP_JUMP_IF_TRUE        11 (to 178)
+
+317         156 LOAD_GLOBAL              7 (NULL + ValueError)
+            166 LOAD_CONST               2 ('没有找到可拆解的视频文件')
+            168 CALL                     1
+            176 RAISE_VARARGS            1
+
+319     >>  178 LOAD_GLOBAL             11 (NULL + _resolve_outputs_root)
+            188 LOAD_FAST                0 (folder)
+            190 LOAD_FAST                2 (output_root)
+            192 CALL                     2
+            200 STORE_DEREF             20 (outputs)
+
+320         202 LOAD_DEREF              20 (outputs)
+            204 LOAD_ATTR               13 (NULL|self + mkdir)
+            224 LOAD_CONST               3 (True)
+            226 LOAD_CONST               3 (True)
+            228 KW_NAMES                 4 (('parents', 'exist_ok'))
+            230 CALL                     2
+            238 POP_TOP
+
+322         240 LOAD_GLOBAL             15 (NULL + max)
+            250 LOAD_CONST               5 (1)
+            252 LOAD_GLOBAL             17 (NULL + min)
+            262 LOAD_FAST                4 (video_workers)
+            264 LOAD_GLOBAL             19 (NULL + len)
+            274 LOAD_DEREF              21 (videos)
+            276 CALL                     1
+            284 CALL                     2
+            292 CALL                     2
+            300 STORE_DEREF             22 (worker_count)
+
+323         302 LOAD_DEREF               1 (progress_callback)
+            304 POP_JUMP_IF_FALSE       38 (to 382)
+            306 LOAD_GLOBAL             19 (NULL + len)
+            316 LOAD_DEREF              21 (videos)
+            318 CALL                     1
+            326 LOAD_CONST               5 (1)
+            328 COMPARE_OP              68 (>)
+            332 POP_JUMP_IF_FALSE       24 (to 382)
+
+324         334 PUSH_NULL
+            336 LOAD_DEREF               1 (progress_callback)
+            338 LOAD_CONST               6 ('检测到 ')
+            340 LOAD_GLOBAL             19 (NULL + len)
+            350 LOAD_DEREF              21 (videos)
+            352 CALL                     1
+            360 FORMAT_VALUE             0
+            362 LOAD_CONST               7 (' 条视频，轻量并行拆解 ')
+            364 LOAD_DEREF              22 (worker_count)
+            366 FORMAT_VALUE             0
+            368 LOAD_CONST               8 (' 路')
+            370 BUILD_STRING             5
+            372 CALL                     1
+            380 POP_TOP
+
+326     >>  382 LOAD_GLOBAL             21 (NULL + list)
+            392 LOAD_GLOBAL             23 (NULL + enumerate)
+            402 LOAD_DEREF              21 (videos)
+            404 LOAD_CONST               5 (1)
+            406 KW_NAMES                 9 (('start',))
+            408 CALL                     2
+            416 CALL                     1
+            424 STORE_FAST               5 (indexed_videos)
+
+328         426 LOAD_CONST              19 (('index', 'int', 'video', 'Path', 'return', 'SplitResult'))
+            428 LOAD_CLOSURE            20 (outputs)
+            430 LOAD_CLOSURE             3 (pause_event)
+            432 LOAD_CLOSURE             1 (progress_callback)
+            434 LOAD_CLOSURE            21 (videos)
+            436 LOAD_CLOSURE            22 (worker_count)
+            438 BUILD_TUPLE              5
+            440 LOAD_CONST              10 (<code object split_one at <address>, file "xiaoguan_classifier\shot_splitter.py", line 328>)
+            442 MAKE_FUNCTION           12 (annotations, closure)
+            444 STORE_FAST               6 (split_one)
+
+335         446 LOAD_DEREF              22 (worker_count)
+            448 LOAD_CONST               5 (1)
+            450 COMPARE_OP              26 (<=)
+            454 POP_JUMP_IF_FALSE       96 (to 648)
+
+336         456 BUILD_LIST               0
+            458 STORE_FAST               7 (results)
+
+337         460 BUILD_LIST               0
+            462 STORE_FAST               8 (failures)
+
+338         464 LOAD_FAST                5 (indexed_videos)
+            466 GET_ITER
+        >>  468 FOR_ITER                30 (to 532)
+            472 UNPACK_SEQUENCE          2
+            476 STORE_FAST               9 (index)
+            478 STORE_FAST              10 (video)
+
+339         480 NOP
+
+340         482 LOAD_FAST                7 (results)
+            484 LOAD_ATTR               25 (NULL|self + append)
+            504 PUSH_NULL
+            506 LOAD_FAST                6 (split_one)
+            508 LOAD_FAST                9 (index)
+            510 LOAD_FAST               10 (video)
+            512 CALL                     2
+            520 CALL                     1
+            528 POP_TOP
+            530 JUMP_BACKWARD           32 (to 468)
+
+338     >>  532 END_FOR
+
+346         534 LOAD_GLOBAL             37 (NULL + _write_failure_csv)
+            544 LOAD_DEREF              20 (outputs)
+            546 LOAD_FAST                8 (failures)
+            548 CALL                     2
+            556 STORE_FAST              13 (failure_csv)
+
+347         558 LOAD_FAST                8 (failures)
+            560 POP_JUMP_IF_FALSE       25 (to 612)
+            562 LOAD_DEREF               1 (progress_callback)
+            564 POP_JUMP_IF_FALSE       23 (to 612)
+
+348         566 PUSH_NULL
+            568 LOAD_DEREF               1 (progress_callback)
+            570 LOAD_CONST              16 ('有 ')
+            572 LOAD_GLOBAL             19 (NULL + len)
+            582 LOAD_FAST                8 (failures)
+            584 CALL                     1
+            592 FORMAT_VALUE             0
+            594 LOAD_CONST              17 (' 条视频拆解失败，失败清单：')
+            596 LOAD_FAST               13 (failure_csv)
+            598 FORMAT_VALUE             0
+            600 BUILD_STRING             4
+            602 CALL                     1
+            610 POP_TOP
+
+349     >>  612 LOAD_FAST                7 (results)
+            614 POP_JUMP_IF_TRUE        14 (to 644)
+            616 LOAD_FAST                8 (failures)
+            618 POP_JUMP_IF_FALSE       12 (to 644)
+
+350         620 LOAD_GLOBAL             39 (NULL + BatchSplitError)
+            630 LOAD_FAST                8 (failures)
+            632 LOAD_FAST               13 (failure_csv)
+            634 CALL                     2
+            642 RAISE_VARARGS            1
+
+351     >>  644 LOAD_FAST                7 (results)
+            646 RETURN_VALUE
+
+353     >>  648 LOAD_CONST               0 (None)
+            650 BUILD_LIST               1
+            652 LOAD_GLOBAL             19 (NULL + len)
+            662 LOAD_DEREF              21 (videos)
+            664 CALL                     1
+            672 BINARY_OP                5 (*)
+            676 STORE_FAST               7 (results)
+
+354         678 BUILD_LIST               0
+            680 STORE_FAST               8 (failures)
+
+355         682 LOAD_CONST              11 (0)
+            684 STORE_FAST              14 (next_submit)
+
+356         686 LOAD_GLOBAL             41 (NULL + ThreadPoolExecutor)
+            696 LOAD_DEREF              22 (worker_count)
+            698 KW_NAMES                18 (('max_workers',))
+            700 CALL                     1
+            708 BEFORE_WITH
+            710 STORE_FAST              15 (executor)
+
+357         712 BUILD_MAP                0
+            714 STORE_FAST              16 (futures)
+
+358         716 LOAD_FAST               14 (next_submit)
+            718 LOAD_GLOBAL             19 (NULL + len)
+            728 LOAD_FAST                5 (indexed_videos)
+            730 CALL                     1
+            738 COMPARE_OP               2 (<)
+            742 POP_JUMP_IF_FALSE       78 (to 900)
+            744 LOAD_GLOBAL             19 (NULL + len)
+            754 LOAD_FAST               16 (futures)
+            756 CALL                     1
+            764 LOAD_DEREF              22 (worker_count)
+            766 COMPARE_OP               2 (<)
+            770 POP_JUMP_IF_FALSE       64 (to 900)
+
+359     >>  772 LOAD_FAST                5 (indexed_videos)
+            774 LOAD_FAST               14 (next_submit)
+            776 BINARY_SUBSCR
+            780 UNPACK_SEQUENCE          2
+            784 STORE_FAST               9 (index)
+            786 STORE_FAST              10 (video)
+
+360         788 LOAD_FAST                9 (index)
+            790 LOAD_FAST               16 (futures)
+            792 LOAD_FAST               15 (executor)
+            794 LOAD_ATTR               43 (NULL|self + submit)
+            814 LOAD_FAST                6 (split_one)
+            816 LOAD_FAST                9 (index)
+            818 LOAD_FAST               10 (video)
+            820 CALL                     3
+            828 STORE_SUBSCR
+
+361         832 LOAD_FAST               14 (next_submit)
+            834 LOAD_CONST               5 (1)
+            836 BINARY_OP               13 (+=)
+            840 STORE_FAST              14 (next_submit)
+
+358         842 LOAD_FAST               14 (next_submit)
+            844 LOAD_GLOBAL             19 (NULL + len)
+            854 LOAD_FAST                5 (indexed_videos)
+            856 CALL                     1
+            864 COMPARE_OP               2 (<)
+            868 POP_JUMP_IF_FALSE       15 (to 900)
+            870 LOAD_GLOBAL             19 (NULL + len)
+            880 LOAD_FAST               16 (futures)
+            882 CALL                     1
+            890 LOAD_DEREF              22 (worker_count)
+            892 COMPARE_OP               2 (<)
+            896 POP_JUMP_IF_FALSE        1 (to 900)
+            898 JUMP_BACKWARD           64 (to 772)
+
+363     >>  900 LOAD_FAST               16 (futures)
+            902 POP_JUMP_IF_FALSE      121 (to 1146)
+
+364     >>  904 LOAD_GLOBAL             45 (NULL + as_completed)
+            914 LOAD_FAST               16 (futures)
+            916 CALL                     1
+            924 GET_ITER
+            926 FOR_ITER                20 (to 970)
+            930 STORE_FAST              17 (future)
+
+365         932 LOAD_FAST               16 (futures)
+            934 LOAD_ATTR               47 (NULL|self + pop)
+            954 LOAD_FAST               17 (future)
+            956 CALL                     1
+            964 STORE_FAST               9 (index)
+
+366         966 POP_TOP
+            968 JUMP_FORWARD             1 (to 972)
+
+364     >>  970 END_FOR
+
+367     >>  972 NOP
+
+368         974 LOAD_FAST_CHECK         17 (future)
+            976 LOAD_ATTR               49 (NULL|self + result)
+            996 CALL                     0
+           1004 LOAD_FAST                7 (results)
+           1006 LOAD_FAST_CHECK          9 (index)
+           1008 LOAD_CONST               5 (1)
+           1010 BINARY_OP               10 (-)
+           1014 STORE_SUBSCR
+
+375     >> 1018 LOAD_FAST               14 (next_submit)
+           1020 LOAD_GLOBAL             19 (NULL + len)
+           1030 LOAD_FAST                5 (indexed_videos)
+           1032 CALL                     1
+           1040 COMPARE_OP               2 (<)
+           1044 POP_JUMP_IF_FALSE       47 (to 1140)
+
+376        1046 LOAD_GLOBAL             51 (NULL + _wait_if_paused)
+           1056 LOAD_DEREF               3 (pause_event)
+           1058 LOAD_DEREF               1 (progress_callback)
+           1060 CALL                     2
+           1068 POP_TOP
+
+377        1070 LOAD_FAST                5 (indexed_videos)
+           1072 LOAD_FAST               14 (next_submit)
+           1074 BINARY_SUBSCR
+           1078 UNPACK_SEQUENCE          2
+           1082 STORE_FAST               9 (index)
+           1084 STORE_FAST              10 (video)
+
+378        1086 LOAD_FAST                9 (index)
+           1088 LOAD_FAST               16 (futures)
+           1090 LOAD_FAST               15 (executor)
+           1092 LOAD_ATTR               43 (NULL|self + submit)
+           1112 LOAD_FAST                6 (split_one)
+           1114 LOAD_FAST                9 (index)
+           1116 LOAD_FAST               10 (video)
+           1118 CALL                     3
+           1126 STORE_SUBSCR
+
+379        1130 LOAD_FAST               14 (next_submit)
+           1132 LOAD_CONST               5 (1)
+           1134 BINARY_OP               13 (+=)
+           1138 STORE_FAST              14 (next_submit)
+
+363     >> 1140 LOAD_FAST               16 (futures)
+           1142 POP_JUMP_IF_FALSE        1 (to 1146)
+           1144 JUMP_BACKWARD          121 (to 904)
+
+356     >> 1146 LOAD_CONST               0 (None)
+           1148 LOAD_CONST               0 (None)
+           1150 LOAD_CONST               0 (None)
+           1152 CALL                     2
+           1160 POP_TOP
+
+381     >> 1162 LOAD_FAST                7 (results)
+           1164 GET_ITER
+           1166 LOAD_FAST_AND_CLEAR     18 (result)
+           1168 SWAP                     2
+           1170 BUILD_LIST               0
+           1172 SWAP                     2
+        >> 1174 FOR_ITER                 7 (to 1192)
+           1178 STORE_FAST              18 (result)
+           1180 LOAD_FAST               18 (result)
+           1182 POP_JUMP_IF_NOT_NONE     1 (to 1186)
+           1184 JUMP_BACKWARD            6 (to 1174)
+        >> 1186 LOAD_FAST               18 (result)
+           1188 LIST_APPEND              2
+           1190 JUMP_BACKWARD            9 (to 1174)
+        >> 1192 END_FOR
+           1194 STORE_FAST              19 (completed_results)
+           1196 STORE_FAST              18 (result)
+
+382        1198 LOAD_GLOBAL             37 (NULL + _write_failure_csv)
+           1208 LOAD_DEREF              20 (outputs)
+           1210 LOAD_FAST                8 (failures)
+           1212 CALL                     2
+           1220 STORE_FAST              13 (failure_csv)
+
+383        1222 LOAD_FAST                8 (failures)
+           1224 POP_JUMP_IF_FALSE       25 (to 1276)
+           1226 LOAD_DEREF               1 (progress_callback)
+           1228 POP_JUMP_IF_FALSE       23 (to 1276)
+
+384        1230 PUSH_NULL
+           1232 LOAD_DEREF               1 (progress_callback)
+           1234 LOAD_CONST              16 ('有 ')
+           1236 LOAD_GLOBAL             19 (NULL + len)
+           1246 LOAD_FAST                8 (failures)
+           1248 CALL                     1
+           1256 FORMAT_VALUE             0
+           1258 LOAD_CONST              17 (' 条视频拆解失败，失败清单：')
+           1260 LOAD_FAST               13 (failure_csv)
+           1262 FORMAT_VALUE             0
+           1264 BUILD_STRING             4
+           1266 CALL                     1
+           1274 POP_TOP
+
+385     >> 1276 LOAD_FAST               19 (completed_results)
+           1278 POP_JUMP_IF_TRUE        14 (to 1308)
+           1280 LOAD_FAST                8 (failures)
+           1282 POP_JUMP_IF_FALSE       12 (to 1308)
+
+386        1284 LOAD_GLOBAL             39 (NULL + BatchSplitError)
+           1294 LOAD_FAST                8 (failures)
+           1296 LOAD_FAST               13 (failure_csv)
+           1298 CALL                     2
+           1306 RAISE_VARARGS            1
+
+387     >> 1308 LOAD_FAST               19 (completed_results)
+           1310 RETURN_VALUE
+        >> 1312 PUSH_EXC_INFO
+
+341        1314 LOAD_GLOBAL             26 (Exception)
+           1324 CHECK_EXC_MATCH
+           1326 POP_JUMP_IF_FALSE      117 (to 1562)
+           1328 STORE_FAST              11 (exc)
+
+342        1330 LOAD_GLOBAL             29 (NULL + str)
+           1340 LOAD_FAST               11 (exc)
+           1342 CALL                     1
+           1350 LOAD_ATTR               31 (NULL|self + splitlines)
+           1370 CALL                     0
+           1378 LOAD_CONST              11 (0)
+           1380 BINARY_SUBSCR
+           1384 STORE_FAST              12 (reason)
+
+343        1386 LOAD_FAST                8 (failures)
+           1388 LOAD_ATTR               25 (NULL|self + append)
+           1408 LOAD_GLOBAL             33 (NULL + SplitFailure)
+           1418 LOAD_FAST               10 (video)
+           1420 LOAD_FAST               12 (reason)
+           1422 LOAD_GLOBAL             29 (NULL + str)
+           1432 LOAD_FAST               11 (exc)
+           1434 CALL                     1
+           1442 CALL                     3
+           1450 CALL                     1
+           1458 POP_TOP
+
+344        1460 LOAD_DEREF               1 (progress_callback)
+           1462 POP_JUMP_IF_FALSE       39 (to 1542)
+
+345        1464 PUSH_NULL
+           1466 LOAD_DEREF               1 (progress_callback)
+           1468 LOAD_CONST              12 ('[')
+           1470 LOAD_FAST                9 (index)
+           1472 FORMAT_VALUE             0
+           1474 LOAD_CONST              13 ('/')
+           1476 LOAD_GLOBAL             19 (NULL + len)
+           1486 LOAD_DEREF              21 (videos)
+           1488 CALL                     1
+           1496 FORMAT_VALUE             0
+           1498 LOAD_CONST              14 ('] 拆解失败，已跳过：')
+           1500 LOAD_FAST               10 (video)
+           1502 LOAD_ATTR               34 (name)
+           1522 FORMAT_VALUE             0
+           1524 LOAD_CONST              15 (' -> ')
+           1526 LOAD_FAST               12 (reason)
+           1528 FORMAT_VALUE             0
+           1530 BUILD_STRING             8
+           1532 CALL                     1
+           1540 POP_TOP
+        >> 1542 POP_EXCEPT
+           1544 LOAD_CONST               0 (None)
+           1546 STORE_FAST              11 (exc)
+           1548 DELETE_FAST             11 (exc)
+           1550 EXTENDED_ARG             2
+           1552 JUMP_BACKWARD          543 (to 468)
+        >> 1554 LOAD_CONST               0 (None)
+           1556 STORE_FAST              11 (exc)
+           1558 DELETE_FAST             11 (exc)
+           1560 RERAISE                  1
+
+341     >> 1562 RERAISE                  0
+        >> 1564 COPY                     3
+           1566 POP_EXCEPT
+           1568 RERAISE                  1
+        >> 1570 PUSH_EXC_INFO
+
+369        1572 LOAD_GLOBAL             26 (Exception)
+           1582 CHECK_EXC_MATCH
+           1584 POP_JUMP_IF_FALSE      125 (to 1836)
+           1586 STORE_FAST              11 (exc)
+
+370        1588 LOAD_DEREF              21 (videos)
+           1590 LOAD_FAST_CHECK          9 (index)
+           1592 LOAD_CONST               5 (1)
+           1594 BINARY_OP               10 (-)
+           1598 BINARY_SUBSCR
+           1602 STORE_FAST              10 (video)
+
+371        1604 LOAD_GLOBAL             29 (NULL + str)
+           1614 LOAD_FAST               11 (exc)
+           1616 CALL                     1
+           1624 LOAD_ATTR               31 (NULL|self + splitlines)
+           1644 CALL                     0
+           1652 LOAD_CONST              11 (0)
+           1654 BINARY_SUBSCR
+           1658 STORE_FAST              12 (reason)
+
+372        1660 LOAD_FAST                8 (failures)
+           1662 LOAD_ATTR               25 (NULL|self + append)
+           1682 LOAD_GLOBAL             33 (NULL + SplitFailure)
+           1692 LOAD_FAST               10 (video)
+           1694 LOAD_FAST               12 (reason)
+           1696 LOAD_GLOBAL             29 (NULL + str)
+           1706 LOAD_FAST               11 (exc)
+           1708 CALL                     1
+           1716 CALL                     3
+           1724 CALL                     1
+           1732 POP_TOP
+
+373        1734 LOAD_DEREF               1 (progress_callback)
+           1736 POP_JUMP_IF_FALSE       39 (to 1816)
+
+374        1738 PUSH_NULL
+           1740 LOAD_DEREF               1 (progress_callback)
+           1742 LOAD_CONST              12 ('[')
+           1744 LOAD_FAST                9 (index)
+           1746 FORMAT_VALUE             0
+           1748 LOAD_CONST              13 ('/')
+           1750 LOAD_GLOBAL             19 (NULL + len)
+           1760 LOAD_DEREF              21 (videos)
+           1762 CALL                     1
+           1770 FORMAT_VALUE             0
+           1772 LOAD_CONST              14 ('] 拆解失败，已跳过：')
+           1774 LOAD_FAST               10 (video)
+           1776 LOAD_ATTR               34 (name)
+           1796 FORMAT_VALUE             0
+           1798 LOAD_CONST              15 (' -> ')
+           1800 LOAD_FAST               12 (reason)
+           1802 FORMAT_VALUE             0
+           1804 BUILD_STRING             8
+           1806 CALL                     1
+           1814 POP_TOP
+        >> 1816 POP_EXCEPT
+           1818 LOAD_CONST               0 (None)
+           1820 STORE_FAST              11 (exc)
+           1822 DELETE_FAST             11 (exc)
+           1824 EXTENDED_ARG             1
+           1826 JUMP_BACKWARD          405 (to 1018)
+        >> 1828 LOAD_CONST               0 (None)
+           1830 STORE_FAST              11 (exc)
+           1832 DELETE_FAST             11 (exc)
+           1834 RERAISE                  1
+
+369     >> 1836 RERAISE                  0
+        >> 1838 COPY                     3
+           1840 POP_EXCEPT
+           1842 RERAISE                  1
+
+356     >> 1844 PUSH_EXC_INFO
+           1846 WITH_EXCEPT_START
+           1848 POP_JUMP_IF_TRUE         1 (to 1852)
+           1850 RERAISE                  2
+        >> 1852 POP_TOP
+           1854 POP_EXCEPT
+           1856 POP_TOP
+           1858 POP_TOP
+           1860 EXTENDED_ARG             1
+           1862 JUMP_BACKWARD          351 (to 1162)
+        >> 1864 COPY                     3
+           1866 POP_EXCEPT
+           1868 RERAISE                  1
+        >> 1870 SWAP                     2
+           1872 POP_TOP
+
+381        1874 SWAP                     2
+           1876 STORE_FAST              18 (result)
+           1878 RERAISE                  0
+ExceptionTable:
+  482 to 528 -> 1312 [1]
+  710 to 896 -> 1844 [1] lasti
+  900 to 970 -> 1844 [1] lasti
+  974 to 1016 -> 1570 [1]
+  1018 to 1142 -> 1844 [1] lasti
+  1170 to 1182 -> 1870 [2]
+  1186 to 1192 -> 1870 [2]
+  1312 to 1328 -> 1564 [2] lasti
+  1330 to 1540 -> 1554 [2] lasti
+  1554 to 1562 -> 1564 [2] lasti
+  1570 to 1586 -> 1838 [2] lasti
+  1588 to 1814 -> 1828 [2] lasti
+  1816 to 1826 -> 1844 [1] lasti
+  1828 to 1836 -> 1838 [2] lasti
+  1838 to 1842 -> 1844 [1] lasti
+  1844 to 1852 -> 1864 [3] lasti
+
+Disassembly of <code object split_one at <address>, file "xiaoguan_classifier\shot_splitter.py", line 328>:
+              0 COPY_FREE_VARS           5
+
+328           2 RESUME                   0
+
+329           4 LOAD_GLOBAL              1 (NULL + _wait_if_paused)
+             14 LOAD_DEREF               4 (pause_event)
+             16 LOAD_DEREF               5 (progress_callback)
+             18 CALL                     2
+             26 POP_TOP
+
+330          28 LOAD_DEREF               5 (progress_callback)
+             30 POP_JUMP_IF_FALSE       36 (to 104)
+
+331          32 PUSH_NULL
+             34 LOAD_DEREF               5 (progress_callback)
+             36 LOAD_CONST               1 ('[')
+             38 LOAD_FAST                0 (index)
+             40 FORMAT_VALUE             0
+             42 LOAD_CONST               2 ('/')
+             44 LOAD_GLOBAL              3 (NULL + len)
+             54 LOAD_DEREF               6 (videos)
+             56 CALL                     1
+             64 FORMAT_VALUE             0
+             66 LOAD_CONST               3 ('] 拆解 ')
+             68 LOAD_FAST                1 (video)
+             70 LOAD_ATTR                4 (name)
+             90 FORMAT_VALUE             0
+             92 BUILD_STRING             6
+             94 CALL                     1
+            102 POP_TOP
+
+332     >>  104 LOAD_DEREF               7 (worker_count)
+            106 LOAD_CONST               4 (1)
+            108 COMPARE_OP              68 (>)
+            112 POP_JUMP_IF_FALSE        2 (to 118)
+            114 LOAD_CONST               4 (1)
+            116 JUMP_FORWARD             5 (to 128)
+        >>  118 LOAD_GLOBAL              6 (SPLIT_EXPORT_WORKERS)
+        >>  128 STORE_FAST               2 (per_video_export_workers)
+
+333         130 LOAD_GLOBAL              9 (NULL + split_video_stable)
+            140 LOAD_FAST                1 (video)
+            142 LOAD_DEREF               3 (outputs)
+            144 LOAD_DEREF               5 (progress_callback)
+            146 LOAD_DEREF               4 (pause_event)
+            148 LOAD_FAST                2 (per_video_export_workers)
+            150 CALL                     5
+            158 RETURN_VALUE

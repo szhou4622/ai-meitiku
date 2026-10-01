@@ -1,0 +1,146 @@
+{
+  "module": "xiaoguan_classifier.prompt",
+  "bytecode_sha256": "52665f14af2c503d1075fd127a9c5fb1dbcba0bc4a459de87de5f718790a03c8",
+  "observed_in_classification_run": true,
+  "sample_count": 3,
+  "samples": [
+    {
+      "module": "xiaoguan_classifier.prompt",
+      "function": "<module>",
+      "calls": 1,
+      "input": {},
+      "output": null
+    },
+    {
+      "module": "xiaoguan_classifier.prompt",
+      "function": "taxonomy_text",
+      "calls": 1,
+      "input": {},
+      "output": "<str length=433 sha256=2df2d33c14f9d116>"
+    },
+    {
+      "module": "xiaoguan_classifier.prompt",
+      "function": "taxonomy_text_for",
+      "calls": 1,
+      "input": {
+        "taxonomy": {
+          "00_待筛素材": {
+            "type": "list",
+            "length": 1,
+            "items": [
+              "画面不明确或低相关"
+            ]
+          },
+          "01_痛点镜头": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "上课备考犯困",
+              "办公开会犯困",
+              "午后工作犯困",
+              "加班熬夜犯困",
+              "通勤路上犯困",
+              "开车出行犯困"
+            ]
+          },
+          "02_产品镜头": {
+            "type": "list",
+            "length": 10,
+            "items": [
+              "瓶身展示",
+              "整箱展示",
+              "产品组合",
+              "包装信息",
+              "配料表",
+              "营养成分",
+              "活动机制",
+              "产品空镜",
+              "冰爽清冽",
+              "液体质感"
+            ]
+          },
+          "03_使用镜头": {
+            "type": "list",
+            "length": 7,
+            "items": [
+              "上课备考",
+              "办公开会",
+              "午后工位",
+              "加班续航",
+              "通勤外带",
+              "开车出行",
+              "冰饮畅饮"
+            ]
+          },
+          "04_卖点镜头": {
+            "type": "list",
+            "length": 3,
+            "items": [
+              "提神醒脑",
+              "配料干净低负担",
+              "好喝体验"
+            ]
+          },
+          "05_对比镜头": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "喝前喝后",
+              "对比普通咖啡",
+              "对比含糖饮料",
+              "对比能量饮料",
+              "对比普通茶饮",
+              "成分负担对比"
+            ]
+          },
+          "06_真人口播": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "痛点口播",
+              "卖点口播",
+              "场景口播",
+              "测评口播",
+              "活动口播",
+              "主播讲解"
+            ]
+          },
+          "07_品牌背书": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "小罐茶品牌",
+              "现代中国茶",
+              "工厂矩阵",
+              "门店销量",
+              "专利技术",
+              "茶饮研发"
+            ]
+          },
+          "08_达人素材": {
+            "type": "list",
+            "length": 2,
+            "items": [
+              "达人原片",
+              "达人口播"
+            ]
+          },
+          "10_AI生成": {
+            "type": "list",
+            "length": 6,
+            "items": [
+              "脑雾清醒特效",
+              "茶咖融合视觉",
+              "咖啡因示意",
+              "液体漩涡",
+              "场景补充",
+              "转场动效"
+            ]
+          }
+        }
+      },
+      "output": "<str length=433 sha256=2df2d33c14f9d116>"
+    }
+  ],
+  "note": ""
+}

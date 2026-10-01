@@ -1,0 +1,250 @@
+"""浏览器驱动领取任务与回传结果用例。"""
+
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
+from secrets import token_urlsafe
+
+from loguru import logger
+from pydantic import JsonValue
+
+from xhs_core.domain import (
+    BrowserDriver,
+    BrowserTask,
+    BrowserTaskClaim,
+    BrowserTaskError,
+    BrowserTaskLeaseConflictError,
+    BrowserTaskStatus,
+    browser_task_may_write_platform,
+    sanitize_browser_page_diagnostics,
+    sanitize_browser_task_message,
+)
+from xhs_core.domain.browser_ports import BrowserTaskRepository
+from xhs_core.domain.browser_requests import validate_browser_task_result
+
+_ACTIVE = {BrowserTaskStatus.CLAIMED, BrowserTaskStatus.RUNNING}
+_TERMINAL = {
+    BrowserTaskStatus.SUCCEEDED,
+    BrowserTaskStatus.FAILED,
+    BrowserTaskStatus.NEEDS_REVIEW,
+}
+
+
+class BrowserExecutionService:
+    """向浏览器执行器提供短期租约并维护执行状态。
+
+    Args:
+        repository: 浏览器任务仓储。
+        lease_seconds: 执行器无心跳时的租约秒数。
+
+    Raises:
+        ValueError: 租约期限不在协议支持范围内。
+    """
+
+    def __init__(
+        self,
+        repository: BrowserTaskRepository,
+        lease_seconds: float,
+    ) -> None:
+        if not 0.01 <= lease_seconds <= 3600:
+            raise ValueError("浏览器任务租约必须在 0.01 到 3600 秒之间")
+        self._repository = repository
+        self._lease_seconds = lease_seconds
+
+    async def claim(
+        self,
+        executor_id: str,
+        target_driver: BrowserDriver = BrowserDriver.EXTENSION,
+    ) -> BrowserTaskClaim | None:
+        """原子领取最早排队的浏览器任务。
+
+        Args:
+            executor_id: 已登记扩展或受管 Worker 实例 ID。
+            target_driver: 只领取该驱动的排队任务。
+
+        Returns:
+            带短期令牌的任务；队列为空时返回 ``None``。
+        """
+        await self.reconcile_expired()
+        now = datetime.now(UTC)
+        token = token_urlsafe(32)
+        task = await self._repository.claim_next(
+            executor_id,
+            now,
+            now + timedelta(seconds=self._lease_seconds),
+            _token_hash(token),
+            target_driver,
+        )
+        return (
+            BrowserTaskClaim(
+                task=task,
+                lease_token=token,
+                lease_seconds=self._lease_seconds,
+            )
+            if task
+            else None
+        )
+
+    async def update(
+        self,
+        task_id: str,
+        lease_token: str,
+        status: BrowserTaskStatus,
+        message: str,
+        result: dict[str, JsonValue] | None = None,
+    ) -> BrowserTask:
+        """推进任务状态并在终态保存结构化结果。
+
+        Args:
+            task_id: 任务唯一标识。
+            lease_token: 浏览器执行器领取任务时获得的短期令牌。
+            status: 运行中或终态状态。
+            message: 不含用户原文的执行摘要。
+            result: 浏览器执行器返回的结构化结果。
+
+        Returns:
+            更新后的任务。
+
+        Raises:
+            BrowserTaskLeaseConflictError: 租约无效或状态快照已经变化。
+            BrowserTaskError: 状态转换或成功结果结构无效。
+        """
+        task = await self._require_lease(task_id, lease_token)
+        allowed = _allowed_transitions(task.status)
+        if status not in allowed:
+            raise BrowserTaskError(f"不能从 {task.status.value} 转换到 {status.value}")
+        if status is BrowserTaskStatus.SUCCEEDED and result is None:
+            raise BrowserTaskError("成功任务必须返回结构化结果")
+        normalized_result = _normalize_terminal_result(task, status, result)
+        _log_discarded_reason(task_id, status, message)
+        now = datetime.now(UTC)
+        terminal = status in _TERMINAL
+        updated = task.model_copy(
+            update={
+                "status": status,
+                "result": normalized_result if terminal else task.result,
+                "message": sanitize_browser_task_message(status, message),
+                "lease_expires_at": (
+                    None if terminal else now + timedelta(seconds=self._lease_seconds)
+                ),
+                "updated_at": now,
+            }
+        )
+        if not await self._repository.save_if_status(
+            updated,
+            task.status,
+            expected_updated_at=task.updated_at,
+            expected_lease_expires_at=task.lease_expires_at,
+            expected_lease_hash=_token_hash(lease_token),
+            clear_lease=terminal,
+        ):
+            raise BrowserTaskLeaseConflictError("浏览器任务状态已经变化，请刷新后重试")
+        return updated
+
+    async def reconcile_expired(self) -> None:
+        """恢复租约过期任务，并隔离可能已经产生外部写入的任务。"""
+        now = datetime.now(UTC)
+        for task in await self._repository.list_expired(now):
+            recoverable = (
+                task.status is BrowserTaskStatus.CLAIMED
+                or not browser_task_may_write_platform(task.kind)
+            )
+            status = (
+                BrowserTaskStatus.QUEUED
+                if recoverable
+                else BrowserTaskStatus.NEEDS_REVIEW
+            )
+            message = (
+                "租约过期，任务已重新排队"
+                if recoverable
+                else "执行中租约过期，请人工核对平台结果"
+            )
+            updated = task.model_copy(
+                update={
+                    "status": status,
+                    "executor_id": None,
+                    "extension_id": None,
+                    "lease_expires_at": None,
+                    "message": message,
+                    "updated_at": now,
+                }
+            )
+            await self._repository.save_if_status(
+                updated,
+                task.status,
+                expected_updated_at=task.updated_at,
+                expected_lease_expires_at=task.lease_expires_at,
+                clear_lease=True,
+            )
+
+    async def _require_lease(
+        self,
+        task_id: str,
+        lease_token: str,
+    ) -> BrowserTask:
+        task = await self._repository.get(task_id)
+        valid_hash = await self._repository.validate_lease(
+            task_id,
+            _token_hash(lease_token),
+        )
+        lease_active = bool(
+            task
+            and task.status in _ACTIVE
+            and task.lease_expires_at
+            and task.lease_expires_at > datetime.now(UTC)
+        )
+        if not task or not valid_hash or not lease_active:
+            raise BrowserTaskLeaseConflictError("浏览器任务租约无效或已经过期")
+        return task
+
+
+def _allowed_transitions(
+    status: BrowserTaskStatus,
+) -> set[BrowserTaskStatus]:
+    if status is BrowserTaskStatus.CLAIMED:
+        return {BrowserTaskStatus.RUNNING, *_TERMINAL}
+    if status is BrowserTaskStatus.RUNNING:
+        return {BrowserTaskStatus.RUNNING, *_TERMINAL}
+    return set()
+
+
+def _token_hash(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
+
+
+def _normalize_terminal_result(
+    task: BrowserTask,
+    status: BrowserTaskStatus,
+    result: dict[str, JsonValue] | None,
+) -> dict[str, JsonValue] | None:
+    if status is BrowserTaskStatus.SUCCEEDED and result is not None:
+        return validate_browser_task_result(task.kind, result)
+    if status in {BrowserTaskStatus.FAILED, BrowserTaskStatus.NEEDS_REVIEW}:
+        return sanitize_browser_page_diagnostics(result)
+    return None
+
+
+def _log_discarded_reason(
+    task_id: str,
+    status: BrowserTaskStatus,
+    message: str,
+) -> None:
+    """把即将被脱敏掉的失败原因留在本地日志里。
+
+    对外的消息必须白名单化, 执行器返回的原文可能夹带页面内容。但整条原因连本地
+    日志都不留, 出问题时连开发者也无从查起——界面上只剩一句通用失败。这里只写本机
+    日志文件, 不进入任何 API 响应。
+
+    Args:
+        task_id: 浏览器任务标识。
+        status: 任务即将进入的状态。
+        message: 执行器返回的原始消息。
+    """
+    safe = sanitize_browser_task_message(status, message)
+    if safe == message:
+        return
+    logger.warning(
+        "浏览器任务 {} 进入 {} 的原始原因：{}",
+        task_id,
+        status.value,
+        message[:500],
+    )
