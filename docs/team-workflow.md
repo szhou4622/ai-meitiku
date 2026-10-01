@@ -53,3 +53,12 @@ git diff --check origin/main HEAD
 分别报告已开发、已提交并推送、已验证、已合并、已上线。
 提供分支、提交号、PR 与检查链接，明确未完成项。
 不覆盖未知改动，不修改其他仓库，不因检查失败关闭保护。
+
+## 配置验收记录（2026-10-01）
+
+- 配置 PR：[PR #1](https://github.com/szhou4622/ai-meitiku/pull/1)。
+- [首次真实检查通过](https://github.com/szhou4622/ai-meitiku/actions/runs/36841271458)。
+- [受控失败演练](https://github.com/szhou4622/ai-meitiku/actions/runs/36841396466)：仅在配置分支暂时移除 PR 模板，检查明确失败，PR 状态为 `BLOCKED`；随后恢复模板，故障内容不进入最终基线。
+- 设置回读确认：main 必需检查绑定 GitHub Actions，要求同步主分支、解决讨论，管理员受保护，禁止强推与删除，只允许 Squash。
+- 独立成员批准流程尚未验收：当前只有仓库所有者，批准人数为 0；成员加入后再完成该项。
+- 应用功能、构建、启动及上线验证尚未执行，等待完整源码导入。
