@@ -11,13 +11,17 @@ export function feiguaPage(command, argument = {}) {
     const candidates = [node, node?.closest('a,button,li,label')].filter(Boolean);
     return candidates.some(item => /(^|[\s_-])(active|selected|checked|current)([\s_-]|$)/i.test(item.className || '') || item.getAttribute('aria-selected') === 'true' || item.getAttribute('aria-pressed') === 'true');
   };
-  const authenticated = () => {
+  const authState = () => {
     const body = text(document.body);
-    const hasShell = body.includes('个人中心') && body.includes('收藏夹') && body.includes('视频/素材');
+    const compactBody = body.replace(/\s+/g, '');
+    const hasShell = compactBody.includes('个人中心') && compactBody.includes('收藏夹') && compactBody.includes('视频/素材');
     const loginDialog = elements('input[type="password"], iframe').some(node => node.tagName === 'INPUT' || /login|qrcode/i.test(node.getAttribute('src') || ''))
       || /微信扫码登录|扫码登录\/注册|登录已过期|请重新登录/.test(body);
-    return hasShell && !loginDialog;
+    const loginVisible = loginDialog || exact('注册 / 登录').length > 0 || exact('登录').length > 0;
+    return { authenticated: hasShell && !loginDialog, loginVisible,
+      workspaceAvailable: !hasShell && !loginVisible && exact('进入工作台').length === 1 };
   };
+  const authenticated = () => authState().authenticated;
   const failure = message => ({ error: message });
   const scope = label => {
     const labels = exact(label);
@@ -28,7 +32,15 @@ export function feiguaPage(command, argument = {}) {
     }
     return null;
   };
-  if (command === 'auth') return { authenticated: authenticated(), loginVisible: /微信扫码登录|注册\s*\/\s*登录|请重新登录/.test(text(document.body)) };
+  if (command === 'auth') return authState();
+  if (command === 'enter-workspace') {
+    if (!authState().workspaceAvailable) return failure('尚未发现登录后的工作台入口');
+    const entry = exact('进入工作台')[0];
+    const anchor = entry.closest('a[href]');
+    if (anchor && /^https:\/\/dy\d*\.feigua\.cn\//.test(anchor.href)) return { url: anchor.href };
+    entry.click();
+    return { clicked: true };
+  }
   if (command === 'login') {
     const link = exact('注册 / 登录')[0] || exact('登录')[0];
     if (link) link.click();

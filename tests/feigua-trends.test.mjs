@@ -185,3 +185,37 @@ test('automatic login notification reaches the state polled by the media library
   browser.onAuthChange({ status: 'authenticated', message: '已登录飞瓜' });
   assert.equal((await service.state()).auth.status, 'authenticated');
 });
+
+test('signed-in marketing homepage enters the workspace before closing the login window', async () => {
+  const browser = new FeiguaBrowser({});
+  let url = 'https://dy.feigua.cn/', closed = 0, entered = 0;
+  const states = [];
+  browser.window = { isDestroyed: () => false, webContents: { getURL: () => url }, close: () => { closed++; } };
+  browser.onAuthChange = auth => states.push(auth.status);
+  browser.execute = async command => {
+    if (command === 'enter-workspace') { entered++; return { url: 'https://dy.feigua.cn/synthetic/workspace' }; }
+    return { authenticated: url.endsWith('/workspace'), workspaceAvailable: url === 'https://dy.feigua.cn/' };
+  };
+  browser.navigate = async target => { url = target; };
+  browser.startLoginWatch();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(entered, 1); assert.equal(closed, 0);
+  assert.deepEqual(states, ['checking']);
+  browser.startLoginWatch();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(closed, 1); assert.deepEqual(states, ['checking', 'authenticated']);
+  assert.equal(browser.loginTimer, null);
+});
+
+test('persisted homepage session is resolved to the workspace during login checks', async () => {
+  const browser = new FeiguaBrowser({});
+  let entered = false;
+  browser.ensureWindow = () => {};
+  browser.window = { webContents: { getURL: () => 'https://dy.feigua.cn/' } };
+  browser.execute = async command => {
+    if (command === 'enter-workspace') { entered = true; return { clicked: true }; }
+    return { authenticated: entered, workspaceAvailable: !entered, loginVisible: false };
+  };
+  assert.equal((await browser.checkLogin()).status, 'authenticated');
+  assert.equal(entered, true);
+});

@@ -12,6 +12,12 @@ try {
   await mount('<h1>微信扫码登录/注册飞瓜数据</h1>');
   assert('登录页面不能视为已登录', run('auth').authenticated === false);
   assert('登录页不能采集为空榜单', run('capture', {kind:'videos'}).authRequired === true);
+  await mount('<header><a href="https://dy.feigua.cn/synthetic/workspace">进入工作台</a><img alt="用户头像"></header>');
+  assert('官网登录后首页识别工作台入口', run('auth').workspaceAvailable === true);
+  assert('官网首页本身不冒充后台验证成功', run('auth').authenticated === false);
+  assert('使用页面真实工作台链接', run('enter-workspace').url === 'https://dy.feigua.cn/synthetic/workspace');
+  await mount('<header><a>进入工作台</a><a>注册 / 登录</a></header>');
+  assert('仍有登录入口时不误判已完成登录', run('auth').workspaceAvailable === false);
   await mount(shell + `<div><span>视频标签</span><a class="active"><span>全部</span></a><a>时尚</a></div>
     <table><thead><tr><th>音乐</th><th>总使用人数</th><th aria-sort="descending">昨日使用人数</th></tr></thead>
     <tbody><tr><td><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></td><td>100w</td><td>3w</td></tr></tbody></table>`);

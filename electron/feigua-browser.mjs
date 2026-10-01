@@ -86,7 +86,7 @@ export class FeiguaBrowser {
     this.ensureWindow(true);
     if (!isFeiguaDataUrl(this.window.webContents.getURL())) await this.navigate(FEIGUA_HOME);
     const auth = await this.execute('auth');
-    if (!auth.authenticated) await this.execute('login');
+    if (!auth.authenticated && !auth.workspaceAvailable) await this.execute('login');
     this.startLoginWatch();
   }
 
@@ -97,6 +97,7 @@ export class FeiguaBrowser {
 
   startLoginWatch() {
     this.stopLoginWatch();
+    const enteredUrls = new Set();
     const check = async () => {
       if (this.loginCheckPending || !this.window || this.window.isDestroyed()) return;
       this.loginCheckPending = true;
@@ -104,6 +105,14 @@ export class FeiguaBrowser {
       try {
         if (!isFeiguaDataUrl(loginWindow.webContents.getURL())) return;
         const auth = await this.execute('auth');
+        if (!auth.authenticated && auth.workspaceAvailable) {
+          const currentUrl = loginWindow.webContents.getURL();
+          if (enteredUrls.has(currentUrl)) return;
+          enteredUrls.add(currentUrl);
+          this.onAuthChange?.({ status: 'checking', message: '登录已完成，正在进入飞瓜工作台核验…' });
+          await this.enterWorkspace();
+          return;
+        }
         if (!auth.authenticated || this.window !== loginWindow) return;
         this.wasAuthenticated = true;
         this.onAuthChange?.({ status: 'authenticated', message: '已登录飞瓜' });
@@ -121,9 +130,29 @@ export class FeiguaBrowser {
     this.ensureWindow();
     if (!this.window.webContents.getURL()) await this.navigate(FEIGUA_HOME);
     if (!isFeiguaDataUrl(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在飞瓜窗口完成登录' };
-    const auth = await this.execute('auth');
+    let auth = await this.execute('auth');
+    if (!auth.authenticated && auth.workspaceAvailable) {
+      await this.enterWorkspace();
+      auth = await this.waitForWorkspace();
+    }
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
     return { status: this.wasAuthenticated ? 'expired' : 'signed_out', message: this.wasAuthenticated ? '飞瓜登录已失效，请重新登录' : '请先在飞瓜窗口完成登录' };
+  }
+
+  async enterWorkspace() {
+    const entry = await this.execute('enter-workspace');
+    if (entry.url) await this.navigate(entry.url);
+  }
+
+  async waitForWorkspace(signal) {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+      const auth = await this.execute('auth');
+      if (auth.authenticated || auth.loginVisible) return auth;
+      await delay(300, undefined, { signal });
+    }
+    throw issue('未能进入飞瓜工作台，请打开登录窗口核对页面', 'FEIGUA_WORKSPACE_UNAVAILABLE');
   }
 
   async choose(command, args, signal) {
@@ -140,6 +169,11 @@ export class FeiguaBrowser {
     if (signal.aborted) throw issue('已取消采集');
     // Discover routes from the signed-in application's menu; never guess API paths.
     await this.navigate(FEIGUA_HOME);
+    const auth = await this.execute('auth');
+    if (auth.workspaceAvailable) {
+      await this.enterWorkspace();
+      await this.waitForWorkspace(signal);
+    }
     await this.settle(signal);
     let destination = await this.execute('navigate', { labels: source.navigation });
     if (destination.expanded) { await this.settle(signal); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
