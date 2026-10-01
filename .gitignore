@@ -1,0 +1,47 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+
+# Dependencies and build outputs
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+coverage/
+*.egg-info/
+
+# Runtime data and installation packages
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+*.exe
+*.dmg
+*.zip
+*.tar
+*.tar.gz
+uploads/
+downloads/
+backups/
+state/
+.task-temp/
+
+# OS and editor files
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/
