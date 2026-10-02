@@ -368,3 +368,52 @@ test('explicit batch selection does not substitute another batch after a failure
   const runs=[{id:'new',groups:[group]},{id:'old',groups:[{kind:'music',status:'completed',result:{rows:[{}]}}]}];
   assert.deepEqual(displayedFeiguaGroups(runs,'new'),[group]);
 });
+
+test('save and refresh persists selection and collects only BGM', async () => {
+  const {service,calls,disk}=fixture();
+  await service.ready; await service.cacheMusicTags({options:tagOptions});
+  await service.saveKeywords(['保留关键词']);
+  await service.saveAndRefreshMusicTag(['测试一级甲','测试二级乙']); await service.job;
+  assert.deepEqual(calls,[['music',null]]);
+  assert.deepEqual(disk().musicTag,['测试一级甲','测试二级乙']);
+  assert.deepEqual(disk().keywords,['保留关键词']);
+  assert.equal(disk().runs[0].groups[0].result.filters.category,'测试一级甲 > 测试二级乙');
+});
+
+test('save and refresh keeps selection and records a visible failure when login is unavailable', async () => {
+  const {service,calls}=fixture({auth:{status:'signed_out'}});
+  await service.ready; await service.cacheMusicTags({options:tagOptions});
+  await service.saveAndRefreshMusicTag(['测试一级甲']); await service.job;
+  const state=await service.state();
+  assert.deepEqual(state.musicTag,['测试一级甲']);assert.equal(calls.length,0);
+  assert.equal(state.runs[0].status,'failed');assert.match(state.runs[0].groups[0].message,/已保存/);
+});
+
+test('busy refresh refuses to overwrite settings or start a second BGM job', async () => {
+  let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const {service}=fixture({collect:async(kind,keyword,_signal,options)=>{await gate;return capture(kind,keyword,{musicTag:options.musicTag});}});
+  await service.ready;await service.cacheMusicTags({options:tagOptions});
+  await service.saveAndRefreshMusicTag(['测试一级甲']);
+  await assert.rejects(service.saveAndRefreshMusicTag(['测试一级乙']),/正在执行/);
+  assert.deepEqual((await service.state()).musicTag,['测试一级甲']);
+  release();await service.job;
+});
+
+test('fallback display exposes the attempted category and refresh failure while retaining old result labels', () => {
+  const runs=[{id:'new',groups:[{kind:'music',status:'failed',message:'筛选未完成',musicTag:['新分类']}]},{id:'old',groups:[{kind:'music',status:'completed',result:{rows:[{}],filters:{category:'全部'}}}]}];
+  const group=displayedFeiguaGroups(runs)[0];
+  assert.equal(group.refreshStatus,'failed');assert.equal(group.refreshMessage,'筛选未完成');
+  assert.deepEqual(group.requestedMusicTag,['新分类']);assert.equal(group.result.filters.category,'全部');
+});
+
+test('repeated BGM-only refreshes do not evict other modules from the latest results cache', async () => {
+  const {service,disk}=fixture();
+  await service.saveKeywords(['已采集关键词']);await service.start();await service.job;
+  for(let i=0;i<13;i++){await service.saveAndRefreshMusicTag([]);await service.job;}
+  const reloaded=fixture({stored:disk()}).service;
+  const state=await reloaded.state();
+  assert.equal(state.runs.length,12);
+  const shown=displayedFeiguaGroups(state.runs,'',state.latestResults);
+  assert.equal(shown.length,4);assert.ok(shown.every(group=>group.result.rows.length===5));
+});
