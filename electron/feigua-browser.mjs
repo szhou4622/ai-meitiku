@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl } from './feigua-contract.mjs';
+import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
@@ -186,10 +186,10 @@ export class FeiguaBrowser {
     if (!verified.verified) throw issue('未能确认筛选条件，已停止本组采集');
   }
 
-  async collect(kind, keyword, signal) {
+  async openSource(kind, signal) {
     const source = FEIGUA_SOURCES[kind];
     if (!source) throw issue('未知飞瓜来源');
-    if (signal.aborted) throw issue('已取消采集');
+    if (signal?.aborted) throw issue('已取消采集');
     // Discover routes from the signed-in application's menu; never guess API paths.
     await this.navigate(FEIGUA_HOME);
     const auth = await this.resolveAuth(signal);
@@ -207,6 +207,17 @@ export class FeiguaBrowser {
       if (this.window.webContents.getURL() === previousUrl) throw issue('飞瓜菜单未完成跳转，已停止读取旧页面');
     }
     await this.settle(signal);
+  }
+
+  async getMusicTags() {
+    await this.openSource('music');
+    return this.execute('music-tag-options');
+  }
+
+  async collect(kind, keyword, signal, options = {}) {
+    const source = FEIGUA_SOURCES[kind];
+    await this.openSource(kind, signal);
+    const musicTag = kind === 'music' ? normalizeMusicTag(options.musicTag) : [];
     if (kind === 'videos') {
       await this.execute('clear'); await this.settle(signal);
       await this.choose('category', { label: '带货品类' }, signal);
@@ -220,7 +231,10 @@ export class FeiguaBrowser {
         await this.choose('category', { label: '话题分类' }, signal);
         await this.choose('category', { label: '话题类型' }, signal);
       } else {
-        await this.choose('category', { label: kind === 'music' ? '视频标签' : '热点标签' }, signal);
+        if (kind === 'music') {
+          if (musicTag.length > 1) { await this.execute('music-tag', { path: musicTag, phase: 'expand' }); await this.settle(signal); }
+          await this.choose('music-tag', { path: musicTag, phase: 'select' }, signal);
+        } else await this.choose('category', { label: '热点标签' }, signal);
         if (kind === 'hotspots') await this.choose('choice', { label: '近7天' }, signal);
       }
     }

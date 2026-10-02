@@ -26,18 +26,48 @@ export function normalizeKeywords(input) {
   return result;
 }
 
+export function normalizeMusicTag(input = []) {
+  if (!Array.isArray(input) || input.length > 2) throw new Error('BGM 视频标签只支持一级、二级分类');
+  return input.map(label => {
+    if (typeof label !== 'string' || !label.trim() || label.trim() === '全部' || label.length > 60 || /[\u0000-\u001f]/.test(label)) throw new Error('BGM 视频标签无效');
+    return label.trim();
+  });
+}
+
+export function normalizeMusicTagOptions(options) {
+  if (!Array.isArray(options) || !options.length || options.length > 100) throw new Error('飞瓜未返回有效的视频标签目录');
+  const seen = new Set();
+  return options.map(option => {
+    const [label] = normalizeMusicTag([option?.label]);
+    if (seen.has(label) || !Array.isArray(option.children) || option.children.length > 200) throw new Error('飞瓜视频标签目录结构异常');
+    seen.add(label);
+    const children = [...new Set(option.children.map(child => normalizeMusicTag([child?.label])[0]))].map(label => ({ label }));
+    return { label, children };
+  });
+}
+
+export function validateMusicTag(path, options) {
+  const selection = normalizeMusicTag(path);
+  if (!selection.length) return selection;
+  const parent = options.find(option => option.label === selection[0]);
+  if (!parent || selection.length === 2 && !parent.children.some(child => child.label === selection[1])) throw new Error('该 BGM 视频标签已不在飞瓜目录中，请刷新分类后重新选择');
+  return selection;
+}
+
 function value(input, max = 1000) {
   return typeof input === 'string' ? input.trim().slice(0, max) || null : null;
 }
 
 // Whitelist provider data before it crosses IPC or reaches the local store.
-export function validateCapture(kind, keyword, capture) {
+export function validateCapture(kind, keyword, capture, options = {}) {
   const source = FEIGUA_SOURCES[kind];
   if (!source || !capture || !isFeiguaDataUrl(capture.url)) throw new Error('飞瓜来源校验失败');
   if (capture.sort !== source.sort || capture.direction !== 'desc' || capture.period !== source.period || capture.filtersVerified !== true) {
     throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
   }
   if (kind === 'videos' && capture.keyword !== keyword) throw new Error('关键词筛选与当前采集组不一致');
+  const musicTag = kind === 'music' ? normalizeMusicTag(options.musicTag) : [];
+  if (kind === 'music' && JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag)) throw new Error('BGM 实际视频标签与任务选择不一致，本组未保存');
   if (['topics', 'videos'].includes(kind) && !value(capture.dateRange, 100)) throw new Error('未取得实际统计日期，本组未保存');
   if (!Array.isArray(capture.rows) || (!capture.rows.length && capture.emptyVerified !== true)) throw new Error('未读到榜单，不能将未加载页面保存为空榜单');
   const seen = new Set();
@@ -67,7 +97,7 @@ export function validateCapture(kind, keyword, capture) {
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
     sort: source.sort, direction: 'desc', period: source.period,
     dateRange: value(capture.dateRange, 100),
-    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : { category: '全部' },
+    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : kind === 'music' ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
     rows,
   };
 }

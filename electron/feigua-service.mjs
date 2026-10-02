@@ -1,9 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { FEIGUA_SOURCES, normalizeKeywords, validateCapture } from './feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture } from './feigua-contract.mjs';
 
-const initial = () => ({ version: 1, keywords: [], runs: [] });
+const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [] });
 
 export class FeiguaService {
   constructor({ userDataPath, browser, storage }) {
@@ -44,7 +44,10 @@ export class FeiguaService {
   async load() {
     const data = await this.storage.read();
     if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
-    this.data = { version: 1, keywords: normalizeKeywords(data.keywords), runs: data.runs.slice(0, 12) };
+    this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
+      musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
+      musicTagRestricted: data.musicTagRestricted === true,
+      musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null, runs: data.runs.slice(0, 12) };
     let recovered = false;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
@@ -98,6 +101,48 @@ export class FeiguaService {
     return this.state();
   }
 
+  async saveMusicTag(input) {
+    await this.ready;
+    const selection = validateMusicTag(input, this.data.musicTagOptions);
+    const save = this.writeQueue.then(async () => {
+      validateMusicTag(selection, this.data.musicTagOptions);
+      await this.storage.write({ ...structuredClone(this.data), musicTag: selection });
+      this.data.musicTag = selection;
+    });
+    this.writeQueue = save.catch(() => {});
+    this.configQueue = save.catch(() => {});
+    await save;
+    return this.state();
+  }
+
+  async refreshMusicTags() {
+    await this.exclusive(async () => {
+      this.auth = await this.browser.checkLogin();
+      if (this.auth.status !== 'authenticated') throw new Error('请先登录飞瓜，分类目录会在登录后自动加载');
+      await this.syncMusicTags();
+    });
+    return this.state();
+  }
+
+  async syncMusicTags() {
+    const catalog = await this.browser.getMusicTags();
+    await this.cacheMusicTags(catalog);
+  }
+
+  async cacheMusicTags(catalog) {
+    const musicTagOptions = normalizeMusicTagOptions(catalog.options);
+    const musicTagRestricted = catalog.restricted === true;
+    const loadedAt = new Date().toISOString();
+    const save = this.writeQueue.then(async () => {
+      await this.storage.write({ ...structuredClone(this.data), musicTagOptions, musicTagOptionsLoadedAt: loadedAt, musicTagRestricted });
+      this.data.musicTagOptions = musicTagOptions;
+      this.data.musicTagOptionsLoadedAt = loadedAt;
+      this.data.musicTagRestricted = musicTagRestricted;
+    });
+    this.writeQueue = save.catch(() => {});
+    await save;
+  }
+
   async checkLogin() {
     await this.exclusive(async () => { this.auth = await this.browser.checkLogin(); });
     return this.state();
@@ -106,11 +151,13 @@ export class FeiguaService {
   async start() {
     await this.exclusive(async () => {
       await this.configQueue;
+      const musicTag = [...this.data.musicTag];
+      const keywords = [...this.data.keywords];
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending' }));
-      groups.push(...this.data.keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
-      const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords: [...this.data.keywords], groups, message: '准备采集' };
+      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
+      groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
+      const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, message: '准备采集' };
       this.data.runs.unshift(run);
       this.data.runs = this.data.runs.slice(0, 12);
       try { await this.persist(); } catch (error) { this.data.runs.shift(); throw error; }
@@ -131,9 +178,10 @@ export class FeiguaService {
       run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}`;
       await this.persist();
       try {
-        const capture = await this.browser.collect(group.kind, group.keyword, signal);
+        const capture = await this.browser.collect(group.kind, group.keyword, signal, { musicTag: group.musicTag || [] });
         if (signal.aborted) { group.status = 'cancelled'; continue; }
-        group.result = validateCapture(group.kind, group.keyword, capture);
+        if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
+        group.result = validateCapture(group.kind, group.keyword, capture, { musicTag: group.musicTag || [] });
         group.status = 'completed';
       } catch (error) {
         group.status = signal.aborted ? 'cancelled' : 'failed';

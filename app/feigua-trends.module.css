@@ -20,6 +20,11 @@
 .configuration form { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
 .configuration input { width: min(340px, 100%); border: 1px solid #d5e1e2; border-radius: 6px; background: #fbfdfd; padding: 10px; font-size: 13px; color: #29494c; }
 .configuration > small { display: block; color: #76898c; margin-top: 10px; font-size: 11px; }
+.musicConfiguration { margin-bottom: 14px; }
+.tagSelectors { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 14px; }
+.tagSelectors label { display: flex; flex-direction: column; gap: 6px; color: #73868b; font-size: 12px; }
+.tagSelectors select { min-width: 175px; max-width: 100%; padding: 9px 10px; border: 1px solid #d5e1e2; border-radius: 6px; background: #fbfdfd; color: #29494c; font-size: 13px; }
+.configuration .permissionNote { color: #996b38; }
 .tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .tags > span { display: inline-flex; background: #edf6f5; border: 1px solid #cfe6e2; border-radius: 5px; }
 .tags button { background: transparent; border: 0; padding: 5px 8px; }

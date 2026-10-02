@@ -2646,6 +2646,7 @@ if (hasSingleInstanceLock) {
   for (const [channel, method] of Object.entries({
     "feigua-state": "state", "feigua-save-keywords": "saveKeywords", "feigua-login": "login",
     "feigua-check-login": "checkLogin", "feigua-start": "start", "feigua-cancel": "cancel",
+    "feigua-save-music-tag": "saveMusicTag", "feigua-refresh-music-tags": "refreshMusicTags",
   })) {
     registerProtectedHandle(channel, async (event, ...args) => {
       if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {

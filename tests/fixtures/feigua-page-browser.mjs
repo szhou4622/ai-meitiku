@@ -61,5 +61,25 @@ try {
   assert('完整标题、佣金率、粉丝和区间保真', videos.rows[0].title === '合成完整标题' && videos.rows[0].products[0].commission === '5.00%' && videos.rows[0].followers === '10w' && videos.rows[0].sales === '10w~25w');
   assert('缺少播放列不填零', !videos.rows[0].plays);
   assert('统计日期提取', videos.dateRange === '2026-09-25 - 2026-10-01');
+  await mount(shell + `<div class="tag-cascader"><span class="tag-label">视频标签</span><div class="permission-wrapper"><ul class="tag-list"><li class="tag-element" id="all-tag">全部</li><li class="tag-element" id="parent-tag">合成一级</li></ul></div><div class="el-popover" style="display:none"><span id="child-tag">合成二级</span></div></div>`);
+  const tagRoot = frame.contentDocument.querySelector('.tag-cascader');
+  const widgetProps = { value:['0'],options:[{Id:'0',Name:'全部',Sub:[]},{Id:'1',Name:'合成一级',Sub:[{Id:'11',Name:'合成二级',Sub:[]}]}] };
+  tagRoot.__vue__ = { $props:widgetProps };
+  frame.contentDocument.querySelector('#all-tag').onclick = () => { widgetProps.value=['0']; };
+  frame.contentDocument.querySelector('#parent-tag').onclick = () => { widgetProps.value=['1']; };
+  frame.contentDocument.querySelector('#parent-tag').onmouseenter = () => { tagRoot.querySelector('.el-popover').style.display='block'; };
+  frame.contentDocument.querySelector('#child-tag').onclick = () => { widgetProps.value=['1','11']; };
+  const catalog=run('music-tag-options');
+  assert('BGM 分类目录包含真实父子层级', catalog.options[0].children[0].label==='合成二级');
+  run('music-tag',{path:['合成一级'],phase:'select'});
+  assert('只选择一级可以回读',run('music-tag',{path:['合成一级'],verify:true}).verified===true);
+  run('music-tag',{path:['合成一级','合成二级'],phase:'expand'});
+  run('music-tag',{path:['合成一级','合成二级'],phase:'select'});
+  assert('选择二级并核验完整路径',run('music-tag',{path:['合成一级','合成二级'],verify:true}).verified===true);
+  assert('错误二级不得视为筛选生效',run('music-tag',{path:['合成一级','不存在'],verify:true}).verified===false);
+  run('music-tag',{path:[],phase:'select'});
+  assert('支持回到全部标签',run('music-tag',{path:[],verify:true}).verified===true);
+  const mask=frame.contentDocument.createElement('div');mask.className='purview-mask-layer';mask.textContent='权限遮罩';tagRoot.querySelector('.permission-wrapper').append(mask);
+  assert('权限层存在时不得点击穿透',/权限受限/.test(run('music-tag',{path:['合成一级'],phase:'select'}).error)&&widgetProps.value[0]==='0');
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');

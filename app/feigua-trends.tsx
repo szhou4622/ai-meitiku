@@ -6,19 +6,22 @@ import styles from './feigua-trends.module.css';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
-type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[] };
-type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result };
+type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[] } };
+type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
-type State = { keywords: string[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
+type MusicTagOption = { label: string; children: { label: string }[] };
+type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
+  saveMusicTag: (path: string[]) => Promise<State>;
+  refreshMusicTags: () => Promise<State>;
   login: () => Promise<State>;
   checkLogin: () => Promise<State>;
   start: () => Promise<State>;
   cancel: () => Promise<State>;
 };
-const emptyState: State = { keywords: [], runs: [], busy: false, auth: { status: 'unknown', message: '尚未检查登录状态' } };
+const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点库 · 近7天 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
@@ -51,6 +54,7 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
 export function FeiguaTrends() {
   const [state, setState] = useState<State>(emptyState);
   const [keywords, setKeywords] = useState<string[]>([]);
+  const [musicTag, setMusicTag] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -60,6 +64,9 @@ export function FeiguaTrends() {
   const [selectedRun, setSelectedRun] = useState('');
   const initialized = useRef(false);
   const dirty = JSON.stringify(keywords) !== JSON.stringify(state.keywords);
+  const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
+  const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
+  const secondTags = firstTag?.children || [];
   const run = state.runs.find(item => item.id === selectedRun) || state.runs[0];
 
   useEffect(() => {
@@ -72,8 +79,8 @@ export function FeiguaTrends() {
       try {
         const next = await api.state();
         if (!alive) return;
-        setDesktop(true); setState(next); setLoaded(true);
-        if (!initialized.current) { setKeywords(next.keywords); initialized.current = true; }
+        setDesktop(true); setState({ ...emptyState, ...next }); setLoaded(true);
+        if (!initialized.current) { setKeywords(next.keywords); setMusicTag(next.musicTag || []); initialized.current = true; }
       } catch { if (alive) { setError('热点数据读取失败，请重试；原有数据不会被覆盖。'); setLoaded(true); } }
       finally { pending = false; }
     };
@@ -87,8 +94,9 @@ export function FeiguaTrends() {
     if (!api) { setError('请在 AI 媒体库桌面版使用飞瓜采集'); return; }
     setAction(name); setError('');
     try {
-      const next = await operation(api); setState(next);
+      const next = await operation(api); setState({ ...emptyState, ...next });
       if (name === 'save') setKeywords(next.keywords);
+      if (name === 'music-save') setMusicTag(next.musicTag);
       if (name === 'start') setSelectedRun(next.runs[0]?.id || '');
     } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作失败，请重试'); }
     finally { setAction(''); }
@@ -109,13 +117,33 @@ export function FeiguaTrends() {
     <header className={styles.heading}>
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
-        <button disabled={disabled || state.busy} onClick={() => void perform('login', api => api.login())}><LogIn size={16} />登录飞瓜</button>
+        <button disabled={disabled || state.busy || dirty || musicDirty} onClick={() => void perform('login', api => api.login())}><LogIn size={16} />登录飞瓜</button>
         {state.busy ? <button disabled={disabled} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止采集</button>
-          : <button className={styles.primary} disabled={disabled || dirty || !!input.trim() || editing !== null || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
+          : <button className={styles.primary} disabled={disabled || dirty || musicDirty || !!input.trim() || editing !== null || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
       </div>
     </header>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
+
+    <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 视频标签配置">
+      <div><h2>本周爆款 BGM · 视频标签</h2><p>选择一级或二级分类，按昨日使用人数降序取前 5</p></div>
+      <div className={styles.tagSelectors}>
+        <label>一级分类<select aria-label="BGM 一级分类" value={musicTag[0] || ''} disabled={disabled || !state.musicTagOptions.length} onChange={event => setMusicTag(event.target.value ? [event.target.value] : [])}>
+          <option value="">全部视频标签</option>
+          {!!musicTag[0] && !firstTag && <option value={musicTag[0]} disabled>{musicTag[0]}（目录中已失效）</option>}
+          {state.musicTagOptions.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
+        </select></label>
+        <label>二级分类<select aria-label="BGM 二级分类" value={musicTag[1] || ''} disabled={disabled || !secondTags.length} onChange={event => setMusicTag(event.target.value ? [musicTag[0], event.target.value] : [musicTag[0]])}>
+          <option value="">{musicTag[0] ? `全部${musicTag[0]}` : '先选择一级分类'}</option>
+          {!!musicTag[1] && !secondTags.some(option => option.label === musicTag[1]) && <option value={musicTag[1]} disabled>{musicTag[1]}（目录中已失效）</option>}
+          {secondTags.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
+        </select></label>
+        <button className={styles.primary} disabled={disabled || !musicDirty} onClick={() => void perform('music-save', api => api.saveMusicTag(musicTag))}>{action === 'music-save' ? '保存中…' : '保存 BGM 标签'}</button>
+        <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
+      </div>
+      <small>{musicDirty ? '标签尚未保存，保存后用于下一批采集；当前批次保持原选择。' : `已保存：${state.musicTag.join(' > ') || '全部视频标签'}`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
+      {state.musicTagRestricted && <small className={styles.permissionNote}>当前飞瓜账号的视频标签筛选权限受限；选择具体分类时会报告权限不足，不会改采全部。</small>}
+    </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
       <div><h2>带货视频关键词</h2><p>每个关键词独立采集销售额前 5 · 时间周期近7天</p></div>
@@ -137,7 +165,7 @@ export function FeiguaTrends() {
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
         const group = run?.groups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p></header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{kind === 'music' && <p>本批视频标签：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>

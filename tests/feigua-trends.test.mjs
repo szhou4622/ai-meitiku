@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { FEIGUA_SOURCES, normalizeKeywords, validateCapture, isFeiguaDataUrl } from '../electron/feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl } from '../electron/feigua-contract.mjs';
 import { FeiguaService } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
@@ -18,7 +18,7 @@ function fixture({ stored, collect, auth, write } = {}) {
   const calls = [];
   const browser = {
     async openLogin() {}, async checkLogin() { return auth || { status: 'authenticated', message: '已登录' }; },
-    async collect(kind, keyword, signal) { calls.push([kind, keyword]); return collect ? collect(kind, keyword, signal) : capture(kind, keyword); },
+    async collect(kind, keyword, signal, options) { calls.push([kind, keyword]); return collect ? collect(kind, keyword, signal, options) : capture(kind, keyword, { musicTag: options?.musicTag || [] }); },
     stop() {}, dispose() {},
   };
   const service = new FeiguaService({ userDataPath: '/unused', browser, storage: {
@@ -130,7 +130,7 @@ test('storage failure before provider I/O prevents collection', async () => {
 });
 
 test('all Feigua operations retain base-license authorization', () => {
-  for (const method of ['state', 'save-keywords', 'login', 'check-login', 'start', 'cancel']) {
+  for (const method of ['state', 'save-keywords', 'save-music-tag', 'refresh-music-tags', 'login', 'check-login', 'start', 'cancel']) {
     assert.equal(featureRegistry.forIpc(`feigua-${method}`).id, 'feigua-trends');
   }
   assert.throws(() => requireFeatureAccess(featureRegistry, 'feigua-trends', { authorized: false }), /无权/);
@@ -262,4 +262,81 @@ test('failed automatic notice confirmation stops remaining reads without claimin
   assert.equal(state.auth.status, 'error'); assert.equal(calls.length, 1);
   assert.equal(state.runs[0].status, 'failed');
   assert.equal(state.runs[0].groups[1].status, 'skipped');
+});
+
+const tagOptions = [{ label: '测试一级甲', children: [{ label: '测试二级甲' }, { label: '测试二级乙' }] }, { label: '测试一级乙', children: [{ label: '测试二级丙' }] }];
+
+test('music tags support all, first level and second level without cross-parent selections', () => {
+  assert.deepEqual(normalizeMusicTag(), []);
+  assert.deepEqual(validateMusicTag(['测试一级甲'], tagOptions), ['测试一级甲']);
+  assert.deepEqual(validateMusicTag(['测试一级甲', '测试二级乙'], tagOptions), ['测试一级甲', '测试二级乙']);
+  for (const invalid of [['a', 'b', 'c'], [''], ['全部'], ['a\nb'], 'a']) assert.throws(() => normalizeMusicTag(invalid));
+  assert.throws(() => validateMusicTag(['测试一级乙', '测试二级甲'], tagOptions), /目录/);
+  assert.throws(() => normalizeMusicTagOptions([{ label: 'a', children: null }]), /结构/);
+});
+
+test('legacy saved state gains all-category defaults without changing keywords or history', async () => {
+  const { service } = fixture({ stored: { version: 1, keywords: ['旧关键词'], runs: [{ id: 'old', status: 'completed', groups: [] }] } });
+  const state = await service.state();
+  assert.deepEqual(state.musicTag, []); assert.deepEqual(state.musicTagOptions, []);
+  assert.deepEqual(state.keywords, ['旧关键词']); assert.equal(state.runs[0].id, 'old');
+});
+
+test('catalog and selected second-level tag survive reload independently of keywords', async () => {
+  const { service, browser, disk } = fixture();
+  browser.getMusicTags = async () => ({ options: tagOptions, restricted: true });
+  await service.refreshMusicTags();
+  await service.saveKeywords(['测试关键词']);
+  await service.saveMusicTag(['测试一级甲', '测试二级乙']);
+  const restored = fixture({ stored: disk() }).service;
+  const state = await restored.state();
+  assert.deepEqual(state.musicTag, ['测试一级甲', '测试二级乙']);
+  assert.equal(state.musicTagRestricted, true);
+  assert.deepEqual(state.keywords, ['测试关键词']);
+  assert.equal(state.musicTagOptions[0].children.length, 2);
+});
+
+test('running music group retains its category snapshot when user changes settings', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const paths = [];
+  const { service, disk } = fixture({ collect: async (kind, keyword, _signal, options) => {
+    if (kind === 'music') { paths.push(options.musicTag); await gate; }
+    return capture(kind, keyword, { musicTag: options.musicTag });
+  } });
+  await service.ready; await service.cacheMusicTags({ options: tagOptions });
+  await service.saveMusicTag(['测试一级甲', '测试二级甲']);
+  await service.start();
+  await service.saveMusicTag(['测试一级乙', '测试二级丙']);
+  release(); await service.job;
+  assert.deepEqual(paths, [['测试一级甲', '测试二级甲']]);
+  assert.deepEqual(disk().musicTag, ['测试一级乙', '测试二级丙']);
+  assert.equal(disk().runs[0].groups[0].result.filters.category, '测试一级甲 > 测试二级甲');
+  assert.deepEqual(disk().runs[0].groups[1].result.filters, { category: '全部' });
+});
+
+test('category mismatch cannot be silently recorded as all-category music', () => {
+  assert.throws(() => validateCapture('music', null, capture('music'), { musicTag: ['测试一级甲'] }), /不一致/);
+  assert.throws(() => validateCapture('music', null, capture('music', null, { musicTag: ['测试一级乙'] }), { musicTag: ['测试一级甲'] }), /不一致/);
+});
+
+test('failed music selection write keeps the prior saved choice', async () => {
+  const { service } = fixture({ stored: { version: 1, keywords: [], runs: [], musicTag: ['测试一级甲'], musicTagOptions: tagOptions }, write: async () => { throw new Error('disk full'); } });
+  await assert.rejects(service.saveMusicTag(['测试一级乙']), /disk full/);
+  assert.deepEqual((await service.state()).musicTag, ['测试一级甲']);
+});
+
+test('category snapshot is fixed before the login check finishes', async () => {
+  let entered, release;
+  const checking = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const { service, browser } = fixture();
+  await service.ready; await service.cacheMusicTags({ options: tagOptions });
+  await service.saveMusicTag(['测试一级甲']);
+  browser.checkLogin = async () => { entered(); await gate; return { status: 'authenticated' }; };
+  const starting = service.start();
+  await checking;
+  await service.saveMusicTag(['测试一级乙']);
+  release(); await starting; await service.job;
+  assert.deepEqual((await service.state()).runs[0].musicTag, ['测试一级甲']);
 });
