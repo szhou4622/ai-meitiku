@@ -91,6 +91,7 @@ export function FeiguaTrends() {
   const [action, setAction] = useState('');
   const [selectedRun, setSelectedRun] = useState('');
   const initialized = useRef(false);
+  const settingsPanel = useRef<HTMLDetailsElement>(null);
   const dirty = JSON.stringify(keywords) !== JSON.stringify(state.keywords);
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
@@ -127,7 +128,10 @@ export function FeiguaTrends() {
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
       if (name === 'save') setKeywords(next.keywords);
-      if (name === 'music-save') { setMusicTag(next.musicTag); setSelectedRun(''); }
+      if (name === 'music-save') {
+        setMusicTag(next.musicTag); setSelectedRun('');
+        if (settingsPanel.current) settingsPanel.current.open = false;
+      }
       if (name === 'start') setSelectedRun('');
     } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作失败，请重试'); }
     finally { setAction(''); }
@@ -156,7 +160,7 @@ export function FeiguaTrends() {
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
 
-    <details className={styles.settings}>
+    <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 视频标签配置">
       <div><h2>本周爆款 BGM · 视频标签</h2><p>选择一级或二级分类，按昨日使用人数降序取前 5</p></div>
