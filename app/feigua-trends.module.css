@@ -24,7 +24,10 @@
 .tagSelectors { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 14px; }
 .tagSelectors label { display: flex; flex-direction: column; gap: 6px; color: #73868b; font-size: 12px; }
 .tagSelectors select { min-width: 175px; max-width: 100%; padding: 9px 10px; border: 1px solid #d5e1e2; border-radius: 6px; background: #fbfdfd; color: #29494c; font-size: 13px; }
-.configuration .permissionNote { color: #996b38; }
+.settings { border: 1px solid #dee7e7; border-radius: 8px; background: white; padding: 12px 16px; }
+.settings > summary { cursor: pointer; color: #34595c; font-size: 13px; }
+.settings > summary span { margin-left: 12px; color: #73868b; font-size: 12px; }
+.settings[open] > summary { margin-bottom: 14px; }
 .tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .tags > span { display: inline-flex; background: #edf6f5; border: 1px solid #cfe6e2; border-radius: 5px; }
 .tags button { background: transparent; border: 0; padding: 5px 8px; }
@@ -40,7 +43,7 @@
 .board h3 small { margin-left: auto; color: #93a4a6; font-size: 10px; font-weight: 500; }
 .board header p { margin-top: 7px; font-size: 11px; }
 .ranking,.videoList { margin: 0; padding: 0 16px; list-style: none; }
-.ranking li { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid #eef2f2; }
+.ranking li { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eef2f2; }
 .ranking li:last-child { border-bottom: 0; }
 .rank { font-size: 12px; color: #8aa3a5; font-variant-numeric: tabular-nums; padding-top: 2px; }
 .rowContent { flex: 1; min-width: 0; }

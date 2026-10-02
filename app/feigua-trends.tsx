@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Globe2, Music2, TrendingUp, Plus, X, RefreshCw, LogIn, Square, Search } from 'lucide-react';
 import styles from './feigua-trends.module.css';
+import { displayedFeiguaGroups } from './feigua-results.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
 type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[] } };
-type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[] };
+type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; showingPrevious?: boolean };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
 type MusicTagOption = { label: string; children: { label: string }[] };
 type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
@@ -67,7 +68,10 @@ export function FeiguaTrends() {
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
   const secondTags = firstTag?.children || [];
-  const run = state.runs.find(item => item.id === selectedRun) || state.runs[0];
+  const effectiveRunId = state.runs.some(item => item.id === selectedRun) ? selectedRun : '';
+  const run = state.runs.find(item => item.id === effectiveRunId) || state.runs[0];
+  const displayedGroups = displayedFeiguaGroups(state.runs, effectiveRunId) as Group[];
+  const displayedCount = displayedGroups.reduce((sum, group) => sum + (group.result?.rows.length || 0), 0);
 
   useEffect(() => {
     let alive = true, pending = false;
@@ -97,7 +101,7 @@ export function FeiguaTrends() {
       const next = await operation(api); setState({ ...emptyState, ...next });
       if (name === 'save') setKeywords(next.keywords);
       if (name === 'music-save') setMusicTag(next.musicTag);
-      if (name === 'start') setSelectedRun(next.runs[0]?.id || '');
+      if (name === 'start') setSelectedRun('');
     } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作失败，请重试'); }
     finally { setAction(''); }
   }
@@ -122,9 +126,11 @@ export function FeiguaTrends() {
           : <button className={styles.primary} disabled={disabled || dirty || musicDirty || !!input.trim() || editing !== null || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
       </div>
     </header>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
 
+    <details className={styles.settings}>
+      <summary>采集设置 <span>BGM：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 视频标签配置">
       <div><h2>本周爆款 BGM · 视频标签</h2><p>选择一级或二级分类，按昨日使用人数降序取前 5</p></div>
       <div className={styles.tagSelectors}>
@@ -142,7 +148,6 @@ export function FeiguaTrends() {
         <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
       </div>
       <small>{musicDirty ? '标签尚未保存，保存后用于下一批采集；当前批次保持原选择。' : `已保存：${state.musicTag.join(' > ') || '全部视频标签'}`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
-      {state.musicTagRestricted && <small className={styles.permissionNote}>当前飞瓜账号的视频标签筛选权限受限；选择具体分类时会报告权限不足，不会改采全部。</small>}
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
@@ -155,22 +160,23 @@ export function FeiguaTrends() {
       <div className={styles.tags}>{keywords.map((keyword, index) => <span key={`${index}:${keyword}`}><button disabled={disabled} title={`修改「${keyword}」`} onClick={() => { setEditing(index); setInput(keyword); }}>{keyword}</button><button disabled={disabled} aria-label={`删除关键词${keyword}`} onClick={() => { setKeywords(keywords.filter((_, current) => current !== index)); setEditing(null); setInput(''); }}><X size={13} /></button></span>)}</div>
       <small>{editing !== null ? '正在修改关键词，确认后请保存。' : dirty ? '配置尚未保存。保存后用于下一次采集，当前任务保持原关键词。' : keywords.length ? `已保存 ${keywords.length} 个关键词，点击词条可以修改。` : '尚未配置关键词。仍可采集 BGM、话题和全网热点三个榜单。'}</small>
     </section>
+    </details>
 
     <div className={styles.history}>
       <h2>采集结果</h2>
-      {state.runs.length > 0 && <label>采集批次 <select aria-label="采集批次" value={run?.id || ''} onChange={event => setSelectedRun(event.target.value)}>{state.runs.map(item => <option key={item.id} value={item.id}>{date(item.startedAt)} · {names[item.status]}</option>)}</select></label>}
-      <span role="status">{run ? `${names[run.status]} · ${run.message}` : '登录后点击“开始采集”'}</span>
+      {state.runs.length > 0 && <label>采集批次 <select aria-label="采集批次" value={effectiveRunId} onChange={event => setSelectedRun(event.target.value)}><option value="">最新已采集结果</option>{state.runs.map(item => <option key={item.id} value={item.id}>{date(item.startedAt)} · {names[item.status]}</option>)}</select></label>}
+      <span role="status">{run ? effectiveRunId ? `${names[run.status]} · ${run.message}` : state.busy ? `${run.message} · 已有结果持续显示` : `已展示 ${displayedCount} 条采集结果` : '登录后自动采集'}</span>
     </div>
     <div className={styles.boards}>
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
-        const group = run?.groups.find(item => item.kind === kind);
+        const group = displayedGroups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{kind === 'music' && <p>本批视频标签：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{kind === 'music' && <p>结果视频标签：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}{group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
-      {run?.groups.filter(group => group.kind === 'videos').map(group => <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {names[group.status]}</small></h3><ResultBody group={group} kind="videos" />{group.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>)}
-      {!run?.groups.some(group => group.kind === 'videos') && <div className={styles.empty}>{state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
+      {displayedGroups.filter(group => group.kind === 'videos').map(group => <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : names[group.status]}</small></h3><ResultBody group={group} kind="videos" />{group.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>)}
+      {!displayedGroups.some(group => group.kind === 'videos') && <div className={styles.empty}>{state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>
   </section>;
 }

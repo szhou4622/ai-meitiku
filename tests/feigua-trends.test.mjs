@@ -5,6 +5,7 @@ import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTag
 import { FeiguaService } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
+import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
@@ -339,4 +340,31 @@ test('category snapshot is fixed before the login check finishes', async () => {
   await service.saveMusicTag(['测试一级乙']);
   release(); await starting; await service.job;
   assert.deepEqual((await service.state()).runs[0].musicTag, ['测试一级甲']);
+});
+
+test('latest display keeps cached music during a pending or failed update and preserves its original category', () => {
+  const old = { kind:'music', status:'completed', result:{ rows:[{title:'已采集'}], filters:{category:'全部'}, collectedAt:'2026-10-01T00:00:00Z' } };
+  const runs = [{id:'new',groups:[{kind:'music',status:'failed',musicTag:['另一分类']}]},{id:'old',groups:[old]}];
+  const shown = displayedFeiguaGroups(runs);
+  assert.equal(shown[0].result.rows.length,1);
+  assert.equal(shown[0].result.filters.category,'全部');
+  assert.equal(shown[0].showingPrevious,true);
+  assert.equal(old.showingPrevious,undefined);
+});
+
+test('latest display includes captured keyword videos from another batch without changing current settings', () => {
+  const runs=[{id:'new',groups:[{kind:'music',status:'completed',result:{rows:[{}]}}]}, {id:'video',groups:[{kind:'videos',keyword:'原关键词',status:'completed',result:{rows:[{},{}]}}]}];
+  const shown=displayedFeiguaGroups(runs);
+  assert.equal(shown.length,2);assert.equal(shown[1].keyword,'原关键词');assert.equal(shown[1].result.rows.length,2);
+});
+
+test('verified empty results supersede older nonempty data instead of showing stale rows', () => {
+  const runs=[{id:'new',groups:[{kind:'music',status:'completed',result:{rows:[]}}]},{id:'old',groups:[{kind:'music',status:'completed',result:{rows:[{}]}}]}];
+  assert.deepEqual(displayedFeiguaGroups(runs)[0].result.rows,[]);
+});
+
+test('explicit batch selection does not substitute another batch after a failure', () => {
+  const group={kind:'music',status:'failed'};
+  const runs=[{id:'new',groups:[group]},{id:'old',groups:[{kind:'music',status:'completed',result:{rows:[{}]}}]}];
+  assert.deepEqual(displayedFeiguaGroups(runs,'new'),[group]);
 });
