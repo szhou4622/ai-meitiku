@@ -387,6 +387,7 @@ export class FeiguaService {
         // Only adapter-owned messages are exposed, never raw browser/network errors.
         group.message = signal.aborted ? '已取消' : error.publicMessage || '本组采集未通过校验，请打开飞瓜核对页面后重试';
         if (error.code === 'FEIGUA_STORAGE') throw error;
+        if (error.code === 'FEIGUA_QUOTA') stop = true;
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }

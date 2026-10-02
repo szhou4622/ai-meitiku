@@ -51,7 +51,7 @@ export function feiguaPage(command, argument = {}) {
     };
     let fullOptions;
     try { fullOptions = tree(props.options); } catch { return null; }
-    return { root, path: findPath(props.options, values.at(-1)), fullOptions,
+    return { root, path: findPath(props.options, values.at(-1)), selectionId: String(values.at(-1)), fullOptions,
       unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };
@@ -216,6 +216,45 @@ export function feiguaPage(command, argument = {}) {
     const keywords = elements('input[type="text"],input:not([type])').filter(node => /音乐|热点/.test(node.placeholder || '') && node.value.trim());
     if (keywords.length) return failure('页面仍有音乐或热点搜索词，请清除后重新采集');
     return { verified: true };
+  }
+  if (command === 'capture-context') {
+    // This branch reads only controls. Ranking rows come from the API client.
+    if (!feiguaPage('ready').ready) return failure('榜单仍在加载，本组未保存');
+    const optional = feiguaPage('optional-filters');
+    if (!optional.verified) return optional;
+    const hasCategory = ['music', 'topics'].includes(argument.kind);
+    const category = hasCategory ? musicTagData() : null;
+    const videoCategory = argument.kind === 'videos' ? musicTagData('带货品类') : null;
+    const videoTag = argument.kind === 'videos' ? musicTagData('视频标签') : null;
+    if (hasCategory && (!Array.isArray(category?.path) || category.unsupportedDepth)) return failure('无法核对榜单分类，本组未保存');
+    if (argument.kind === 'videos' && (!Array.isArray(videoCategory?.path) || !Array.isArray(videoTag?.path))) return failure('无法核对视频分类，本组未保存');
+    const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : argument.kind === 'videos' ? [argument.period] : [];
+    let period = '昨日使用人数';
+    for (const label of choices) {
+      const current = feiguaPage('choice', { label, verify: true });
+      if (!current.verified) return failure('榜单类型或周期未生效，本组未保存');
+      period = current.label;
+    }
+    if (argument.kind === 'topics' && !feiguaPage('category', { label: '话题类型', verify: true }).verified) return failure('话题类型未生效，本组未保存');
+    let keyword = null;
+    if (argument.kind === 'videos') {
+      const current = feiguaPage('keyword', { keyword: argument.keyword, verify: true });
+      if (!current.verified) return failure('关键词未生效，本组未保存');
+      keyword = current.keyword;
+    }
+    const inputs = elements('input');
+    const starts = inputs.filter(input => input.placeholder === '开始日期');
+    const ends = inputs.filter(input => input.placeholder === '结束日期');
+    const date = '\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}';
+    const ranges = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}\\s*[-~～至]\\s*${date}$`).test(value)))];
+    const days = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}$`).test(value)))];
+    const dateRange = argument.kind === 'music' ? null : argument.kind === 'hotspots' ? days.length === 1 ? days[0] : null
+      : starts.length === 1 && ends.length === 1 ? `${starts[0].value} - ${ends[0].value}` : ranges.length === 1 ? ranges[0] : null;
+    if (argument.kind !== 'music' && !dateRange) return failure('未能唯一回读实际统计日期，本组未保存');
+    return { url: location.href, period, keyword, dateRange, filtersVerified: true,
+      ...(hasCategory ? { musicTag: category.path, musicTagId: category.selectionId, musicTagOptions: category.options, musicTagRestricted: category.restricted } : {}),
+      ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, categoryId: videoCategory.selectionId, tagPath: videoTag.path, tagId: videoTag.selectionId } : {}),
+    };
   }
   const findTable = sortLabel => {
     const table = elements('table').find(table => elements('th', table).some(header => compact(header) === sortLabel));

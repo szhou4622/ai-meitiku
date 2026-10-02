@@ -184,6 +184,7 @@ test('catalogs update automatically even with no keywords; refresh errors preser
 
 test('browser applies both video paths, then keyword, period and sales sort for each group', async () => {
   const browser=new FeiguaBrowser({}); const calls=[];
+  browser.readRanking=async()=>({});
   browser.openSource=async()=>{};browser.settle=async()=>{};
   browser.execute=async(command,args)=>{calls.push([command,args]);return {verified:true};};
   await browser.collect('videos','拌饭',undefined,videoQueries[0]);
@@ -526,12 +527,13 @@ test('state polling cannot observe captured rows before the durable write resolv
 
 test('hotspots select the daily hot ranking and verify descending peak heat before capture', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking = async () => capture('hotspots');
   const calls = [];
   browser.openSource = async kind => { calls.push(['source', FEIGUA_SOURCES[kind].navigation]); };
   browser.settle = async () => {};
   browser.execute = async (command, args) => {
     calls.push([command, args]);
-    return command === 'capture' ? capture('hotspots', null, args) : { verified: true };
+    return { verified: true };
   };
   const result = await browser.collect('hotspots');
   assert.deepEqual(calls, [
@@ -539,8 +541,8 @@ test('hotspots select the daily hot ranking and verify descending peak heat befo
     ['choice', { label: '热点榜' }],
     ['choice', { label: '日榜' }],
     ['optional-filters', undefined],
-    ['sort', { label: '峰值热度', verify: false }],
-    ['capture', { kind: 'hotspots', keyword: undefined, sort: '峰值热度', period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
   ]);
   assert.equal(validateCapture('hotspots', null, result).period, '日榜');
   for (const invalid of [{ period: '近7天' }, { period: '实时榜' }, { period: '周榜' }, { direction: 'asc' }]) {
@@ -595,6 +597,21 @@ test('session expiry halts remaining groups and preserves successful groups', as
   assert.equal(state.auth.status, 'expired'); assert.equal(state.runs[0].status, 'partial');
   assert.equal(state.runs[0].groups[2].status, 'skipped'); assert.equal(calls.length, 2);
   assert.doesNotMatch(JSON.stringify(state), /private network detail/);
+});
+
+test('exhausted provider quota stops remaining keyword requests while keeping completed rankings', async () => {
+  const {service,calls}=fixture({collect:async(kind,keyword)=>{
+    if(kind==='videos')throw Object.assign(new Error('quota'),{code:'FEIGUA_QUOTA',publicMessage:'飞瓜接口查询额度已用完'});
+    return capture(kind,keyword);
+  }});
+  await service.saveKeywords(['合成甲','合成乙']);
+  await service.start();await service.job;
+  const state=await service.state();
+  assert.equal(calls.length,4);
+  assert.equal(state.runs[0].status,'partial');
+  assert.equal(state.runs[0].groups[3].status,'failed');
+  assert.equal(state.runs[0].groups[4].status,'skipped');
+  assert.equal(state.runs[0].groups.filter(group=>group.result).length,3);
 });
 
 test('failed refresh does not overwrite older successful results', async () => {
@@ -834,6 +851,7 @@ test('topic results must confirm the complete shared path including the second l
 
 test('topic browser applies shared first/second levels without changing weekly ranking rules', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking=async()=>({});
   const calls=[];
   browser.openSource=async kind=>assert.equal(kind,'topics');
   browser.settle=async()=>{};

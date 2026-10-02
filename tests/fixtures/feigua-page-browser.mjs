@@ -209,5 +209,9 @@ try {
   await mount(shell + `<div role="tab" aria-selected="true"><div><span>热点榜</span></div></div><button class="active">日榜</button><input value="2026-10-01"><section><div class="list-hd"><div class="col-item">排名</div><div class="col-item">热点</div><div class="col-item">峰值热度</div></div><div class="item-border-bottom"><div class="row-cells"><div class="col-item">01</div><div class="col-item">合成热点</div><div class="col-item">1000w</div></div></div></section>`);
   frame.contentDocument.querySelector('.item-border-bottom').__vue__={$props:{source:{HotId:'nested-row-id',Title:'合成热点'}}};
   assert('真实自定义列表从外层行组件回读身份',run('capture',hotspotArgs).rows[0].id==='hotspot:nested-row-id');
+  const context=run('capture-context',hotspotArgs);
+  assert('接口采集上下文只回读控件，不携带表格数据',context.dateRange==='2026-10-01'&&!Object.hasOwn(context,'rows'));
+  frame.contentDocument.querySelector('section').remove();
+  assert('表格不存在也能完成接口请求的筛选上下文核验',run('capture-context',hotspotArgs).filtersVerified===true);
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');

@@ -174,7 +174,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
         ? (Array.isArray(row.products) ? row.products.slice(0, 30).map(product => ({ title: value(product?.title), commission: value(product?.commission, 60) })).filter(product => product.title) : [])
         : value(row[field]);
     }
-    clean.missingFields = source.fields.filter(field => field === 'products' ? !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
+    clean.missingFields = source.fields.filter(field => field === 'products' ? row.productsIncomplete === true || !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
     rows.push(clean);
     if (rows.length === 5) break;
   }
@@ -183,6 +183,9 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
     sort: source.sort, direction: 'desc', period: source.period,
     ...dates,
+    ...(capture.provenance?.transport === 'provider-api' ? { provenance: {
+      transport: 'provider-api', endpoint: value(capture.provenance.endpoint, 200), method: 'GET', responseCode: 200, dateCode: value(capture.provenance.dateCode, 30),
+    } } : {}),
     filters: kind === 'videos' ? { keyword, publishedAt: '不限', ...videoFilters } : hasCategory ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
     rows,
   };
