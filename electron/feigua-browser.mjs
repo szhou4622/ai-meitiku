@@ -217,7 +217,7 @@ export class FeiguaBrowser {
   async collect(kind, keyword, signal, options = {}) {
     const source = FEIGUA_SOURCES[kind];
     await this.openSource(kind, signal);
-    const musicTag = kind === 'music' ? normalizeMusicTag(options.musicTag) : [];
+    const musicTag = ['music', 'topics'].includes(kind) ? normalizeMusicTag(options.musicTag) : [];
     if (kind === 'videos') {
       await this.execute('clear'); await this.settle(signal);
       await this.choose('category', { label: '带货品类' }, signal);
@@ -228,7 +228,8 @@ export class FeiguaBrowser {
       if (kind === 'topics') {
         await this.choose('choice', { label: '话题总榜' }, signal);
         await this.choose('choice', { label: '周榜' }, signal);
-        await this.choose('category', { label: '话题分类' }, signal);
+        if (musicTag.length > 1) { await this.execute('music-tag', { kind, path: musicTag, phase: 'expand' }); await this.settle(signal); }
+        await this.choose('music-tag', { kind, path: musicTag, phase: 'select' }, signal);
         await this.choose('category', { label: '话题类型' }, signal);
       } else {
         if (kind === 'music') {

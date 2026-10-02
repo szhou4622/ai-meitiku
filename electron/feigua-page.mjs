@@ -24,7 +24,8 @@ export function feiguaPage(command, argument = {}) {
   };
   const authenticated = () => authState().authenticated;
   const failure = message => ({ error: message });
-  const musicTagRoot = () => elements('.tag-cascader').find(root => text(root.querySelector('.tag-label')) === '视频标签');
+  const categoryLabel = argument.kind === 'topics' ? '话题分类' : '视频标签';
+  const musicTagRoot = () => elements('.tag-cascader').find(root => text(root.querySelector('.tag-label')) === categoryLabel);
   const musicTagData = () => {
     const root = musicTagRoot();
     // Read only the options/value already supplied to this visible filter widget.
@@ -42,6 +43,7 @@ export function feiguaPage(command, argument = {}) {
       return null;
     };
     return { root, path: findPath(props.options, props.value.at(-1)),
+      unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };
   };
@@ -80,19 +82,21 @@ export function feiguaPage(command, argument = {}) {
   if (!authenticated()) return { authRequired: true };
   if (command === 'music-tag-options') {
     const data = musicTagData();
-    return data ? { options: data.options, restricted: data.restricted } : failure('未能读取飞瓜 BGM 视频标签目录，请刷新分类');
+    if (data?.unsupportedDepth) return failure('飞瓜分类出现三级或更深目录，请更新适配后再采集');
+    return data ? { options: data.options, restricted: data.restricted } : failure(`未能读取飞瓜${categoryLabel}目录，请刷新分类`);
   }
   if (command === 'music-tag') {
     const data = musicTagData();
-    if (!data) return failure('未能识别飞瓜 BGM 视频标签控件');
+    if (!data) return failure(`未能识别飞瓜${categoryLabel}控件`);
+    if (data.unsupportedDepth) return failure('飞瓜分类出现三级或更深目录，请更新适配后再采集');
     const path = argument.path || [];
     if (data.path && JSON.stringify(data.path) === JSON.stringify(path)) return { verified: true, path: data.path };
     if (argument.verify) return { verified: false, path: data.path };
-    if (data.restricted) return failure('当前飞瓜账号的 BGM 视频标签筛选权限受限，本组未采集');
+    if (data.restricted) return failure(`当前飞瓜账号的${categoryLabel}筛选权限受限，本组未采集`);
     const parent = path.length ? data.options.find(option => option.label === path[0]) : null;
-    if (path.length && (!parent || path.length > 1 && !parent.children.some(child => child.label === path[1]))) return failure('所选 BGM 分类已不在飞瓜目录中');
+    if (path.length && (!parent || path.length > 1 && !parent.children.some(child => child.label === path[1]))) return failure(`所选${categoryLabel}已不在飞瓜目录中`);
     const first = elements('.tag-list > .tag-element', data.root).find(node => compact(node) === (path[0] || '全部'));
-    if (!first) return failure('未找到 BGM 一级分类入口');
+    if (!first) return failure(`未找到${categoryLabel}一级分类入口`);
     if (path.length < 2) { first.click(); return { changed: true }; }
     if (argument.phase === 'expand') {
       first.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
@@ -100,7 +104,7 @@ export function feiguaPage(command, argument = {}) {
       return { changed: true };
     }
     const children = elements('.el-popover', data.root).flatMap(popover => exact(path[1], popover));
-    if (children.length !== 1) return failure('未能唯一识别 BGM 二级分类选项');
+    if (children.length !== 1) return failure(`未能唯一识别${categoryLabel}二级分类选项`);
     (children[0].closest('label') || children[0]).click();
     return { changed: true };
   }
@@ -208,6 +212,10 @@ export function feiguaPage(command, argument = {}) {
     return { changed: true };
   }
   if (command === 'capture') {
+    const hasCategory = ['music', 'topics'].includes(argument.kind);
+    const categoryData = hasCategory ? musicTagData() : null;
+    if (hasCategory && !Array.isArray(categoryData?.path)) return failure(`无法回读实际${categoryLabel}，本组未保存`);
+    if (categoryData?.unsupportedDepth) return failure('飞瓜分类出现三级或更深目录，请更新适配后再采集');
     const table = findTable(argument.sort);
     if (!table || sortDirection(table.headers.find(node => compact(node) === argument.sort)) !== 'desc') return failure('榜单排序状态发生变化');
     const headers = table.headers.map(compact);
@@ -243,7 +251,7 @@ export function feiguaPage(command, argument = {}) {
     const startDate = elements('input').find(input => input.placeholder === '开始日期')?.value;
     const endDate = elements('input').find(input => input.placeholder === '结束日期')?.value;
     return { url: location.href, rows, direction: 'desc', sort: argument.sort, period: argument.period, keyword: argument.keyword, filtersVerified: true,
-      ...(argument.kind === 'music' ? { musicTag: musicTagData()?.path ?? [], musicTagOptions: musicTagData()?.options, musicTagRestricted: musicTagData()?.restricted } : {}),
+      ...(hasCategory ? { musicTag: categoryData.path, musicTagOptions: categoryData.options, musicTagRestricted: categoryData.restricted } : {}),
       dateRange: startDate && endDate ? `${startDate} - ${endDate}` : dateText.match(/\d{4}[-/]\d{2}[-/]\d{2}\s*[-~至]\s*\d{4}[-/]\d{2}[-/]\d{2}/)?.[0] || null,
       emptyVerified: /暂无数据|暂无相关|没有找到/.test(text(table.root)) };
   }

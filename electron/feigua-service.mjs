@@ -175,7 +175,7 @@ export class FeiguaService {
   async saveAndRefreshMusicTag(input) {
     await this.exclusive(async () => {
       await this.saveMusicTag(input);
-      await this.launchRun([...this.data.musicTag], [], { onlyMusic: true, verifyLogin: true });
+      await this.launchRun([...this.data.musicTag], [], { onlyRankings: true, verifyLogin: true });
     });
     return this.state();
   }
@@ -216,10 +216,10 @@ export class FeiguaService {
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, onlyHotspots = false, verifyLogin = false, scheduledDate = null } = {}) {
-    const groups = (onlyMusic ? ['music'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, verifyLogin = false, scheduledDate = null } = {}) {
+    const groups = (onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: 'daily-hotspots' } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyHotspots ? '正在更新每日热点榜' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: 'daily-hotspots' } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : '准备采集' };
     const previousRuns = this.data.runs;
     const previousScheduleDate = this.data.lastHotspotsScheduleDate;
     if (scheduledDate) this.data.lastHotspotsScheduleDate = scheduledDate;
@@ -236,7 +236,7 @@ export class FeiguaService {
         } catch (error) {
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
-          run.message = onlyHotspots ? '日榜定时采集未完成，请登录飞瓜后手动重试' : 'BGM 刷新未完成';
+          run.message = onlyHotspots ? '日榜定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
           for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '标签已保存，飞瓜登录状态未确认，请登录后重试'); }
           await this.persist(); return;
         }

@@ -26,7 +26,7 @@ export type FeiguaBridge = {
 const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
-const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
+const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
 const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 
@@ -64,15 +64,15 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
   </ol>;
 }
 
-function MusicCaption({group, selection, dirty, history}: {group?: Group; selection:string[]; dirty:boolean; history:boolean}) {
+function MusicCaption({group, kind, selection, dirty, history}: {group?: Group; kind:'music'|'topics'; selection:string[]; dirty:boolean; history:boolean}) {
   const selected = (history ? group?.musicTag || group?.result?.filters?.categoryPath || [] : selection).join(' > ') || '全部';
   const actual = group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部';
   const status = group?.refreshStatus || group?.status;
   const refreshing = !history && ['pending', 'running'].includes(status || '');
   const failed = !history && ['failed','cancelled','interrupted'].includes(status || '');
   return <>
-    <p>飞瓜数据 · 热门音乐 · 视频标签：<strong>{selected}</strong>{dirty && !history ? '（未保存）' : ''} · 昨日使用人数降序</p>
-    {refreshing && <p className={styles.refreshing} role="status">正在刷新「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」热门 BGM…</p>}
+    <p>飞瓜数据 · {kind === 'music' ? '热门音乐 · 视频标签' : '话题周榜 · 话题分类'}：<strong>{selected}</strong>{dirty && !history ? '（未保存）' : ''} · {kind === 'music' ? '昨日使用人数降序' : '参与人数增长率降序'}</p>
+    {refreshing && <p className={styles.refreshing} role="status">正在刷新「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」{kind === 'music' ? '热门 BGM' : '话题榜单'}…</p>}
     {failed && <p className={styles.refreshError} role="status">「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」刷新未完成：{group?.refreshMessage || group?.message || names[status || 'failed']}</p>}
     {group?.result && (actual !== selected || group.showingPrevious) && <p>当前显示：{actual} · 上次采集结果</p>}
     {!group?.result && !refreshing && !failed && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
@@ -163,24 +163,24 @@ export function FeiguaTrends() {
     <p>全网热点日榜每天北京时间 07:00 自动采集；请保持应用运行并登录飞瓜。错过时间后，当天重新打开或恢复运行时补采一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
-      <summary>采集设置 <span>BGM：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
-    <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 视频标签配置">
-      <div><h2>本周爆款 BGM · 视频标签</h2><p>选择一级或二级分类，按昨日使用人数降序取前 5</p></div>
+      <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
+    <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">
+      <div><h2>BGM 与话题 · 榜单分类</h2><p>共用已核对一致的一级、二级分类，保存后同步刷新两个榜单</p></div>
       <div className={styles.tagSelectors}>
-        <label>一级分类<select aria-label="BGM 一级分类" value={musicTag[0] || ''} disabled={disabled || !state.musicTagOptions.length} onChange={event => setMusicTag(event.target.value ? [event.target.value] : [])}>
+        <label>一级分类<select aria-label="榜单一级分类" value={musicTag[0] || ''} disabled={disabled || !state.musicTagOptions.length} onChange={event => setMusicTag(event.target.value ? [event.target.value] : [])}>
           <option value="">全部视频标签</option>
           {!!musicTag[0] && !firstTag && <option value={musicTag[0]} disabled>{musicTag[0]}（目录中已失效）</option>}
           {state.musicTagOptions.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
-        <label>二级分类<select aria-label="BGM 二级分类" value={musicTag[1] || ''} disabled={disabled || !secondTags.length} onChange={event => setMusicTag(event.target.value ? [musicTag[0], event.target.value] : [musicTag[0]])}>
+        <label>二级分类<select aria-label="榜单二级分类" value={musicTag[1] || ''} disabled={disabled || !secondTags.length} onChange={event => setMusicTag(event.target.value ? [musicTag[0], event.target.value] : [musicTag[0]])}>
           <option value="">{musicTag[0] ? `全部${musicTag[0]}` : '先选择一级分类'}</option>
           {!!musicTag[1] && !secondTags.some(option => option.label === musicTag[1]) && <option value={musicTag[1]} disabled>{musicTag[1]}（目录中已失效）</option>}
           {secondTags.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
-        <button className={styles.primary} disabled={disabled || state.busy} onClick={() => void perform('music-save', api => api.saveAndRefreshMusicTag(musicTag))}>{action === 'music-save' ? '正在保存并刷新…' : '保存并刷新 BGM'}</button>
+        <button className={styles.primary} disabled={disabled || state.busy} onClick={() => void perform('music-save', api => api.saveAndRefreshMusicTag(musicTag))}>{action === 'music-save' ? '正在保存并刷新…' : '保存并刷新 BGM / 话题'}</button>
         <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
       </div>
-      <small>{musicDirty ? `已选择：${musicTag.join(' > ') || '全部视频标签'}，点击“保存并刷新 BGM”立即更新榜单。` : `已保存：${state.musicTag.join(' > ') || '全部视频标签'} · 保存后自动刷新 BGM`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
+      <small>{musicDirty ? `已选择：${musicTag.join(' > ') || '全部视频标签'}，点击“保存并刷新 BGM / 话题”立即更新榜单。` : `已保存：${state.musicTag.join(' > ') || '全部视频标签'} · 保存后自动刷新 BGM / 话题`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
@@ -204,7 +204,7 @@ export function FeiguaTrends() {
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
         const group = displayedGroups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{kind === 'music' ? <MusicCaption group={group} selection={musicTag} dirty={musicDirty} history={!!effectiveRunId} /> : <p>{rules[kind]}</p>}{kind !== 'music' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{(kind === 'music' || kind === 'topics') ? <MusicCaption kind={kind} group={group} selection={musicTag} dirty={musicDirty} history={!!effectiveRunId} /> : <p>{rules[kind]}</p>}{kind === 'hotspots' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
