@@ -234,8 +234,10 @@ export class FeiguaBrowser {
         if (kind === 'music') {
           if (musicTag.length > 1) { await this.execute('music-tag', { path: musicTag, phase: 'expand' }); await this.settle(signal); }
           await this.choose('music-tag', { path: musicTag, phase: 'select' }, signal);
-        } else await this.choose('category', { label: '热点标签' }, signal);
-        if (kind === 'hotspots') await this.choose('choice', { label: '近7天' }, signal);
+        } else {
+          await this.choose('choice', { label: '热点榜' }, signal);
+          await this.choose('choice', { label: source.period }, signal);
+        }
       }
     }
     await this.execute('optional-filters');

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture } from './feigua-contract.mjs';
 
-const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -15,6 +15,12 @@ function recoverLatestResults(runs, cached = []) {
     if (!found.has(key)) found.set(key, group);
   }
   return [...found.values()];
+}
+
+// Fixed Beijing time, independent of the computer's timezone and DST settings.
+export function dueHotspotsDate(now = Date.now()) {
+  const beijing = new Date(now + 8 * 60 * 60 * 1000);
+  return beijing.getUTCHours() >= 7 ? beijing.toISOString().slice(0, 10) : null;
 }
 
 export class FeiguaService {
@@ -37,6 +43,9 @@ export class FeiguaService {
     this.writeQueue = Promise.resolve();
     this.configQueue = Promise.resolve();
     this.operation = null;
+    this.disposed = false;
+    this.scheduleTimer = null;
+    this.schedulePending = false;
     const filename = path.join(userDataPath, 'feigua-trends', 'state.json');
     this.storage = storage || {
       read: async () => {
@@ -59,6 +68,7 @@ export class FeiguaService {
     this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
+      lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
       latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
     let recovered = false;
@@ -81,7 +91,32 @@ export class FeiguaService {
 
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller) });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), scheduleMessage: this.scheduleMessage || null });
+  }
+
+  startDailySchedule(canRun) {
+    if (this.scheduleTimer || this.disposed) return;
+    const tick = () => void this.checkDailySchedule(Date.now(), canRun).catch(() => {
+      this.scheduleMessage = '日榜定时采集未能启动，请检查本机存储或手动重试';
+    });
+    this.scheduleTimer = setInterval(tick, 30_000);
+    this.scheduleTimer.unref?.();
+    tick();
+  }
+
+  async checkDailySchedule(now = Date.now(), canRun = () => false) {
+    if (this.disposed || this.schedulePending) return;
+    this.schedulePending = true;
+    try {
+      await this.ready;
+      const scheduledDate = dueHotspotsDate(now);
+      if (this.disposed || !scheduledDate || this.data.lastHotspotsScheduleDate >= scheduledDate || this.operation || this.controller || !canRun()) return;
+      await this.exclusive(async () => {
+        if (this.disposed || !canRun()) return;
+        await this.launchRun([], [], { onlyHotspots: true, verifyLogin: true, scheduledDate });
+        this.scheduleMessage = null;
+      });
+    } finally { this.schedulePending = false; }
   }
 
   async exclusive(action) {
@@ -181,25 +216,28 @@ export class FeiguaService {
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, verifyLogin = false } = {}) {
-    const groups = (onlyMusic ? ['music'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyHotspots = false, verifyLogin = false, scheduledDate = null } = {}) {
+    const groups = (onlyMusic ? ['music'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, message: onlyMusic ? '正在刷新 BGM' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: 'daily-hotspots' } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyHotspots ? '正在更新每日热点榜' : '准备采集' };
     const previousRuns = this.data.runs;
+    const previousScheduleDate = this.data.lastHotspotsScheduleDate;
+    if (scheduledDate) this.data.lastHotspotsScheduleDate = scheduledDate;
     this.data.runs = [run, ...previousRuns].slice(0, 12);
-    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; throw error; }
+    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data.lastHotspotsScheduleDate = previousScheduleDate; throw error; }
+    if (this.disposed) return;
     this.controller = new AbortController();
     const signal = this.controller.signal;
     this.job = (async () => {
       if (verifyLogin) {
         try {
           this.auth = await this.browser.checkLogin();
-          if (this.auth.status !== 'authenticated') throw new Error('标签已保存，请登录飞瓜后刷新 BGM');
+          if (this.auth.status !== 'authenticated') throw new Error(onlyHotspots ? '请登录飞瓜后刷新日榜' : '标签已保存，请登录飞瓜后刷新 BGM');
         } catch (error) {
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
-          run.message = 'BGM 刷新未完成';
-          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || '标签已保存，飞瓜登录状态未确认，请登录后重试'; }
+          run.message = onlyHotspots ? '日榜定时采集未完成，请登录飞瓜后手动重试' : 'BGM 刷新未完成';
+          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '标签已保存，飞瓜登录状态未确认，请登录后重试'); }
           await this.persist(); return;
         }
       }
@@ -251,5 +289,5 @@ export class FeiguaService {
     return this.state();
   }
 
-  dispose() { this.autoCollectRequested = false; this.loginSequence++; this.controller?.abort(); this.browser.dispose?.(); }
+  dispose() { this.disposed = true; clearInterval(this.scheduleTimer); this.scheduleTimer = null; this.autoCollectRequested = false; this.loginSequence++; this.controller?.abort(); this.browser.dispose?.(); }
 }

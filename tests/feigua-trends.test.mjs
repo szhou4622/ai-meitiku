@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl } from '../electron/feigua-contract.mjs';
-import { FeiguaService } from '../electron/feigua-service.mjs';
+import { FeiguaService, dueHotspotsDate } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
@@ -28,6 +28,114 @@ function fixture({ stored, collect, auth, write } = {}) {
   return { service, calls, disk: () => disk, browser };
 }
 
+test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-01T22:59:59Z')), null);
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-01T23:00:00Z')), '2026-10-02');
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-02T15:59:59Z')), '2026-10-02');
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-02T16:00:00Z')), null);
+});
+
+test('daily collection catches up only hotspots once per day, including after restart', async () => {
+  const { service, calls, disk } = fixture();
+  await service.saveKeywords(['已保存关键词']);
+  const now = Date.parse('2026-10-02T01:00:00Z');
+  await Promise.all([service.checkDailySchedule(now, () => true), service.checkDailySchedule(now, () => true)]);
+  await service.job;
+  assert.deepEqual(calls, [['hotspots', null]]);
+  assert.equal(disk().runs[0].trigger, 'daily-hotspots');
+  assert.equal(disk().runs[0].scheduledDate, '2026-10-02');
+  // The durable marker survives even when that run has fallen out of history.
+  const restored = fixture({ stored: { ...disk(), runs: [] } });
+  await restored.service.checkDailySchedule(now, () => true);
+  assert.equal(restored.calls.length, 0);
+  await restored.service.checkDailySchedule(now + 86400000, () => true);
+  await restored.service.job;
+  assert.deepEqual(restored.calls, [['hotspots', null]]);
+});
+
+test('daily collection waits for 07:00, authorization and idle state', async () => {
+  const { service, calls, disk } = fixture();
+  const now = Date.parse('2026-10-01T23:00:00Z');
+  await service.checkDailySchedule(now - 1, () => true);
+  await service.checkDailySchedule(now, () => false);
+  service.operation = Promise.resolve();
+  await service.checkDailySchedule(now, () => true);
+  service.operation = null;
+  assert.equal(calls.length, 0);
+  assert.equal(disk().lastHotspotsScheduleDate, undefined);
+  await service.checkDailySchedule(now, () => true);
+  await service.job;
+  assert.equal(calls.length, 1);
+});
+
+test('expired scheduled login is visible without repeated attempts or replacing prior results', async () => {
+  const previous = fixture();
+  await previous.service.start(); await previous.service.job;
+  const { service, browser, calls, disk } = fixture({ stored: previous.disk() });
+  let checks = 0;
+  browser.checkLogin = async () => { checks++; return { status: 'expired', message: '请重新登录' }; };
+  const now = Date.parse('2026-10-01T23:00:00Z');
+  await service.checkDailySchedule(now, () => true); await service.job;
+  await service.checkDailySchedule(now + 60000, () => true);
+  assert.equal(checks, 1);
+  assert.equal(calls.length, 0);
+  assert.equal(disk().runs[0].status, 'failed');
+  assert.match(disk().runs[0].message, /登录/);
+  assert.equal(disk().runs[1].groups[2].result.rows.length, 5);
+});
+
+test('failed schedule persistence prevents browser I/O and rolls back the daily marker', async () => {
+  const { service, browser, calls } = fixture({ write: async () => { throw new Error('disk full'); } });
+  let checks = 0;
+  browser.checkLogin = async () => { checks++; return { status: 'authenticated' }; };
+  await assert.rejects(service.checkDailySchedule(Date.parse('2026-10-01T23:00:00Z'), () => true), /disk full/);
+  assert.equal(checks, 0); assert.equal(calls.length, 0);
+  const state = await service.state();
+  assert.equal(state.lastHotspotsScheduleDate, null); assert.equal(state.runs.length, 0);
+});
+
+test('disposing stops the daily timer and prevents subsequent collection', async () => {
+  const { service, calls } = fixture();
+  service.startDailySchedule(() => false);
+  const timer = service.scheduleTimer;
+  service.startDailySchedule(() => false);
+  assert.equal(service.scheduleTimer, timer);
+  service.dispose();
+  await service.checkDailySchedule(Date.parse('2026-10-01T23:00:00Z'), () => true);
+  assert.equal(service.scheduleTimer, null); assert.equal(calls.length, 0);
+});
+
+test('cancelling scheduled login prevents collection and does not requeue that day', async () => {
+  const { service, browser, calls, disk } = fixture();
+  let release;
+  browser.checkLogin = () => new Promise(resolve => { release = resolve; });
+  const now = Date.parse('2026-10-01T23:00:00Z');
+  await service.checkDailySchedule(now, () => true);
+  await service.cancel();
+  release({ status: 'authenticated' });
+  await service.job;
+  await service.checkDailySchedule(now + 60000, () => true);
+  assert.equal(calls.length, 0);
+  assert.equal(disk().runs[0].status, 'cancelled');
+  assert.equal(disk().lastHotspotsScheduleDate, '2026-10-02');
+});
+
+test('daily-only history rotation preserves cached BGM, topics and keyword videos', async () => {
+  const { service, disk } = fixture();
+  await service.saveKeywords(['已保存关键词']);
+  await service.start(); await service.job;
+  const now = Date.parse('2026-10-01T23:00:00Z');
+  for (let day = 0; day < 13; day++) {
+    await service.checkDailySchedule(now + day * 86400000, () => true);
+    await service.job;
+  }
+  const restored = fixture({ stored: disk() });
+  const state = await restored.service.state();
+  assert.equal(state.runs.length, 12);
+  assert.ok(state.runs.every(run => run.groups.length === 1 && run.groups[0].kind === 'hotspots'));
+  assert.deepEqual(new Set(state.latestResults.map(group => group.kind)), new Set(['music', 'topics', 'hotspots', 'videos']));
+});
+
 test('keywords are validated and deduplicated without grouping distinct terms', () => {
   assert.deepEqual(normalizeKeywords([' 素颜霜 ', '粉底液', '素颜霜', '']), ['素颜霜', '粉底液']);
   for (const invalid of [[3], ['a\nb'], ['a'.repeat(61)], Array(51).fill('a'), 'abc']) assert.throws(() => normalizeKeywords(invalid));
@@ -45,6 +153,30 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
     assert.throws(() => validateCapture('videos', '测试', capture('videos', '测试', invalid)));
   }
   assert.equal(validateCapture('videos', '测试', capture('videos', '测试', { rows: [], emptyVerified: true })).rows.length, 0);
+});
+
+test('hotspots select the daily hot ranking and verify descending peak heat before capture', async () => {
+  const browser = new FeiguaBrowser({});
+  const calls = [];
+  browser.openSource = async kind => { calls.push(['source', FEIGUA_SOURCES[kind].navigation]); };
+  browser.settle = async () => {};
+  browser.execute = async (command, args) => {
+    calls.push([command, args]);
+    return command === 'capture' ? capture('hotspots', null, args) : { verified: true };
+  };
+  const result = await browser.collect('hotspots');
+  assert.deepEqual(calls, [
+    ['source', ['抖音热点榜']],
+    ['choice', { label: '热点榜' }],
+    ['choice', { label: '日榜' }],
+    ['optional-filters', undefined],
+    ['sort', { label: '峰值热度', verify: false }],
+    ['capture', { kind: 'hotspots', keyword: undefined, sort: '峰值热度', period: '日榜' }],
+  ]);
+  assert.equal(validateCapture('hotspots', null, result).period, '日榜');
+  for (const invalid of [{ period: '近7天' }, { period: '实时榜' }, { period: '周榜' }, { direction: 'asc' }]) {
+    assert.throws(() => validateCapture('hotspots', null, { ...result, ...invalid }), /筛选或降序/);
+  }
 });
 
 test('deduplicate stable IDs within each group and never expose unrecognized payload fields', () => {
