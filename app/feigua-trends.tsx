@@ -25,7 +25,7 @@ export type FeiguaBridge = {
 const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
-const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点库 · 近7天 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
+const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
 const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 

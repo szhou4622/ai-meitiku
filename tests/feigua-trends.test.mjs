@@ -47,6 +47,30 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
   assert.equal(validateCapture('videos', '测试', capture('videos', '测试', { rows: [], emptyVerified: true })).rows.length, 0);
 });
 
+test('hotspots select the daily hot ranking and verify descending peak heat before capture', async () => {
+  const browser = new FeiguaBrowser({});
+  const calls = [];
+  browser.openSource = async kind => { calls.push(['source', FEIGUA_SOURCES[kind].navigation]); };
+  browser.settle = async () => {};
+  browser.execute = async (command, args) => {
+    calls.push([command, args]);
+    return command === 'capture' ? capture('hotspots', null, args) : { verified: true };
+  };
+  const result = await browser.collect('hotspots');
+  assert.deepEqual(calls, [
+    ['source', ['抖音热点榜']],
+    ['choice', { label: '热点榜' }],
+    ['choice', { label: '日榜' }],
+    ['optional-filters', undefined],
+    ['sort', { label: '峰值热度', verify: false }],
+    ['capture', { kind: 'hotspots', keyword: undefined, sort: '峰值热度', period: '日榜' }],
+  ]);
+  assert.equal(validateCapture('hotspots', null, result).period, '日榜');
+  for (const invalid of [{ period: '近7天' }, { period: '实时榜' }, { period: '周榜' }, { direction: 'asc' }]) {
+    assert.throws(() => validateCapture('hotspots', null, { ...result, ...invalid }), /筛选或降序/);
+  }
+});
+
 test('deduplicate stable IDs within each group and never expose unrecognized payload fields', () => {
   const row = capture('music').rows[0];
   const result = validateCapture('music', null, capture('music', null, { rows: [row, row, { ...row, id: 'another', extra: 'private-test-value' }], cookies: 'private-test-value' }));
