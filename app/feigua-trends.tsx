@@ -8,21 +8,22 @@ import { displayedFeiguaGroups } from './feigua-results.mjs';
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
 type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[] } };
-type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; showingPrevious?: boolean };
+type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
 type MusicTagOption = { label: string; children: { label: string }[] };
-type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
+type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
   saveMusicTag: (path: string[]) => Promise<State>;
+  saveAndRefreshMusicTag: (path: string[]) => Promise<State>;
   refreshMusicTags: () => Promise<State>;
   login: () => Promise<State>;
   checkLogin: () => Promise<State>;
   start: () => Promise<State>;
   cancel: () => Promise<State>;
 };
-const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
+const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
@@ -32,14 +33,25 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
 function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
   if (!group?.result) return <div className={styles.empty}><span>{group ? names[group.status] : '尚未采集'}</span><p>{group?.message || '采集完成后，飞瓜的前 5 条结果会显示在这里。'}</p></div>;
   if (!group.result.rows.length) return <div className={styles.empty}>飞瓜在当前筛选条件下暂无结果</div>;
-  return <ol className={kind === 'videos' ? styles.videoList : styles.ranking}>
+  if (kind !== 'videos') return <ol className={styles.ranking}>
+    {group.result.rows.map(row => <li key={row.id} className={styles.compactRow}>
+      <span className={styles.rank}>{row.rank}</span>
+      <div className={styles.rankText}>
+        <div className={styles.rankTitle} title={`${row.title}${row.author ? ` · ${row.author}` : ''}`}><strong>{row.title}</strong>{kind === 'music' && <span> · {display(row.author)}</span>}</div>
+        {kind === 'topics' && <p title={`发起人：${display(row.author)} · 粉丝 ${display(row.followers)}`}>发起人：{display(row.author)} · 粉丝 {display(row.followers)}</p>}
+      </div>
+      <div className={styles.rankNumbers}>
+        {kind === 'music' && <><div>累计 <b>{display(row.totalUsers)}</b></div><div>昨日 <b>{display(row.yesterdayUsers)}</b></div></>}
+        {kind === 'topics' && <><div>播放增长 <b>{display(row.playGrowth)}</b></div><div>参与增长 <b>{display(row.participantGrowth)}</b></div></>}
+        {kind === 'hotspots' && <div>热度 <b>{display(row.peakHeat)}</b></div>}
+      </div>
+    </li>)}
+  </ol>;
+  return <ol className={styles.videoList}>
     {group.result.rows.map(row => <li key={row.id}>
       <span className={styles.rank}>{String(row.rank).padStart(2, '0')}</span>
       <div className={styles.rowContent}>
         <h4 title={row.title}>{row.title}</h4>
-        {kind === 'music' && <><p>{display(row.author)}</p><dl><div><dt>累计使用人数</dt><dd>{display(row.totalUsers)}</dd></div><div><dt>昨日使用人数</dt><dd>{display(row.yesterdayUsers)}</dd></div></dl></>}
-        {kind === 'topics' && <><p>发起人：{display(row.author)} · 粉丝 {display(row.followers)}</p><dl><div><dt>参与人数增长率</dt><dd>{display(row.participantGrowth)}</dd></div><div><dt>播放增长率</dt><dd>{display(row.playGrowth)}</dd></div></dl></>}
-        {kind === 'hotspots' && <dl><div><dt>峰值热度</dt><dd>{display(row.peakHeat)}</dd></div></dl>}
         {kind === 'videos' && <>
           <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{product.title}<small>佣金率 {display(product.commission)}</small></p>) : <p>关联商品未取得</p>}</div>
           <p>{display(row.author)} · 粉丝 {display(row.followers)}</p>
@@ -50,6 +62,21 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
       </div>
     </li>)}
   </ol>;
+}
+
+function MusicCaption({group, selection, dirty, history}: {group?: Group; selection:string[]; dirty:boolean; history:boolean}) {
+  const selected = (history ? group?.musicTag || group?.result?.filters?.categoryPath || [] : selection).join(' > ') || '全部';
+  const actual = group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部';
+  const status = group?.refreshStatus || group?.status;
+  const refreshing = !history && ['pending', 'running'].includes(status || '');
+  const failed = !history && ['failed','cancelled','interrupted'].includes(status || '');
+  return <>
+    <p>飞瓜数据 · 热门音乐 · 视频标签：<strong>{selected}</strong>{dirty && !history ? '（未保存）' : ''} · 昨日使用人数降序</p>
+    {refreshing && <p className={styles.refreshing} role="status">正在刷新「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」热门 BGM…</p>}
+    {failed && <p className={styles.refreshError} role="status">「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」刷新未完成：{group?.refreshMessage || group?.message || names[status || 'failed']}</p>}
+    {group?.result && (actual !== selected || group.showingPrevious) && <p>当前显示：{actual} · 上次采集结果</p>}
+    {!group?.result && !refreshing && !failed && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
+  </>;
 }
 
 export function FeiguaTrends() {
@@ -70,7 +97,7 @@ export function FeiguaTrends() {
   const secondTags = firstTag?.children || [];
   const effectiveRunId = state.runs.some(item => item.id === selectedRun) ? selectedRun : '';
   const run = state.runs.find(item => item.id === effectiveRunId) || state.runs[0];
-  const displayedGroups = displayedFeiguaGroups(state.runs, effectiveRunId) as Group[];
+  const displayedGroups = displayedFeiguaGroups(state.runs, effectiveRunId, state.latestResults) as Group[];
   const displayedCount = displayedGroups.reduce((sum, group) => sum + (group.result?.rows.length || 0), 0);
 
   useEffect(() => {
@@ -100,7 +127,7 @@ export function FeiguaTrends() {
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
       if (name === 'save') setKeywords(next.keywords);
-      if (name === 'music-save') setMusicTag(next.musicTag);
+      if (name === 'music-save') { setMusicTag(next.musicTag); setSelectedRun(''); }
       if (name === 'start') setSelectedRun('');
     } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作失败，请重试'); }
     finally { setAction(''); }
@@ -144,10 +171,10 @@ export function FeiguaTrends() {
           {!!musicTag[1] && !secondTags.some(option => option.label === musicTag[1]) && <option value={musicTag[1]} disabled>{musicTag[1]}（目录中已失效）</option>}
           {secondTags.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
-        <button className={styles.primary} disabled={disabled || !musicDirty} onClick={() => void perform('music-save', api => api.saveMusicTag(musicTag))}>{action === 'music-save' ? '保存中…' : '保存 BGM 标签'}</button>
+        <button className={styles.primary} disabled={disabled || state.busy} onClick={() => void perform('music-save', api => api.saveAndRefreshMusicTag(musicTag))}>{action === 'music-save' ? '正在保存并刷新…' : '保存并刷新 BGM'}</button>
         <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
       </div>
-      <small>{musicDirty ? '标签尚未保存，保存后用于下一批采集；当前批次保持原选择。' : `已保存：${state.musicTag.join(' > ') || '全部视频标签'}`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
+      <small>{musicDirty ? `已选择：${musicTag.join(' > ') || '全部视频标签'}，点击“保存并刷新 BGM”立即更新榜单。` : `已保存：${state.musicTag.join(' > ') || '全部视频标签'} · 保存后自动刷新 BGM`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
@@ -171,7 +198,7 @@ export function FeiguaTrends() {
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
         const group = displayedGroups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{kind === 'music' && <p>结果视频标签：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}{group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{kind === 'music' ? <MusicCaption group={group} selection={musicTag} dirty={musicDirty} history={!!effectiveRunId} /> : <p>{rules[kind]}</p>}{kind !== 'music' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>

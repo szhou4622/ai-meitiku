@@ -3,7 +3,19 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture } from './feigua-contract.mjs';
 
-const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [] });
+const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [] });
+
+function recoverLatestResults(runs, cached = []) {
+  const found = new Map();
+  const candidates = [...runs.flatMap(run => (run.groups || []).map(group => ({ ...group, sourceRunId: run.id }))), ...(Array.isArray(cached) ? cached : [])]
+    .filter(group => group.result && Array.isArray(group.result.rows))
+    .sort((a, b) => (Date.parse(b.result.collectedAt) || 0) - (Date.parse(a.result.collectedAt) || 0));
+  for (const group of candidates) {
+    const key = JSON.stringify([group.kind, group.keyword || null]);
+    if (!found.has(key)) found.set(key, group);
+  }
+  return [...found.values()];
+}
 
 export class FeiguaService {
   constructor({ userDataPath, browser, storage }) {
@@ -47,7 +59,8 @@ export class FeiguaService {
     this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
-      musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null, runs: data.runs.slice(0, 12) };
+      musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
+      latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
     let recovered = false;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
@@ -124,6 +137,14 @@ export class FeiguaService {
     return this.state();
   }
 
+  async saveAndRefreshMusicTag(input) {
+    await this.exclusive(async () => {
+      await this.saveMusicTag(input);
+      await this.launchRun([...this.data.musicTag], [], { onlyMusic: true, verifyLogin: true });
+    });
+    return this.state();
+  }
+
   async syncMusicTags() {
     const catalog = await this.browser.getMusicTags();
     await this.cacheMusicTags(catalog);
@@ -155,19 +176,37 @@ export class FeiguaService {
       const keywords = [...this.data.keywords];
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
-      groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
-      const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, message: '准备采集' };
-      this.data.runs.unshift(run);
-      this.data.runs = this.data.runs.slice(0, 12);
-      try { await this.persist(); } catch (error) { this.data.runs.shift(); throw error; }
-      this.controller = new AbortController();
-      // Intent is durable before the first provider read. State is polled via IPC.
-      this.job = this.execute(run, this.controller.signal).catch(() => {
-        run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
-      }).finally(() => { this.controller = null; });
+      await this.launchRun(musicTag, keywords);
     });
     return this.state();
+  }
+
+  async launchRun(musicTag, keywords, { onlyMusic = false, verifyLogin = false } = {}) {
+    const groups = (onlyMusic ? ['music'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
+    groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, message: onlyMusic ? '正在刷新 BGM' : '准备采集' };
+    const previousRuns = this.data.runs;
+    this.data.runs = [run, ...previousRuns].slice(0, 12);
+    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; throw error; }
+    this.controller = new AbortController();
+    const signal = this.controller.signal;
+    this.job = (async () => {
+      if (verifyLogin) {
+        try {
+          this.auth = await this.browser.checkLogin();
+          if (this.auth.status !== 'authenticated') throw new Error('标签已保存，请登录飞瓜后刷新 BGM');
+        } catch (error) {
+          run.status = signal.aborted ? 'cancelled' : 'failed';
+          run.finishedAt = new Date().toISOString();
+          run.message = 'BGM 刷新未完成';
+          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || '标签已保存，飞瓜登录状态未确认，请登录后重试'; }
+          await this.persist(); return;
+        }
+      }
+      await this.execute(run, signal);
+    })().catch(() => {
+      run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
+    }).finally(() => { this.controller = null; });
   }
 
   async execute(run, signal) {
@@ -183,6 +222,7 @@ export class FeiguaService {
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
         group.result = validateCapture(group.kind, group.keyword, capture, { musicTag: group.musicTag || [] });
         group.status = 'completed';
+        this.data.latestResults = recoverLatestResults([{ id: run.id, groups: [group] }], this.data.latestResults);
       } catch (error) {
         group.status = signal.aborted ? 'cancelled' : 'failed';
         // Only adapter-owned messages are exposed, never raw browser/network errors.

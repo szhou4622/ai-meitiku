@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     state: () => ipcRenderer.invoke("feigua-state"),
     saveKeywords: (keywords) => ipcRenderer.invoke("feigua-save-keywords", keywords),
     saveMusicTag: (path) => ipcRenderer.invoke("feigua-save-music-tag", path),
+    saveAndRefreshMusicTag: (path) => ipcRenderer.invoke("feigua-save-refresh-music-tag", path),
     refreshMusicTags: () => ipcRenderer.invoke("feigua-refresh-music-tags"),
     login: () => ipcRenderer.invoke("feigua-login"),
     checkLogin: () => ipcRenderer.invoke("feigua-check-login"),

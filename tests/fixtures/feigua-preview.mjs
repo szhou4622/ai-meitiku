@@ -1,6 +1,6 @@
 // Synthetic UI fixture, explicitly installed only by a developer in a preview tab.
 // Never imported by the production entrypoint. Reload the tab to remove it.
-export function installFeiguaPreview() {
+export function installFeiguaPreview({ musicRefreshFails = false } = {}) {
   let state = { keywords: [], musicTag: [], musicTagOptions: [{ label: '合成一级甲', children: [{label:'合成二级甲'}, {label:'合成二级乙'}] }, { label:'合成一级乙', children:[{label:'合成二级丙'}] }], musicTagOptionsLoadedAt: '2026-10-02T00:00:00Z', musicTagRestricted: false, runs: [], busy: false, auth: { status: 'authenticated', message: '合成测试：已登录' } };
   const snapshot = () => structuredClone(state);
   const group = (kind, keyword = null) => ({ kind, keyword, ...(kind==='music'?{musicTag:[...state.musicTag]}:{}), status: 'completed', result: {
@@ -12,6 +12,12 @@ export function installFeiguaPreview() {
     state: async () => snapshot(),
     saveKeywords: async keywords => { state.keywords = [...keywords]; return snapshot(); },
     saveMusicTag: async path => { state.musicTag = [...path]; return snapshot(); },
+    saveAndRefreshMusicTag: async path => {
+      state.musicTag = [...path];
+      const music = musicRefreshFails ? { kind:'music', keyword:null, musicTag:[...path], status:'failed', message:'合成测试：刷新失败' } : group('music');
+      state.runs.unshift({ id:String(Date.now()), startedAt:new Date().toISOString(), status:music.status, message:'BGM 单独刷新（合成测试）', keywords:[], musicTag:[...path], groups:[music] });
+      return snapshot();
+    },
     refreshMusicTags: async () => snapshot(),
     login: async () => { state.auth = { status: 'authenticated', message: '合成测试：已登录' }; return snapshot(); },
     checkLogin: async () => { state.auth = { status: 'authenticated', message: '合成测试：已登录' }; return snapshot(); },
