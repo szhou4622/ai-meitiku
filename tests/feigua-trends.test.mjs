@@ -9,7 +9,7 @@ import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
+  musicTag: [], filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
@@ -297,7 +297,7 @@ test('catalog and selected second-level tag survive reload independently of keyw
   assert.equal(state.musicTagOptions[0].children.length, 2);
 });
 
-test('running music group retains its category snapshot when user changes settings', async () => {
+test('music and topic groups retain their shared complete category snapshot when settings change', async () => {
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   const paths = [];
@@ -313,12 +313,56 @@ test('running music group retains its category snapshot when user changes settin
   assert.deepEqual(paths, [['测试一级甲', '测试二级甲']]);
   assert.deepEqual(disk().musicTag, ['测试一级乙', '测试二级丙']);
   assert.equal(disk().runs[0].groups[0].result.filters.category, '测试一级甲 > 测试二级甲');
-  assert.deepEqual(disk().runs[0].groups[1].result.filters, { category: '全部' });
+  assert.deepEqual(disk().runs[0].groups[1].result.filters, { category: '测试一级甲 > 测试二级甲', categoryPath: ['测试一级甲', '测试二级甲'] });
 });
 
 test('category mismatch cannot be silently recorded as all-category music', () => {
   assert.throws(() => validateCapture('music', null, capture('music'), { musicTag: ['测试一级甲'] }), /不一致/);
   assert.throws(() => validateCapture('music', null, capture('music', null, { musicTag: ['测试一级乙'] }), { musicTag: ['测试一级甲'] }), /不一致/);
+});
+
+test('topic results must confirm the complete shared path including the second level', () => {
+  const musicTag = ['测试一级甲', '测试二级甲'];
+  assert.deepEqual(validateCapture('topics', null, capture('topics', null, {musicTag}), {musicTag}).filters,
+    {category:'测试一级甲 > 测试二级甲',categoryPath:musicTag});
+  for (const actual of [undefined, null, [], ['测试一级甲'], ['测试一级甲','测试二级乙']]) {
+    assert.throws(() => validateCapture('topics', null, capture('topics', null, {musicTag:actual}), {musicTag}), /不一致/);
+  }
+  assert.deepEqual(validateCapture('topics', null, capture('topics')).filters, {category:'全部',categoryPath:[]});
+});
+
+test('topic browser applies shared first/second levels without changing weekly ranking rules', async () => {
+  const browser = new FeiguaBrowser({});
+  const calls=[];
+  browser.openSource=async kind=>assert.equal(kind,'topics');
+  browser.settle=async()=>{};
+  browser.choose=async(command,args)=>{calls.push([command,args]);};
+  browser.execute=async(command,args)=>{
+    if(command==='sort') {assert.equal(args.label,'参与人数增长率');return {verified:true};}
+    if(command==='music-tag') calls.push([command,args]);
+    return {verified:true};
+  };
+  for(const musicTag of [[],['测试一级甲'],['测试一级甲','测试二级甲']]) {
+    calls.length=0;
+    await browser.collect('topics',null,undefined,{musicTag});
+    const expected=[['choice',{label:'话题总榜'}],['choice',{label:'周榜'}]];
+    if(musicTag.length>1) expected.push(['music-tag',{kind:'topics',path:musicTag,phase:'expand'}]);
+    expected.push(['music-tag',{kind:'topics',path:musicTag,phase:'select'}],['category',{label:'话题类型'}]);
+    assert.deepEqual(calls,expected);
+  }
+});
+
+test('a failed topic filter preserves earlier all-category results under their original label', async () => {
+  const previous={kind:'topics',status:'completed',result:validateCapture('topics',null,capture('topics'))};
+  const {service}=fixture({stored:{version:1,keywords:[],musicTag:['测试一级甲'],musicTagOptions:tagOptions,runs:[{id:'old',status:'completed',groups:[previous]}]},
+    collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{musicTag:kind==='topics'?[]:options.musicTag})});
+  await service.start(); await service.job;
+  const state=await service.state();
+  assert.equal(state.runs[0].groups[1].status,'failed');
+  assert.equal(state.runs[0].groups[1].result,undefined);
+  const shown=displayedFeiguaGroups(state.runs).find(group=>group.kind==='topics');
+  assert.equal(shown.result.filters.category,'全部');
+  assert.equal(shown.showingPrevious,true);
 });
 
 test('failed music selection write keeps the prior saved choice', async () => {

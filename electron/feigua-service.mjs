@@ -155,7 +155,7 @@ export class FeiguaService {
       const keywords = [...this.data.keywords];
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending', ...(kind === 'music' ? { musicTag } : {}) }));
+      const groups = ['music', 'topics', 'hotspots'].map(kind => ({ kind, keyword: null, status: 'pending', ...(['music', 'topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
       groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
       const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, message: '准备采集' };
       this.data.runs.unshift(run);

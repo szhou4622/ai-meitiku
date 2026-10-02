@@ -25,9 +25,10 @@ try {
   frame.contentDocument.querySelector('button').onclick = () => { accepted++; frame.contentDocument.querySelector('[role="dialog"]').remove(); };
   assert('自动确认已授权的指定声明', run('accept-terms').accepted === true && accepted === 1);
   assert('声明消失后不重复确认', run('accept-terms').accepted === false && accepted === 1);
-  await mount(shell + `<div><span>视频标签</span><a class="active"><span>全部</span></a><a>时尚</a></div>
+  await mount(shell + `<div class="tag-cascader"><span class="tag-label">视频标签</span><a class="active"><span>全部</span></a><a>时尚</a></div>
     <table><thead><tr><th>音乐</th><th>总使用人数</th><th aria-sort="descending">昨日使用人数</th></tr></thead>
     <tbody><tr><td><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></td><td>100w</td><td>3w</td></tr></tbody></table>`);
+  frame.contentDocument.querySelector('.tag-cascader').__vue__ = { $props: { value:['0'], options:[{Id:'0',Name:'全部',Sub:[]}] } };
   assert('已登录识别', run('auth').authenticated === true);
   assert('嵌套全部筛选识别', run('category', {label:'视频标签',verify:true}).verified === true);
   assert('明确降序识别', run('sort', {label:'昨日使用人数',verify:true}).verified === true);
@@ -38,8 +39,10 @@ try {
   frame.contentDocument.querySelector('[aria-sort]').removeAttribute('aria-sort');
   assert('未知排序不能伪装降序', Boolean(run('sort', {label:'昨日使用人数',verify:true}).error));
   await mount(shell + `<div class="dy-side-bar-poper" style="display:none"><div class="child-wrapper"><div class="child-label">热门音乐</div></div></div>
+    <div class="tag-cascader"><span class="tag-label">视频标签</span></div>
     <section><div><div class="list-hd"><div class="col-item">音乐</div><div class="col-item">总使用人数</div><div class="col-item"><div class="define-sort-th sorting">昨日使用人数<i class="arrow v-bottom active"></i></div></div></div></div>
     <div><div class="col-item"><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></div><div class="col-item">20w</div><div class="col-item">5w</div></div></section>`);
+  frame.contentDocument.querySelector('.tag-cascader').__vue__ = { $props: { value:['0'], options:[{Id:'0',Name:'全部',Sub:[]}] } };
   let menuClicked = false;
   frame.contentDocument.querySelector('.child-wrapper').onclick = () => { menuClicked = true; };
   assert('识别新版事件菜单入口', run('navigate', {labels:['热门音乐']}).clicked === true && menuClicked);
@@ -81,5 +84,31 @@ try {
   assert('支持回到全部标签',run('music-tag',{path:[],verify:true}).verified===true);
   const mask=frame.contentDocument.createElement('div');mask.className='purview-mask-layer';mask.textContent='权限遮罩';tagRoot.querySelector('.permission-wrapper').append(mask);
   assert('权限层存在时不得点击穿透',/权限受限/.test(run('music-tag',{path:['合成一级'],phase:'select'}).error)&&widgetProps.value[0]==='0');
+  mask.remove();
+  tagRoot.querySelector('.tag-label').textContent = '话题分类';
+  const table = frame.contentDocument.createElement('div');
+  table.innerHTML = `<input value="2026-09-21 - 2026-09-27"><table><thead><tr><th>话题</th><th aria-sort="descending">参与人数增长率</th></tr></thead><tbody><tr><td><a href="https://dy.feigua.cn/synthetic/topic/1">合成话题</a></td><td>20%</td></tr></tbody></table>`;
+  frame.contentDocument.body.append(table);
+  const topicArgs = {kind:'topics',sort:'参与人数增长率',period:'周榜'};
+  assert('话题从自身控件读取二级目录',run('music-tag-options',{kind:'topics'}).options[0].children[0].label==='合成二级');
+  run('music-tag',{kind:'topics',path:['合成一级'],phase:'select'});
+  assert('话题一级分类回读',run('music-tag',{kind:'topics',path:['合成一级'],verify:true}).verified===true);
+  run('music-tag',{kind:'topics',path:['合成一级','合成二级'],phase:'expand'});
+  run('music-tag',{kind:'topics',path:['合成一级','合成二级'],phase:'select'});
+  assert('话题二级分类回读完整路径',run('music-tag',{kind:'topics',path:['合成一级','合成二级'],verify:true}).verified===true);
+  const topicResult = run('capture',topicArgs);
+  assert('话题结果保留二级分类和原排名日期',topicResult.musicTag.join(' > ')==='合成一级 > 合成二级' && topicResult.rows[0].participantGrowth==='20%' && topicResult.dateRange==='2026-09-21 - 2026-09-27');
+  assert('话题不会误读 BGM 控件',Boolean(run('music-tag',{path:['合成一级'],verify:true}).error));
+  assert('不存在的二级不能视为筛选生效',run('music-tag',{kind:'topics',path:['合成一级','不存在'],verify:true}).verified===false);
+  run('music-tag',{kind:'topics',path:[],phase:'select'});
+  assert('话题可回到全部',run('capture',topicArgs).musicTag.length===0);
+  tagRoot.querySelector('.permission-wrapper').append(mask);
+  assert('话题不能穿透权限遮罩',/权限受限/.test(run('music-tag',{kind:'topics',path:['合成一级'],phase:'select'}).error)&&widgetProps.value[0]==='0');
+  mask.remove();
+  widgetProps.value=['unknown'];
+  assert('话题分类回读失败不能当全部保存',/无法回读/.test(run('capture',topicArgs).error));
+  widgetProps.value=['0'];
+  widgetProps.options[1].Sub[0].Sub=[{Id:'111',Name:'新增三级',Sub:[]}];
+  assert('未来出现三级目录时不得静默截断',/三级/.test(run('music-tag-options',{kind:'topics'}).error)&&/三级/.test(run('capture',topicArgs).error));
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');

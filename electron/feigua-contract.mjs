@@ -66,8 +66,9 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
   }
   if (kind === 'videos' && capture.keyword !== keyword) throw new Error('关键词筛选与当前采集组不一致');
-  const musicTag = kind === 'music' ? normalizeMusicTag(options.musicTag) : [];
-  if (kind === 'music' && JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag)) throw new Error('BGM 实际视频标签与任务选择不一致，本组未保存');
+  const hasCategory = ['music', 'topics'].includes(kind);
+  const musicTag = hasCategory ? normalizeMusicTag(options.musicTag) : [];
+  if (hasCategory && (!Array.isArray(capture.musicTag) || JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag))) throw new Error('榜单实际分类与任务选择不一致，本组未保存');
   if (['topics', 'videos'].includes(kind) && !value(capture.dateRange, 100)) throw new Error('未取得实际统计日期，本组未保存');
   if (!Array.isArray(capture.rows) || (!capture.rows.length && capture.emptyVerified !== true)) throw new Error('未读到榜单，不能将未加载页面保存为空榜单');
   const seen = new Set();
@@ -97,7 +98,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
     sort: source.sort, direction: 'desc', period: source.period,
     dateRange: value(capture.dateRange, 100),
-    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : kind === 'music' ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
+    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : hasCategory ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
     rows,
   };
 }

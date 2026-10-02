@@ -25,7 +25,7 @@ export type FeiguaBridge = {
 const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
-const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 全部分类 · 参与人数增长率降序', hotspots: '抖音热点库 · 近7天 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
+const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点库 · 近7天 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
 const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 
@@ -130,24 +130,24 @@ export function FeiguaTrends() {
     {error && <div className={styles.error} role="alert">{error}</div>}
 
     <details className={styles.settings}>
-      <summary>采集设置 <span>BGM：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
-    <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 视频标签配置">
-      <div><h2>本周爆款 BGM · 视频标签</h2><p>选择一级或二级分类，按昨日使用人数降序取前 5</p></div>
+      <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
+    <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">
+      <div><h2>BGM 与话题 · 榜单分类</h2><p>两个榜单共用一级、二级分类，各自按原排名规则取前 5</p></div>
       <div className={styles.tagSelectors}>
-        <label>一级分类<select aria-label="BGM 一级分类" value={musicTag[0] || ''} disabled={disabled || !state.musicTagOptions.length} onChange={event => setMusicTag(event.target.value ? [event.target.value] : [])}>
-          <option value="">全部视频标签</option>
+        <label>一级分类<select aria-label="榜单一级分类" value={musicTag[0] || ''} disabled={disabled || !state.musicTagOptions.length} onChange={event => setMusicTag(event.target.value ? [event.target.value] : [])}>
+          <option value="">全部分类</option>
           {!!musicTag[0] && !firstTag && <option value={musicTag[0]} disabled>{musicTag[0]}（目录中已失效）</option>}
           {state.musicTagOptions.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
-        <label>二级分类<select aria-label="BGM 二级分类" value={musicTag[1] || ''} disabled={disabled || !secondTags.length} onChange={event => setMusicTag(event.target.value ? [musicTag[0], event.target.value] : [musicTag[0]])}>
+        <label>二级分类<select aria-label="榜单二级分类" value={musicTag[1] || ''} disabled={disabled || !secondTags.length} onChange={event => setMusicTag(event.target.value ? [musicTag[0], event.target.value] : [musicTag[0]])}>
           <option value="">{musicTag[0] ? `全部${musicTag[0]}` : '先选择一级分类'}</option>
           {!!musicTag[1] && !secondTags.some(option => option.label === musicTag[1]) && <option value={musicTag[1]} disabled>{musicTag[1]}（目录中已失效）</option>}
           {secondTags.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
-        <button className={styles.primary} disabled={disabled || !musicDirty} onClick={() => void perform('music-save', api => api.saveMusicTag(musicTag))}>{action === 'music-save' ? '保存中…' : '保存 BGM 标签'}</button>
+        <button className={styles.primary} disabled={disabled || !musicDirty} onClick={() => void perform('music-save', api => api.saveMusicTag(musicTag))}>{action === 'music-save' ? '保存中…' : '保存榜单分类'}</button>
         <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
       </div>
-      <small>{musicDirty ? '标签尚未保存，保存后用于下一批采集；当前批次保持原选择。' : `已保存：${state.musicTag.join(' > ') || '全部视频标签'}`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
+      <small>{musicDirty ? '分类尚未保存，保存后用于下一批 BGM 和话题采集；当前批次保持原选择。' : `已保存：${state.musicTag.join(' > ') || '全部分类'}`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
@@ -171,7 +171,7 @@ export function FeiguaTrends() {
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
         const group = displayedGroups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{kind === 'music' && <p>结果视频标签：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}{group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3><p>{rules[kind]}</p>{(kind === 'music' || kind === 'topics') && <p>{kind === 'music' ? '结果视频标签' : '结果话题分类'}：{group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部'}</p>}{group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
