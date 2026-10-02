@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag } from './feigua-contract.mjs';
+import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
@@ -209,9 +209,14 @@ export class FeiguaBrowser {
     await this.settle(signal);
   }
 
-  async getMusicTags() {
-    await this.openSource('music');
+  async getMusicTags(signal) {
+    await this.openSource('music', signal);
     return this.execute('music-tag-options');
+  }
+
+  async getVideoFilters(signal) {
+    await this.openSource('videos', signal);
+    return this.execute('video-filter-options');
   }
 
   async collect(kind, keyword, signal, options = {}) {
@@ -220,8 +225,14 @@ export class FeiguaBrowser {
     const musicTag = ['music', 'topics'].includes(kind) ? normalizeMusicTag(options.musicTag) : [];
     if (kind === 'videos') {
       await this.execute('clear'); await this.settle(signal);
-      await this.choose('category', { label: '带货品类' }, signal);
-      await this.choose('category', { label: '视频标签' }, signal);
+      for (const [key, label] of [['categoryPath', '带货品类'], ['tagPath', '视频标签']]) {
+        const path = normalizeVideoPath(options[key]);
+        for (let depth = 0; depth < path.length - 1; depth++) {
+          await this.execute('video-filter', { label, path, phase: 'expand', depth });
+          await this.settle(signal);
+        }
+        await this.choose('video-filter', { label, path, phase: 'select' }, signal);
+      }
       await this.choose('choice', { label: '近7天' }, signal);
       await this.choose('keyword', { keyword }, signal);
     } else {

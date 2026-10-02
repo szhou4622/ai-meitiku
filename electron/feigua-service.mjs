@@ -1,9 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture } from './feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
-const initial = () => ({ version: 1, keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -66,11 +66,14 @@ export class FeiguaService {
     const data = await this.storage.read();
     if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
     this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
+      videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
+      videoFilterOptions: { categoryPath: normalizeVideoOptions(data.videoFilterOptions?.categoryPath || []), tagPath: normalizeVideoOptions(data.videoFilterOptions?.tagPath || []) },
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
       latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
+    this.data.keywords = this.data.videoQueries.map(query => query.keyword);
     let recovered = false;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
@@ -91,7 +94,7 @@ export class FeiguaService {
 
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), scheduleMessage: this.scheduleMessage || null });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
   }
 
   startDailySchedule(canRun) {
@@ -130,13 +133,51 @@ export class FeiguaService {
     await this.ready;
     const keywords = normalizeKeywords(input);
     const save = this.writeQueue.then(async () => {
-      await this.storage.write({ ...structuredClone(this.data), keywords });
+      const videoQueries = keywords.map(keyword => this.data.videoQueries.find(query => query.keyword === keyword) || { keyword, categoryPath: [], tagPath: [] });
+      await this.storage.write({ ...structuredClone(this.data), keywords, videoQueries });
       this.data.keywords = keywords;
+      this.data.videoQueries = videoQueries;
     });
     this.writeQueue = save.catch(() => {});
     this.configQueue = save.catch(() => {});
     await save;
     return this.state();
+  }
+
+  async saveVideoQueries(input) {
+    await this.ready;
+    const videoQueries = validateVideoQueries(input, this.data.videoFilterOptions);
+    const keywords = videoQueries.map(query => query.keyword);
+    const save = this.writeQueue.then(async () => {
+      validateVideoQueries(videoQueries, this.data.videoFilterOptions);
+      await this.storage.write({ ...structuredClone(this.data), keywords, videoQueries });
+      this.data.keywords = keywords;
+      this.data.videoQueries = videoQueries;
+    });
+    this.writeQueue = save.catch(() => {});
+    this.configQueue = save.catch(() => {});
+    await save;
+    return this.state();
+  }
+
+  async saveAndRefreshVideoQueries(input) {
+    await this.exclusive(async () => {
+      await this.saveVideoQueries(input);
+      if (this.data.keywords.length) await this.launchRun([], [...this.data.keywords], { onlyVideos: true, verifyLogin: true });
+    });
+    return this.state();
+  }
+
+  async syncVideoFilters(signal) {
+    const catalog = await this.browser.getVideoFilters(signal);
+    const videoFilterOptions = { categoryPath: normalizeVideoOptions(catalog.categoryPath), tagPath: normalizeVideoOptions(catalog.tagPath) };
+    if (!videoFilterOptions.categoryPath.length || !videoFilterOptions.tagPath.length) throw new Error('视频分类目录为空');
+    const save = this.writeQueue.then(async () => {
+      await this.storage.write({ ...structuredClone(this.data), videoFilterOptions });
+      this.data.videoFilterOptions = videoFilterOptions;
+    });
+    this.writeQueue = save.catch(() => {});
+    await save;
   }
 
   async login() {
@@ -180,8 +221,8 @@ export class FeiguaService {
     return this.state();
   }
 
-  async syncMusicTags() {
-    const catalog = await this.browser.getMusicTags();
+  async syncMusicTags(signal) {
+    const catalog = await this.browser.getMusicTags(signal);
     await this.cacheMusicTags(catalog);
   }
 
@@ -209,16 +250,17 @@ export class FeiguaService {
       await this.configQueue;
       const musicTag = [...this.data.musicTag];
       const keywords = [...this.data.keywords];
+      const videoQueries = structuredClone(this.data.videoQueries);
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      await this.launchRun(musicTag, keywords);
+      await this.launchRun(musicTag, keywords, { videoQueries });
     });
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, verifyLogin = false, scheduledDate = null } = {}) {
-    const groups = (onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
-    groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending' })));
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries } = {}) {
+    const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
+    groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
     const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: 'daily-hotspots' } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : '准备采集' };
     const previousRuns = this.data.runs;
     const previousScheduleDate = this.data.lastHotspotsScheduleDate;
@@ -232,14 +274,24 @@ export class FeiguaService {
       if (verifyLogin) {
         try {
           this.auth = await this.browser.checkLogin();
-          if (this.auth.status !== 'authenticated') throw new Error(onlyHotspots ? '请登录飞瓜后刷新日榜' : '标签已保存，请登录飞瓜后刷新 BGM');
+          if (this.auth.status !== 'authenticated') throw new Error(onlyHotspots ? '请登录飞瓜后刷新日榜' : '设置已保存，请登录飞瓜后刷新榜单');
         } catch (error) {
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
           run.message = onlyHotspots ? '日榜定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
-          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '标签已保存，飞瓜登录状态未确认，请登录后重试'); }
+          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '设置已保存，飞瓜登录状态未确认，请登录后重试'); }
           await this.persist(); return;
         }
+      }
+      if (!onlyHotspots) {
+        const errors = [];
+        if (!onlyVideos && this.browser.getMusicTags && !signal.aborted) {
+          try { await this.syncMusicTags(signal); } catch { errors.push('榜单分类自动加载失败'); }
+        }
+        if (!onlyMusic && !onlyRankings && this.browser.getVideoFilters && !signal.aborted) {
+          try { await this.syncVideoFilters(signal); } catch { errors.push('带货视频分类自动加载失败'); }
+        }
+        this.catalogMessage = errors.length ? `${errors.join('；')}，保留已有目录，请重新登录后重试。` : null;
       }
       await this.execute(run, signal);
     })().catch(() => {
@@ -255,10 +307,11 @@ export class FeiguaService {
       run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}`;
       await this.persist();
       try {
-        const capture = await this.browser.collect(group.kind, group.keyword, signal, { musicTag: group.musicTag || [] });
+        const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
+        const capture = await this.browser.collect(group.kind, group.keyword, signal, options);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
-        group.result = validateCapture(group.kind, group.keyword, capture, { musicTag: group.musicTag || [] });
+        group.result = validateCapture(group.kind, group.keyword, capture, options);
         group.status = 'completed';
         this.data.latestResults = recoverLatestResults([{ id: run.id, groups: [group] }], this.data.latestResults);
       } catch (error) {

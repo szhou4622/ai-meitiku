@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   feigua: {
     state: () => ipcRenderer.invoke("feigua-state"),
     saveKeywords: (keywords) => ipcRenderer.invoke("feigua-save-keywords", keywords),
+    saveAndRefreshVideoQueries: (queries) => ipcRenderer.invoke("feigua-save-refresh-video-queries", queries),
     saveMusicTag: (path) => ipcRenderer.invoke("feigua-save-music-tag", path),
     saveAndRefreshMusicTag: (path) => ipcRenderer.invoke("feigua-save-refresh-music-tag", path),
     refreshMusicTags: () => ipcRenderer.invoke("feigua-refresh-music-tags"),

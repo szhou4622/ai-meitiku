@@ -25,9 +25,9 @@ export function feiguaPage(command, argument = {}) {
   const authenticated = () => authState().authenticated;
   const failure = message => ({ error: message });
   const categoryLabel = argument.kind === 'topics' ? '话题分类' : '视频标签';
-  const musicTagRoot = () => elements('.tag-cascader').find(root => text(root.querySelector('.tag-label')) === categoryLabel);
-  const musicTagData = () => {
-    const root = musicTagRoot();
+  const musicTagData = (label = categoryLabel) => {
+    const roots = elements('.tag-cascader').filter(root => text(root.querySelector('.tag-label')) === label);
+    const root = roots.length === 1 ? roots[0] : null;
     // Read only the options/value already supplied to this visible filter widget.
     // Do not change the provider component or its permission flags.
     const props = root?.__vue__?.$props;
@@ -42,7 +42,13 @@ export function feiguaPage(command, argument = {}) {
       }
       return null;
     };
-    return { root, path: findPath(props.options, props.value.at(-1)),
+    const tree = (nodes, depth = 0) => {
+      if (depth >= 5 && nodes.length) throw new Error('分类目录超过五级');
+      return nodes.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: tree(Array.isArray(node.Sub) ? node.Sub : [], depth + 1) }));
+    };
+    let fullOptions;
+    try { fullOptions = tree(props.options); } catch { return null; }
+    return { root, path: findPath(props.options, props.value.at(-1)), fullOptions,
       unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };
@@ -80,10 +86,44 @@ export function feiguaPage(command, argument = {}) {
     return { opened: Boolean(link) };
   }
   if (!authenticated()) return { authRequired: true };
+  if (command === 'video-filter-options') {
+    const category = musicTagData('带货品类'), tag = musicTagData('视频标签');
+    if (!category || !tag) return failure('未能读取带货视频分类目录，请重新登录后重试');
+    return { categoryPath: category.fullOptions, tagPath: tag.fullOptions };
+  }
+  if (command === 'video-filter') {
+    if (!['带货品类', '视频标签'].includes(argument.label)) return failure('未知视频筛选项');
+    const data = musicTagData(argument.label);
+    if (!data) return failure(`未能识别${argument.label}控件`);
+    const path = argument.path || [];
+    if (!Array.isArray(path) || path.length > 5) return failure('视频分类路径无效');
+    if (data.path && JSON.stringify(data.path) === JSON.stringify(path)) return { verified: true, path: data.path };
+    if (argument.verify) return { verified: false, path: data.path };
+    if (data.restricted) return failure(`当前飞瓜账号的${argument.label}筛选权限受限，本组未采集`);
+    let options = data.fullOptions;
+    for (const label of path) {
+      const option = options.find(item => item.label === label);
+      if (!option) return failure(`所选${argument.label}已不在飞瓜目录中`);
+      options = option.children;
+    }
+    const depth = argument.phase === 'expand' ? argument.depth : Math.max(0, path.length - 1);
+    if (!Number.isInteger(depth) || depth < 0 || depth >= Math.max(1, path.length)) return failure('视频分类层级无效');
+    const matches = depth === 0
+      ? elements('.tag-list > .tag-element', data.root).filter(node => compact(node) === (path[0] || '全部'))
+      : elements('.el-popover', data.root).flatMap(popover => exact(path[depth], popover));
+    const targets = [...new Set(matches)];
+    if (targets.length !== 1) return failure(`无法唯一定位${argument.label}第${depth + 1}级选项`);
+    const target = targets[0].closest('label') || targets[0];
+    if (argument.phase === 'expand') {
+      target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+      target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    } else target.click();
+    return { changed: true };
+  }
   if (command === 'music-tag-options') {
     const data = musicTagData();
     if (data?.unsupportedDepth) return failure('飞瓜分类出现三级或更深目录，请更新适配后再采集');
-    return data ? { options: data.options, restricted: data.restricted } : failure(`未能读取飞瓜${categoryLabel}目录，请刷新分类`);
+    return data ? { options: data.options, restricted: data.restricted } : failure(`未能读取飞瓜${categoryLabel}目录，请重新登录后重试`);
   }
   if (command === 'music-tag') {
     const data = musicTagData();
@@ -212,6 +252,9 @@ export function feiguaPage(command, argument = {}) {
     return { changed: true };
   }
   if (command === 'capture') {
+    const videoCategory = argument.kind === 'videos' ? musicTagData('带货品类') : null;
+    const videoTag = argument.kind === 'videos' ? musicTagData('视频标签') : null;
+    if (argument.kind === 'videos' && (!Array.isArray(videoCategory?.path) || !Array.isArray(videoTag?.path))) return failure('无法回读带货品类或视频标签，本组未保存');
     const hasCategory = ['music', 'topics'].includes(argument.kind);
     const categoryData = hasCategory ? musicTagData() : null;
     if (hasCategory && !Array.isArray(categoryData?.path)) return failure(`无法回读实际${categoryLabel}，本组未保存`);
@@ -252,6 +295,7 @@ export function feiguaPage(command, argument = {}) {
     const endDate = elements('input').find(input => input.placeholder === '结束日期')?.value;
     return { url: location.href, rows, direction: 'desc', sort: argument.sort, period: argument.period, keyword: argument.keyword, filtersVerified: true,
       ...(hasCategory ? { musicTag: categoryData.path, musicTagOptions: categoryData.options, musicTagRestricted: categoryData.restricted } : {}),
+      ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, tagPath: videoTag.path } : {}),
       dateRange: startDate && endDate ? `${startDate} - ${endDate}` : dateText.match(/\d{4}[-/]\d{2}[-/]\d{2}\s*[-~至]\s*\d{4}[-/]\d{2}[-/]\d{2}/)?.[0] || null,
       emptyVerified: /暂无数据|暂无相关|没有找到/.test(text(table.root)) };
   }

@@ -7,14 +7,17 @@ import { displayedFeiguaGroups } from './feigua-results.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
-type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[] } };
-type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
+type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
+type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; categoryPath?: string[]; tagPath?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
 type MusicTagOption = { label: string; children: { label: string }[] };
-type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null };
+type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
+type CategoryOption = { label: string; children: CategoryOption[] };
+type State = { keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
+  saveAndRefreshVideoQueries: (queries: VideoQuery[]) => Promise<State>;
   saveMusicTag: (path: string[]) => Promise<State>;
   saveAndRefreshMusicTag: (path: string[]) => Promise<State>;
   refreshMusicTags: () => Promise<State>;
@@ -23,7 +26,9 @@ export type FeiguaBridge = {
   start: () => Promise<State>;
   cancel: () => Promise<State>;
 };
-const emptyState: State = { keywords: [], musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
+const emptyState: State = { keywords: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
+const savedVideoQueries = (state: State): VideoQuery[] => state.videoQueries || state.keywords.map(keyword => ({ keyword, categoryPath: [], tagPath: [] }));
+const pathLabel = (path?: string[]) => path?.join(' > ') || '全部';
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
@@ -79,9 +84,26 @@ function MusicCaption({group, kind, selection, dirty, history}: {group?: Group; 
   </>;
 }
 
+function CategorySelect({ label, options, path, disabled, onChange }: { label: string; options: CategoryOption[]; path: string[]; disabled: boolean; onChange: (path: string[]) => void }) {
+  const levels: CategoryOption[][] = [options];
+  for (let depth = 0; depth < path.length && depth < 4; depth++) {
+    const children = levels[depth]?.find(option => option.label === path[depth])?.children || [];
+    if (!children.length && !path[depth + 1]) break;
+    levels.push(children);
+  }
+  return <div className={styles.tagSelectors}>{levels.map((items, depth) => <label key={depth}>{depth === 0 ? label : `${depth + 1}级`}
+    <select aria-label={`${label}第${depth + 1}级`} value={path[depth] || ''} disabled={disabled || !items.length} onChange={event => onChange(event.target.value ? [...path.slice(0, depth), event.target.value] : path.slice(0, depth))}>
+      <option value="">全部{depth ? path[depth - 1] : ''}</option>
+      {!!path[depth] && !items.some(item => item.label === path[depth]) && <option value={path[depth]} disabled>{path[depth]}（目录中已失效）</option>}
+      {items.map(item => <option key={item.label} value={item.label}>{item.label}</option>)}
+    </select>
+  </label>)}</div>;
+}
+
 export function FeiguaTrends() {
   const [state, setState] = useState<State>(emptyState);
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
+  const keywords = videoQueries.map(query => query.keyword);
   const [musicTag, setMusicTag] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
@@ -92,13 +114,13 @@ export function FeiguaTrends() {
   const [selectedRun, setSelectedRun] = useState('');
   const initialized = useRef(false);
   const settingsPanel = useRef<HTMLDetailsElement>(null);
-  const dirty = JSON.stringify(keywords) !== JSON.stringify(state.keywords);
+  const dirty = JSON.stringify(videoQueries) !== JSON.stringify(savedVideoQueries(state));
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
   const secondTags = firstTag?.children || [];
   const effectiveRunId = state.runs.some(item => item.id === selectedRun) ? selectedRun : '';
   const run = state.runs.find(item => item.id === effectiveRunId) || state.runs[0];
-  const displayedGroups = displayedFeiguaGroups(state.runs, effectiveRunId, state.latestResults) as Group[];
+  const displayedGroups = (displayedFeiguaGroups(state.runs, effectiveRunId, state.latestResults) as Group[]).filter(group => effectiveRunId || group.kind !== 'videos' || state.keywords.includes(group.keyword || ''));
   const displayedCount = displayedGroups.reduce((sum, group) => sum + (group.result?.rows.length || 0), 0);
 
   useEffect(() => {
@@ -112,7 +134,7 @@ export function FeiguaTrends() {
         const next = await api.state();
         if (!alive) return;
         setDesktop(true); setState({ ...emptyState, ...next }); setLoaded(true);
-        if (!initialized.current) { setKeywords(next.keywords); setMusicTag(next.musicTag || []); initialized.current = true; }
+        if (!initialized.current) { setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
       } catch { if (alive) { setError('热点数据读取失败，请重试；原有数据不会被覆盖。'); setLoaded(true); } }
       finally { pending = false; }
     };
@@ -127,7 +149,10 @@ export function FeiguaTrends() {
     setAction(name); setError('');
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
-      if (name === 'save') setKeywords(next.keywords);
+      if (name === 'video-save') {
+        setVideoQueries(savedVideoQueries(next)); setSelectedRun('');
+        if (settingsPanel.current) settingsPanel.current.open = false;
+      }
       if (name === 'music-save') {
         setMusicTag(next.musicTag); setSelectedRun('');
         if (settingsPanel.current) settingsPanel.current.open = false;
@@ -143,7 +168,7 @@ export function FeiguaTrends() {
     if (keyword.length > 60 || /[\r\n\u0000-\u001f]/.test(keyword)) { setError('每个关键词限 60 字，不含换行'); return; }
     if (keywords.some((item, index) => item === keyword && index !== editing)) { setError('该关键词已存在'); return; }
     if (editing === null && keywords.length >= 50) { setError('最多保存 50 个关键词'); return; }
-    setKeywords(editing === null ? [...keywords, keyword] : keywords.map((item, index) => index === editing ? keyword : item));
+    setVideoQueries(editing === null ? [...videoQueries, { keyword, categoryPath: [], tagPath: [] }] : videoQueries.map((item, index) => index === editing ? { ...item, keyword } : item));
     setInput(''); setEditing(null); setError('');
   }
 
@@ -160,6 +185,7 @@ export function FeiguaTrends() {
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
+    {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     <p>全网热点日榜每天北京时间 07:00 自动采集；请保持应用运行并登录飞瓜。错过时间后，当天重新打开或恢复运行时补采一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
@@ -178,20 +204,23 @@ export function FeiguaTrends() {
           {secondTags.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
         </select></label>
         <button className={styles.primary} disabled={disabled || state.busy} onClick={() => void perform('music-save', api => api.saveAndRefreshMusicTag(musicTag))}>{action === 'music-save' ? '正在保存并刷新…' : '保存并刷新 BGM / 话题'}</button>
-        <button disabled={disabled || state.busy} onClick={() => void perform('music-refresh', api => api.refreshMusicTags())}><RefreshCw size={14} />{action === 'music-refresh' ? '读取分类中…' : '刷新飞瓜分类'}</button>
       </div>
-      <small>{musicDirty ? `已选择：${musicTag.join(' > ') || '全部视频标签'}，点击“保存并刷新 BGM / 话题”立即更新榜单。` : `已保存：${state.musicTag.join(' > ') || '全部视频标签'} · 保存后自动刷新 BGM / 话题`}{!state.musicTagOptions.length ? ' · 首次登录后自动加载分类，也可点击刷新。' : ''}</small>
+      <small>{musicDirty ? `已选择：${musicTag.join(' > ') || '全部视频标签'}，点击“保存并刷新 BGM / 话题”立即更新榜单。` : `已保存：${state.musicTag.join(' > ') || '全部视频标签'} · 保存后自动刷新 BGM / 话题`}{!state.musicTagOptions.length ? ' · 登录后自动加载分类。' : ''}</small>
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
-      <div><h2>带货视频关键词</h2><p>每个关键词独立采集销售额前 5 · 时间周期近7天</p></div>
+      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组，分别设置带货品类和视频标签 · 近7天销售额前 5</p></div>
       <form onSubmit={event => { event.preventDefault(); addKeyword(); }}>
         <input aria-label="视频关键词" placeholder="输入关键词，按回车添加" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} />
         <button type="submit" disabled={disabled || !input.trim()}><Plus size={15} />{editing === null ? '添加' : '确认修改'}</button>
-        <button type="button" className={styles.primary} disabled={disabled || !dirty || editing !== null || !!input.trim()} onClick={() => void perform('save', api => api.saveKeywords(keywords))}>{action === 'save' ? '保存中…' : '保存关键词'}</button>
+        <button type="button" className={styles.primary} disabled={disabled || state.busy || editing !== null || !!input.trim()} onClick={() => void perform('video-save', api => api.saveAndRefreshVideoQueries(videoQueries))}>{action === 'video-save' ? '正在保存并刷新…' : '保存并刷新关键词榜单'}</button>
       </form>
-      <div className={styles.tags}>{keywords.map((keyword, index) => <span key={`${index}:${keyword}`}><button disabled={disabled} title={`修改「${keyword}」`} onClick={() => { setEditing(index); setInput(keyword); }}>{keyword}</button><button disabled={disabled} aria-label={`删除关键词${keyword}`} onClick={() => { setKeywords(keywords.filter((_, current) => current !== index)); setEditing(null); setInput(''); }}><X size={13} /></button></span>)}</div>
-      <small>{editing !== null ? '正在修改关键词，确认后请保存。' : dirty ? '配置尚未保存。保存后用于下一次采集，当前任务保持原关键词。' : keywords.length ? `已保存 ${keywords.length} 个关键词，点击词条可以修改。` : '尚未配置关键词。仍可采集 BGM、话题和全网热点三个榜单。'}</small>
+      {videoQueries.map((query, index) => <section className={styles.querySettings} key={index} aria-label={`关键词${query.keyword}设置`}>
+        <div className={styles.tags}><span><button disabled={disabled} title={`修改「${query.keyword}」`} onClick={() => { setEditing(index); setInput(query.keyword); }}>{query.keyword}</button><button disabled={disabled} aria-label={`删除关键词${query.keyword}`} onClick={() => { setVideoQueries(videoQueries.filter((_, current) => current !== index)); setEditing(null); setInput(''); }}><X size={13} /></button></span></div>
+        <CategorySelect label={`${query.keyword} · 带货品类`} options={state.videoFilterOptions.categoryPath} path={query.categoryPath} disabled={disabled} onChange={categoryPath => setVideoQueries(videoQueries.map((item, current) => current === index ? { ...item, categoryPath } : item))} />
+        <CategorySelect label={`${query.keyword} · 视频标签`} options={state.videoFilterOptions.tagPath} path={query.tagPath} disabled={disabled} onChange={tagPath => setVideoQueries(videoQueries.map((item, current) => current === index ? { ...item, tagPath } : item))} />
+      </section>)}
+      <small>{editing !== null ? '正在修改关键词，确认后请保存。' : dirty ? '设置尚未保存，保存后立即刷新关键词榜单。' : keywords.length ? `已保存 ${keywords.length} 组，点击关键词可修改名称，分类独立保存。` : '尚未配置关键词。仍可采集 BGM、话题和全网热点三个榜单。'}{!state.videoFilterOptions.categoryPath.length || !state.videoFilterOptions.tagPath.length ? ' 登录后自动加载分类。' : ''}</small>
     </section>
     </details>
 
@@ -208,7 +237,17 @@ export function FeiguaTrends() {
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
-      {displayedGroups.filter(group => group.kind === 'videos').map(group => <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : names[group.status]}</small></h3><ResultBody group={group} kind="videos" />{group.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>)}
+      {displayedGroups.filter(group => group.kind === 'videos').map(group => {
+        const configured = savedVideoQueries(state).find(query => query.keyword === group.keyword);
+        const actual = group.result ? group.result.filters : group;
+        const changed = !effectiveRunId && configured && (JSON.stringify(configured.categoryPath) !== JSON.stringify(actual?.categoryPath || []) || JSON.stringify(configured.tagPath) !== JSON.stringify(actual?.tagPath || []));
+        const status = group.refreshStatus || group.status;
+        return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : names[group.status]}</small></h3>
+          <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
+          {changed && <p>已保存设置 · 带货品类：{pathLabel(configured.categoryPath)} · 视频标签：{pathLabel(configured.tagPath)}（当前结果尚未更新）</p>}
+          {!effectiveRunId && ['pending', 'running', 'failed', 'cancelled', 'interrupted'].includes(status) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
+          <ResultBody group={group} kind="videos" />{group.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+      })}
       {!displayedGroups.some(group => group.kind === 'videos') && <div className={styles.empty}>{state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>
   </section>;

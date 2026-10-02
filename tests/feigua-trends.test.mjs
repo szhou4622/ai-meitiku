@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl } from '../electron/feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
 import { FeiguaService, dueHotspotsDate } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
@@ -9,7 +9,7 @@ import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  musicTag: [], filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
+  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
@@ -19,7 +19,7 @@ function fixture({ stored, collect, auth, write } = {}) {
   const calls = [];
   const browser = {
     async openLogin() {}, async checkLogin() { return auth || { status: 'authenticated', message: '已登录' }; },
-    async collect(kind, keyword, signal, options) { calls.push([kind, keyword]); return collect ? collect(kind, keyword, signal, options) : capture(kind, keyword, { musicTag: options?.musicTag || [] }); },
+    async collect(kind, keyword, signal, options) { calls.push([kind, keyword]); return collect ? collect(kind, keyword, signal, options) : capture(kind, keyword, options); },
     stop() {}, dispose() {},
   };
   const service = new FeiguaService({ userDataPath: '/unused', browser, storage: {
@@ -27,6 +27,134 @@ function fixture({ stored, collect, auth, write } = {}) {
   } });
   return { service, calls, disk: () => disk, browser };
 }
+
+const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
+const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
+
+test('per-keyword filters validate full paths, duplicate names and parent changes', () => {
+  assert.deepEqual(validateVideoQueries(videoQueries, videoCatalog), videoQueries);
+  assert.deepEqual(normalizeVideoQueries([{keyword:'  旧关键词  '}]), [{keyword:'旧关键词',categoryPath:[],tagPath:[]}]);
+  assert.throws(() => normalizeVideoQueries([{keyword:'x'}, {keyword:' x '}]), /重复/);
+  assert.throws(() => normalizeVideoQueries([{keyword:''}]), /不能为空/);
+  assert.throws(() => normalizeVideoQueries([{keyword:'x',categoryPath:['全部']}]), /无效/);
+  assert.throws(() => validateVideoQueries([{...videoQueries[0],categoryPath:['家居','调味品']}],videoCatalog), /失效/);
+  assert.throws(() => normalizeVideoOptions([{label:'重复'}, {label:'重复'}]), /重复/);
+});
+
+test('legacy keyword configuration migrates to independent all filters and preserves history', async () => {
+  const old = {version:1,keywords:['甲','乙'],runs:[{id:'old',status:'completed',groups:[]}]};
+  const {service}=fixture({stored:old});
+  const state=await service.state();
+  assert.deepEqual(state.videoQueries,old.keywords.map(keyword=>({keyword,categoryPath:[],tagPath:[]})));
+  assert.deepEqual(state.runs,old.runs);
+});
+
+test('saving keyword groups refreshes only videos and persists each independent filter through restart', async () => {
+  const {service,browser,calls,disk}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  await service.ready; await service.syncVideoFilters();
+  await service.saveAndRefreshVideoQueries(videoQueries); await service.job;
+  assert.deepEqual(calls,[['videos','拌饭'],['videos','收纳']]);
+  assert.equal(disk().runs[0].status,'completed');
+  for (const [index,query] of videoQueries.entries()) {
+    assert.deepEqual(disk().runs[0].groups[index].result.filters,{...query,publishedAt:'不限'});
+  }
+  const restored=fixture({stored:disk()});
+  assert.deepEqual((await restored.service.state()).videoQueries,videoQueries);
+  assert.deepEqual((await restored.service.state()).videoFilterOptions,videoCatalog);
+});
+
+test('video filter snapshot is fixed before login awaits and edits do not affect in-flight groups', async () => {
+  const {service,browser,disk}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  await service.ready; await service.syncVideoFilters(); await service.saveVideoQueries(videoQueries);
+  let release;
+  browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
+  const starting=service.start();
+  while(!release) await new Promise(resolve=>setImmediate(resolve));
+  await service.saveVideoQueries([{keyword:'拌饭',categoryPath:[],tagPath:[]}]);
+  release({status:'authenticated'}); await starting; await service.job;
+  assert.deepEqual(disk().runs[0].groups.filter(group=>group.kind==='videos').map(({keyword,categoryPath,tagPath})=>({keyword,categoryPath,tagPath})),videoQueries);
+  assert.equal(disk().videoQueries.length,1);
+  assert.equal(disk().runs[0].status,'completed');
+});
+
+test('missing or mismatched provider video filters cannot overwrite previously collected results', async () => {
+  const {service,browser}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  await service.ready; await service.syncVideoFilters();
+  await service.saveAndRefreshVideoQueries(videoQueries); await service.job;
+  browser.collect=async(kind,keyword)=>capture(kind,keyword); // Provider remained on All.
+  await service.saveAndRefreshVideoQueries(videoQueries); await service.job;
+  const state=await service.state();
+  assert.equal(state.runs[0].status,'failed');
+  const groups=displayedFeiguaGroups(state.runs,'',state.latestResults);
+  assert.ok(groups.every(group=>group.showingPrevious && group.refreshStatus==='failed'));
+  assert.deepEqual(groups[0].result.filters.categoryPath,videoQueries[0].categoryPath);
+  for(const invalid of [{categoryPath:undefined},{tagPath:undefined},{categoryPath:['食品']},{tagPath:['生活']}]) {
+    assert.throws(()=>validateCapture('videos','拌饭',capture('videos','拌饭',{...videoQueries[0],...invalid}),videoQueries[0]),/不一致/);
+  }
+});
+
+test('keyword group saving rolls back on disk errors and deleting all groups does not collect rankings', async () => {
+  const {service,calls}=fixture({stored:{version:1,keywords:videoQueries.map(query=>query.keyword),videoQueries,videoFilterOptions:videoCatalog,runs:[]},write:async()=>{throw new Error('disk full');}});
+  await assert.rejects(service.saveAndRefreshVideoQueries([]),/disk full/);
+  assert.deepEqual((await service.state()).videoQueries,videoQueries);
+  assert.equal(calls.length,0);
+  const empty=fixture(); await empty.service.saveAndRefreshVideoQueries([]);
+  assert.deepEqual(empty.calls,[]); assert.deepEqual((await empty.service.state()).runs,[]);
+});
+
+test('busy keyword refresh cannot replace saved groups, and login failure preserves the saved intent', async () => {
+  const {service,browser}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  await service.ready; await service.syncVideoFilters();
+  let release;
+  browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
+  await service.saveAndRefreshVideoQueries(videoQueries);
+  await assert.rejects(service.saveAndRefreshVideoQueries([]),/正在执行/);
+  release({status:'signed_out'}); await service.job;
+  const state=await service.state();
+  assert.deepEqual(state.videoQueries,videoQueries);
+  assert.equal(state.runs[0].status,'failed');
+});
+
+test('catalogs update automatically even with no keywords; refresh errors preserve cached selections', async () => {
+  const {service,browser}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  browser.getMusicTags=async()=>({options:[{label:'榜单分类',children:[]}]});
+  await service.start(); await service.job;
+  assert.deepEqual((await service.state()).videoFilterOptions,videoCatalog);
+  await service.saveVideoQueries(videoQueries);
+  browser.getVideoFilters=async()=>{throw new Error('private payload');};
+  await service.start(); await service.job;
+  const state=await service.state();
+  assert.deepEqual(state.videoQueries,videoQueries);
+  assert.deepEqual(state.videoFilterOptions,videoCatalog);
+  assert.match(state.catalogMessage,/自动加载失败/);
+  assert.doesNotMatch(JSON.stringify(state),/private payload/);
+});
+
+test('browser applies both video paths, then keyword, period and sales sort for each group', async () => {
+  const browser=new FeiguaBrowser({}); const calls=[];
+  browser.openSource=async()=>{};browser.settle=async()=>{};
+  browser.execute=async(command,args)=>{calls.push([command,args]);return {verified:true};};
+  await browser.collect('videos','拌饭',undefined,videoQueries[0]);
+  assert.deepEqual(calls.filter(([command])=>command==='video-filter'),[
+    ['video-filter',{label:'带货品类',path:videoQueries[0].categoryPath,phase:'expand',depth:0}],
+    ['video-filter',{label:'带货品类',path:videoQueries[0].categoryPath,phase:'expand',depth:1}],
+    ['video-filter',{label:'带货品类',path:videoQueries[0].categoryPath,phase:'select'}],
+    ['video-filter',{label:'视频标签',path:videoQueries[0].tagPath,phase:'expand',depth:0}],
+    ['video-filter',{label:'视频标签',path:videoQueries[0].tagPath,phase:'select'}],
+  ]);
+  assert.ok(calls.some(([command,args])=>command==='keyword' && args.keyword==='拌饭'));
+  assert.ok(calls.some(([command,args])=>command==='choice' && args.label==='近7天'));
+  assert.ok(calls.some(([command,args])=>command==='sort' && args.label==='视频销售额'));
+  calls.length=0;
+  await browser.collect('videos','全部');
+  assert.equal(calls[0][0],'clear');
+  assert.deepEqual(calls.filter(([command])=>command==='video-filter').map(([,args])=>args.path),[[],[]]);
+});
 
 test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
   assert.equal(dueHotspotsDate(Date.parse('2026-10-01T22:59:59Z')), null);

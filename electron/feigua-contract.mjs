@@ -50,8 +50,47 @@ export function validateMusicTag(path, options) {
   const selection = normalizeMusicTag(path);
   if (!selection.length) return selection;
   const parent = options.find(option => option.label === selection[0]);
-  if (!parent || selection.length === 2 && !parent.children.some(child => child.label === selection[1])) throw new Error('该 BGM 视频标签已不在飞瓜目录中，请刷新分类后重新选择');
+  if (!parent || selection.length === 2 && !parent.children.some(child => child.label === selection[1])) throw new Error('该榜单分类已失效，请重新登录以自动更新目录后选择');
   return selection;
+}
+
+export function normalizeVideoPath(input = []) {
+  if (!Array.isArray(input) || input.length > 5) throw new Error('视频分类路径最多支持五级');
+  return input.map(label => {
+    if (typeof label !== 'string' || !label.trim() || label.trim() === '全部' || label.length > 60 || /[\u0000-\u001f]/.test(label)) throw new Error('视频分类路径无效');
+    return label.trim();
+  });
+}
+
+export function normalizeVideoOptions(input, depth = 0) {
+  if (!Array.isArray(input) || input.length > 300 || depth >= 5 && input.length) throw new Error('视频分类目录结构异常');
+  const seen = new Set();
+  return input.map(option => {
+    const [label] = normalizeVideoPath([option?.label]);
+    if (seen.has(label)) throw new Error('视频分类目录包含重复名称');
+    seen.add(label);
+    return { label, children: normalizeVideoOptions(option.children || [], depth + 1) };
+  });
+}
+
+export function normalizeVideoQueries(input) {
+  if (!Array.isArray(input) || input.length > 50) throw new Error('最多配置 50 个关键词');
+  const keywords = normalizeKeywords(input.map(query => query?.keyword));
+  if (keywords.length !== input.length) throw new Error('关键词不能为空或重复');
+  return input.map((query, index) => ({ keyword: keywords[index], categoryPath: normalizeVideoPath(query.categoryPath), tagPath: normalizeVideoPath(query.tagPath) }));
+}
+
+export function validateVideoQueries(input, catalogs) {
+  const queries = normalizeVideoQueries(input);
+  for (const query of queries) for (const key of ['categoryPath', 'tagPath']) {
+    let options = catalogs[key] || [];
+    for (const label of query[key]) {
+      const option = options.find(item => item.label === label);
+      if (!option) throw new Error(`「${query.keyword}」的${key === 'categoryPath' ? '带货品类' : '视频标签'}已失效或目录尚未加载，请登录后重新选择`);
+      options = option.children || [];
+    }
+  }
+  return queries;
 }
 
 function value(input, max = 1000) {
@@ -66,6 +105,10 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
   }
   if (kind === 'videos' && capture.keyword !== keyword) throw new Error('关键词筛选与当前采集组不一致');
+  const videoFilters = kind === 'videos' ? { categoryPath: normalizeVideoPath(options.categoryPath), tagPath: normalizeVideoPath(options.tagPath) } : null;
+  if (videoFilters) for (const key of ['categoryPath', 'tagPath']) {
+    if (!Array.isArray(capture[key]) || JSON.stringify(normalizeVideoPath(capture[key])) !== JSON.stringify(videoFilters[key])) throw new Error('带货视频实际分类与关键词设置不一致，本组未保存');
+  }
   const hasCategory = ['music', 'topics'].includes(kind);
   const musicTag = hasCategory ? normalizeMusicTag(options.musicTag) : [];
   if (hasCategory && (!Array.isArray(capture.musicTag) || JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag))) throw new Error('榜单实际分类与任务选择不一致，本组未保存');
@@ -98,7 +141,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
     sort: source.sort, direction: 'desc', period: source.period,
     dateRange: value(capture.dateRange, 100),
-    filters: kind === 'videos' ? { keyword, publishedAt: '不限' } : hasCategory ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
+    filters: kind === 'videos' ? { keyword, publishedAt: '不限', ...videoFilters } : hasCategory ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
     rows,
   };
 }

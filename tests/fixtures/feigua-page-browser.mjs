@@ -60,10 +60,42 @@ try {
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
   assert('其他关键词无法混入', run('keyword', {keyword:'其他词',verify:true}).verified === false);
+  for (const label of ['带货品类', '视频标签']) {
+    const root = frame.contentDocument.createElement('div');
+    root.className = 'tag-cascader';
+    root.innerHTML = `<span class="tag-label">${label}</span><div class="permission-wrapper"><ul class="tag-list"><li class="tag-element">全部</li><li class="tag-element">${label}一级</li></ul></div><div class="el-popover" style="display:none"><span>${label}二级</span><span style="display:none">${label}三级</span></div>`;
+    const props = { value:['0'], options:[{Id:'0',Name:'全部',Sub:[]},{Id:'1',Name:`${label}一级`,Sub:[{Id:'11',Name:`${label}二级`,Sub:[{Id:'111',Name:`${label}三级`,Sub:[]}]}]}] };
+    root.__vue__ = {$props:props};
+    const choices = root.querySelectorAll('.tag-element');
+    choices[0].onclick = () => { props.value=['0']; };
+    choices[1].onclick = () => { props.value=['1']; };
+    choices[1].onmouseenter = () => { root.querySelector('.el-popover').style.display='block'; };
+    const children = root.querySelectorAll('.el-popover span');
+    children[0].onclick = () => { props.value=['1','11']; };
+    children[0].onmouseenter = () => { children[1].style.display='inline'; };
+    children[1].onclick = () => { props.value=['1','11','111']; };
+    frame.contentDocument.body.append(root);
+  }
+  const videoCatalog = run('video-filter-options');
+  assert('带货品类和视频标签目录独立读取，保留三级', videoCatalog.categoryPath[0].children[0].children[0].label === '带货品类三级' && videoCatalog.tagPath[0].label === '视频标签一级');
+  const categoryPath=['带货品类一级','带货品类二级','带货品类三级'], tagPath=['视频标签一级','视频标签二级'];
+  for (const [label,path] of [['带货品类',categoryPath],['视频标签',tagPath]]) {
+    for (let depth=0; depth<path.length-1; depth++) run('video-filter',{label,path,phase:'expand',depth});
+    run('video-filter',{label,path,phase:'select'});
+    assert(`${label}独立选中并回读完整层级`,run('video-filter',{label,path,verify:true}).verified===true);
+  }
   const videos = run('capture', {kind:'videos',sort:'视频销售额',period:'近7天',keyword:'合成词'});
+  assert('视频结果回读两套实际筛选，不用请求参数冒充',videos.categoryPath.join('/')===categoryPath.join('/') && videos.tagPath.join('/')===tagPath.join('/'));
   assert('完整标题、佣金率、粉丝和区间保真', videos.rows[0].title === '合成完整标题' && videos.rows[0].products[0].commission === '5.00%' && videos.rows[0].followers === '10w' && videos.rows[0].sales === '10w~25w');
   assert('缺少播放列不填零', !videos.rows[0].plays);
   assert('统计日期提取', videos.dateRange === '2026-09-25 - 2026-10-01');
+  run('video-filter',{label:'带货品类',path:[],phase:'select'});
+  assert('切换关键词前允许回到全部，另一套筛选保持独立',run('video-filter',{label:'带货品类',path:[],verify:true}).verified===true && run('video-filter',{label:'视频标签',path:tagPath,verify:true}).verified===true);
+  const videoRoot=frame.contentDocument.querySelector('.tag-cascader');
+  const videoMask=frame.contentDocument.createElement('div');videoMask.className='purview-mask-layer';videoMask.textContent='权限遮罩';videoRoot.append(videoMask);
+  assert('视频分类权限遮罩不可穿透',/权限受限/.test(run('video-filter',{label:'带货品类',path:categoryPath,phase:'select'}).error) && videoRoot.__vue__.$props.value[0]==='0');
+  videoRoot.__vue__.$props.value=['unknown'];
+  assert('视频实际分类不明时禁止保存',/无法回读/.test(run('capture',{kind:'videos',sort:'视频销售额'}).error));
   await mount(shell + `<div class="tag-cascader"><span class="tag-label">视频标签</span><div class="permission-wrapper"><ul class="tag-list"><li class="tag-element" id="all-tag">全部</li><li class="tag-element" id="parent-tag">合成一级</li></ul></div><div class="el-popover" style="display:none"><span id="child-tag">合成二级</span></div></div>`);
   const tagRoot = frame.contentDocument.querySelector('.tag-cascader');
   const widgetProps = { value:['0'],options:[{Id:'0',Name:'全部',Sub:[]},{Id:'1',Name:'合成一级',Sub:[{Id:'11',Name:'合成二级',Sub:[]}]}] };

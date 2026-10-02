@@ -2648,6 +2648,7 @@ if (hasSingleInstanceLock) {
     "feigua-check-login": "checkLogin", "feigua-start": "start", "feigua-cancel": "cancel",
     "feigua-save-music-tag": "saveMusicTag", "feigua-refresh-music-tags": "refreshMusicTags",
     "feigua-save-refresh-music-tag": "saveAndRefreshMusicTag",
+    "feigua-save-refresh-video-queries": "saveAndRefreshVideoQueries",
   })) {
     registerProtectedHandle(channel, async (event, ...args) => {
       if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
