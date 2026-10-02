@@ -3858,6 +3858,13 @@ if (hasSingleInstanceLock) {
       await initializeStorageManagementService();
       await startLocalServer();
       await createMainWindow();
+      getFeiguaService().startDailySchedule(() => {
+        try {
+          if (!licenseService || applicationQuitRequested) return false;
+          licenseService.assertFeature("feigua-trends");
+          return true;
+        } catch { return false; }
+      });
       // Strictly after the first paint. start() never throws and is not awaited.
       const factorCollection = machineIdentityService?.start();
       if (factorCollection) {

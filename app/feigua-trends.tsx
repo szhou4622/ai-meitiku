@@ -11,7 +11,7 @@ type Result = { collectedAt: string; dateRange: string | null; period: string; r
 type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
 type MusicTagOption = { label: string; children: { label: string }[] };
-type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean };
+type State = { keywords: string[]; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
@@ -155,6 +155,8 @@ export function FeiguaTrends() {
     </header>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
+    {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
+    <p>全网热点日榜每天北京时间 07:00 自动采集；请保持应用运行并登录飞瓜。错过时间后，当天重新打开或恢复运行时补采一次。</p>
 
     <details className={styles.settings}>
       <summary>采集设置 <span>BGM：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
