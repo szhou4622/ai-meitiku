@@ -8,7 +8,7 @@ export function feiguaPage(command, argument = {}) {
   const exact = (label, root = document) => elements('a,button,label,span,li,div', root)
     .filter(node => compact(node) === label.replace(/\s+/g, '') && ![...node.children].some(child => visible(child) && compact(child) === label.replace(/\s+/g, '')));
   const selected = node => {
-    const candidates = [node, node?.closest('a,button,li,label'), node?.closest('.permission-wrapper')].filter(Boolean);
+    const candidates = [node, node?.closest('a,button,li,label'), node?.closest('[role="tab"]'), node?.closest('.permission-wrapper')].filter(Boolean);
     return candidates.some(item => /(^|[\s_-])(active|selected|checked|current)([\s_-]|$)/i.test(item.className || '') || item.getAttribute('aria-selected') === 'true' || item.getAttribute('aria-pressed') === 'true');
   };
   const authState = () => {
@@ -51,7 +51,7 @@ export function feiguaPage(command, argument = {}) {
     };
     let fullOptions;
     try { fullOptions = tree(props.options); } catch { return null; }
-    return { root, path: findPath(props.options, values.at(-1)), fullOptions,
+    return { root, path: findPath(props.options, values.at(-1)), selectionId: String(values.at(-1)), fullOptions,
       unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };
@@ -179,7 +179,7 @@ export function feiguaPage(command, argument = {}) {
     const matches = exact(argument.label);
     if (matches.length !== 1) return failure(`无法唯一定位「${argument.label}」`);
     if (!selected(matches[0])) { if (argument.verify) return { verified: false }; matches[0].click(); return { changed: true }; }
-    return { verified: true };
+    return { verified: true, label: compact(matches[0]) };
   }
   if (command === 'keyword') {
     // Require the video-keyword search mode, not a global author/product search.
@@ -192,8 +192,8 @@ export function feiguaPage(command, argument = {}) {
       if (inputs.length !== 1 || searches.length !== 1) continue;
       const input = inputs[0];
       if (argument.verify) {
-        const body = text(document.body).replace(/\s+/g, '');
-        return { verified: input.value === argument.keyword && body.includes(`视频关键词:${argument.keyword}`) || input.value === argument.keyword && body.includes(`视频关键词：${argument.keyword}`) };
+        const summaries = exact(`视频关键词:${input.value}`).concat(exact(`视频关键词：${input.value}`));
+        return { verified: input.value === argument.keyword && summaries.length === 1, keyword: input.value };
       }
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       setter.call(input, argument.keyword);
@@ -216,6 +216,45 @@ export function feiguaPage(command, argument = {}) {
     const keywords = elements('input[type="text"],input:not([type])').filter(node => /音乐|热点/.test(node.placeholder || '') && node.value.trim());
     if (keywords.length) return failure('页面仍有音乐或热点搜索词，请清除后重新采集');
     return { verified: true };
+  }
+  if (command === 'capture-context') {
+    // This branch reads only controls. Ranking rows come from the API client.
+    if (!feiguaPage('ready').ready) return failure('榜单仍在加载，本组未保存');
+    const optional = feiguaPage('optional-filters');
+    if (!optional.verified) return optional;
+    const hasCategory = ['music', 'topics'].includes(argument.kind);
+    const category = hasCategory ? musicTagData() : null;
+    const videoCategory = argument.kind === 'videos' ? musicTagData('带货品类') : null;
+    const videoTag = argument.kind === 'videos' ? musicTagData('视频标签') : null;
+    if (hasCategory && (!Array.isArray(category?.path) || category.unsupportedDepth)) return failure('无法核对榜单分类，本组未保存');
+    if (argument.kind === 'videos' && (!Array.isArray(videoCategory?.path) || !Array.isArray(videoTag?.path))) return failure('无法核对视频分类，本组未保存');
+    const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : argument.kind === 'videos' ? [argument.period] : [];
+    let period = '昨日使用人数';
+    for (const label of choices) {
+      const current = feiguaPage('choice', { label, verify: true });
+      if (!current.verified) return failure('榜单类型或周期未生效，本组未保存');
+      period = current.label;
+    }
+    if (argument.kind === 'topics' && !feiguaPage('category', { label: '话题类型', verify: true }).verified) return failure('话题类型未生效，本组未保存');
+    let keyword = null;
+    if (argument.kind === 'videos') {
+      const current = feiguaPage('keyword', { keyword: argument.keyword, verify: true });
+      if (!current.verified) return failure('关键词未生效，本组未保存');
+      keyword = current.keyword;
+    }
+    const inputs = elements('input');
+    const starts = inputs.filter(input => input.placeholder === '开始日期');
+    const ends = inputs.filter(input => input.placeholder === '结束日期');
+    const date = '\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}';
+    const ranges = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}\\s*[-~～至]\\s*${date}$`).test(value)))];
+    const days = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}$`).test(value)))];
+    const dateRange = argument.kind === 'music' ? null : argument.kind === 'hotspots' ? days.length === 1 ? days[0] : null
+      : starts.length === 1 && ends.length === 1 ? `${starts[0].value} - ${ends[0].value}` : ranges.length === 1 ? ranges[0] : null;
+    if (argument.kind !== 'music' && !dateRange) return failure('未能唯一回读实际统计日期，本组未保存');
+    return { url: location.href, period, keyword, dateRange, filtersVerified: true,
+      ...(hasCategory ? { musicTag: category.path, musicTagId: category.selectionId, musicTagOptions: category.options, musicTagRestricted: category.restricted } : {}),
+      ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, categoryId: videoCategory.selectionId, tagPath: videoTag.path, tagId: videoTag.selectionId } : {}),
+    };
   }
   const findTable = sortLabel => {
     const table = elements('table').find(table => elements('th', table).some(header => compact(header) === sortLabel));
@@ -244,11 +283,39 @@ export function feiguaPage(command, argument = {}) {
     if (nodes.some(node => selected(node) && ['desc', 'descending'].includes(node.getAttribute('data-order') || node.getAttribute('data-direction')))) return 'desc';
     return null;
   };
+  const fixedHotspotRanking = table => {
+    // The current daily hot ranking has a fixed order and no sort arrow.
+    // Accept it only with visible source ranks starting at 1 and descending
+    // numeric peak heat; a coloured header or a later page is not evidence.
+    if (!['热点榜', '日榜'].every(label => {
+      const matches = exact(label);
+      return matches.length === 1 && selected(matches[0]);
+    })) return false;
+    const headers = table.headers.map(compact);
+    const rankIndex = headers.indexOf('排名'), heatIndex = headers.indexOf('峰值热度');
+    if (rankIndex < 0 || heatIndex < 0) return false;
+    const rows = table.rows.slice(0, 10);
+    if (!rows.length) return false;
+    let previous = Infinity;
+    return rows.every((cells, index) => {
+      if (cells.length !== headers.length || !/^\d+$/.test(compact(cells[rankIndex])) || Number(compact(cells[rankIndex])) !== index + 1) return false;
+      const metric = compact(cells[heatIndex]).match(/^((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)(万|亿|[wW])?$/);
+      if (!metric) return false;
+      const heat = Number(metric[1].replace(/,/g, '')) * (metric[2] === '亿' ? 1e8 : metric[2] ? 1e4 : 1);
+      if (!Number.isFinite(heat) || heat > previous) return false;
+      previous = heat;
+      return true;
+    });
+  };
+  const rankingDirection = (table, label) => {
+    const explicit = sortDirection(table.headers.find(node => compact(node) === label));
+    return explicit || (label === '峰值热度' && fixedHotspotRanking(table) ? 'desc' : null);
+  };
   if (command === 'sort') {
     const table = findTable(argument.label);
     if (!table) return failure(`未识别含「${argument.label}」的榜单表格`);
     const header = table.headers.find(node => compact(node) === argument.label);
-    const direction = sortDirection(header);
+    const direction = rankingDirection(table, argument.label);
     if (direction === 'desc') return { verified: true };
     if (argument.verify) return failure(`无法确认「${argument.label}」已按降序排列`);
     (elements('.define-sort-th,.sort-th,a,button', header)[0] || header).click();
@@ -263,7 +330,24 @@ export function feiguaPage(command, argument = {}) {
     if (hasCategory && !Array.isArray(categoryData?.path)) return failure(`无法回读实际${categoryLabel}，本组未保存`);
     if (categoryData?.unsupportedDepth) return failure('飞瓜分类出现三级或更深目录，请更新适配后再采集');
     const table = findTable(argument.sort);
-    if (!table || sortDirection(table.headers.find(node => compact(node) === argument.sort)) !== 'desc') return failure('榜单排序状态发生变化');
+    if (!table || rankingDirection(table, argument.sort) !== 'desc') return failure('榜单排序状态发生变化');
+    if (!feiguaPage('ready').ready) return failure('榜单仍在加载，本组未保存');
+    const optional = feiguaPage('optional-filters');
+    if (!optional.verified) return optional;
+    const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : argument.kind === 'videos' ? [argument.period] : [];
+    let period = '昨日使用人数';
+    for (const label of choices) {
+      const current = feiguaPage('choice', { label, verify: true });
+      if (!current.verified) return failure('采集时榜单周期或榜单类型发生变化，本组未保存');
+      period = current.label;
+    }
+    if (argument.kind === 'topics' && !feiguaPage('category', { label: '话题类型', verify: true }).verified) return failure('采集时话题类型发生变化，本组未保存');
+    let keyword = null;
+    if (argument.kind === 'videos') {
+      const current = feiguaPage('keyword', { keyword: argument.keyword, verify: true });
+      if (!current.verified) return failure('采集时关键词发生变化，本组未保存');
+      keyword = current.keyword;
+    }
     const headers = table.headers.map(compact);
     const column = (cells, names) => cells[headers.findIndex(header => names.some(name => header === name || header.startsWith(`${name}/`)))];
     const number = (node, label) => text(node).match(new RegExp(`${label}\\s*[:：]?\\s*([\\d,.]+(?:万|亿|[wW])?(?:%)?)`))?.[1] || null;
@@ -277,6 +361,16 @@ export function feiguaPage(command, argument = {}) {
       const main = column(cells, argument.kind === 'music' ? ['音乐'] : argument.kind === 'topics' ? ['话题'] : argument.kind === 'hotspots' ? ['热点'] : ['带货视频', '带货视频/发布时间']);
       if (!main) return failure('榜单标题列无法识别');
       const item = identity(main);
+      if (argument.kind === 'hotspots' && !item.id) {
+        // Daily hotspots use an event-backed title. Read only the public row
+        // identity already bound to this rendered row; never invent a URL/ID.
+        const source = [main.parentElement, main.parentElement?.parentElement]
+          .map(row => row?.__vue__?.$props?.source).find(Boolean);
+        const title = typeof source?.Title === 'string' ? source.Title.trim() : '';
+        const id = ['string', 'number'].includes(typeof source?.HotId) ? String(source.HotId).trim() : '';
+        if (!id || !title || title !== text(main)) return failure('无法核对热点标题及稳定来源标识，本组未保存');
+        Object.assign(item, { title, id: `hotspot:${id}`, url: null });
+      }
       if (argument.kind === 'music') Object.assign(item, { author: text(main).match(/作者[:：]\s*([^\n]+)/)?.[1] || null, totalUsers: text(column(cells, ['总使用人数'])), yesterdayUsers: text(column(cells, ['昨日使用人数'])) });
       if (argument.kind === 'topics') {
         const author = column(cells, ['发起人']);
@@ -293,13 +387,22 @@ export function feiguaPage(command, argument = {}) {
       rows.push(item);
       if (rows.length === 10) break;
     }
-    const dateText = elements('input').map(input => input.value).concat(text(document.body)).join('\n');
-    const startDate = elements('input').find(input => input.placeholder === '开始日期')?.value;
-    const endDate = elements('input').find(input => input.placeholder === '结束日期')?.value;
-    return { url: location.href, rows, direction: 'desc', sort: argument.sort, period: argument.period, keyword: argument.keyword, filtersVerified: true,
+    // Dates must come from the selected statistics controls, never publication
+    // dates or unrelated examples in the table/body.
+    const inputs = elements('input');
+    const starts = inputs.filter(input => input.placeholder === '开始日期');
+    const ends = inputs.filter(input => input.placeholder === '结束日期');
+    const datePattern = '\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}';
+    const ranges = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${datePattern}\\s*[-~～至]\\s*${datePattern}$`).test(value)))];
+    const days = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${datePattern}$`).test(value)))];
+    const dateRange = argument.kind === 'music' ? null : argument.kind === 'hotspots'
+      ? days.length === 1 ? days[0] : null
+      : starts.length === 1 && ends.length === 1 ? `${starts[0].value} - ${ends[0].value}` : ranges.length === 1 ? ranges[0] : null;
+    if (argument.kind !== 'music' && !dateRange) return failure('未能唯一回读实际统计日期，本组未保存');
+    return { url: location.href, rows, direction: 'desc', sort: argument.sort, period, keyword, filtersVerified: true,
       ...(hasCategory ? { musicTag: categoryData.path, musicTagOptions: categoryData.options, musicTagRestricted: categoryData.restricted } : {}),
       ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, tagPath: videoTag.path } : {}),
-      dateRange: startDate && endDate ? `${startDate} - ${endDate}` : dateText.match(/\d{4}[-/]\d{2}[-/]\d{2}\s*[-~至]\s*\d{4}[-/]\d{2}[-/]\d{2}/)?.[0] || null,
+      dateRange,
       emptyVerified: /暂无数据|暂无相关|没有找到/.test(text(table.root)) };
   }
   if (command === 'ready') return { ready: document.readyState === 'complete' && !elements('[aria-busy="true"], .el-loading-mask, .loading-mask').length };

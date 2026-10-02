@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
+import { observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
@@ -19,6 +20,8 @@ export class FeiguaBrowser {
     this.wasAuthenticated = false;
     this.loginTimer = null; this.loginCheckPending = false;
     this.onAuthChange = null;
+    this.requestSequence = 0;
+    this.rankingRequests = [];
   }
 
   ensureWindow(show = false) {
@@ -30,6 +33,10 @@ export class FeiguaBrowser {
       this.partition.on('will-download', event => event.preventDefault());
       this.partition.webRequest.onBeforeRequest((details, callback) => {
         if (['xhr', 'mainFrame'].includes(details.resourceType)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
+        if (this.window && details.webContentsId === this.window.webContents.id) {
+          const request = observeFeiguaRequest(details);
+          if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
+        }
         callback({});
       });
       const done = details => { this.pending.delete(details.id); this.lastNetwork = Date.now(); };
@@ -48,7 +55,7 @@ export class FeiguaBrowser {
       if (isFeiguaNavigation(url)) void window.loadURL(url).catch(() => {});
       return { action: 'deny' };
     });
-    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); });
+    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); this.rankingRequests = []; });
     return window;
   }
 
@@ -221,6 +228,7 @@ export class FeiguaBrowser {
 
   async collect(kind, keyword, signal, options = {}) {
     const source = FEIGUA_SOURCES[kind];
+    const since = this.requestSequence;
     await this.openSource(kind, signal);
     const musicTag = ['music', 'topics'].includes(kind) ? normalizeMusicTag(options.musicTag) : [];
     if (kind === 'videos') {
@@ -254,16 +262,48 @@ export class FeiguaBrowser {
     }
     await this.execute('optional-filters');
     // At most two clicks to cycle ascending -> descending; unknown direction blocks capture.
-    let sorted = false;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // The fixed hotspot ranking is verified from the API's Rank/HotValueStr.
+    let sorted = kind === 'hotspots';
+    for (let attempt = 0; !sorted && attempt < 3; attempt++) {
       const result = await this.execute('sort', { label: source.sort, verify: attempt === 2 });
       if (result.verified) { sorted = true; break; }
       await this.settle(signal);
     }
     if (!sorted) throw issue('无法确认降序排列');
-    return this.execute('capture', { kind, keyword, sort: source.sort, period: source.period });
+    const args = { kind, keyword, period: source.period };
+    const context = await this.execute('capture-context', args);
+    const capture = await this.readRanking(kind, context, since, signal);
+    await this.settle(signal);
+    const after = await this.execute('capture-context', args);
+    if (JSON.stringify(after) !== JSON.stringify(context)) throw issue('接口返回期间页面筛选发生变化，本组未保存');
+    return capture;
+  }
+
+  async readRanking(kind, context, since, signal) {
+    const observed = this.rankingRequests.filter(request => request.kind === kind && request.sequence > since).at(-1);
+    if (!observed || observed.invalid) throw issue('未监听到本组榜单请求，请重新采集', 'FEIGUA_API_INVALID');
+    const request = structuredClone(observed);
+    // Replay exactly the observed query. Adding a date parameter to a default
+    // week would turn it into a different (historical) provider operation.
+    validateFeiguaRequest(kind, request, context);
+    if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+    const beforeApi = this.requestSequence;
+    const result = this.window.webContents.executeJavaScript(`(${readFeiguaApi.toString()})(${JSON.stringify({ endpoint: request.endpoint, params: request.params })})`);
+    const response = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { cleanup(); reject(issue('飞瓜接口响应超时', 'FEIGUA_NETWORK')); }, 25000);
+      const abort = () => { cleanup(); reject(issue('已取消采集', 'FEIGUA_CANCELLED')); };
+      const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+      signal?.addEventListener('abort', abort, { once: true });
+      Promise.resolve(result).then(value => { cleanup(); resolve(value); }, () => { cleanup(); reject(issue('飞瓜接口请求失败，请检查网络或登录状态', 'FEIGUA_NETWORK')); });
+      if (signal?.aborted) abort();
+    });
+    if (response?.error) throw issue(response.error, 'FEIGUA_API_INVALID');
+    const sent = this.rankingRequests.filter(record => record.kind === kind && record.sequence > beforeApi).at(-1);
+    validateFeiguaRequest(kind, sent, context);
+    if (JSON.stringify(Object.entries(sent.params).sort()) !== JSON.stringify(Object.entries(request.params).sort())) throw issue('实际发出的接口参数与任务不一致，本组未保存');
+    return captureFeiguaResponse(kind, sent, context, response);
   }
 
   stop() { this.window?.webContents.stop(); }
-  dispose() { this.stopLoginWatch(); this.window?.destroy(); this.window = null; }
+  dispose() { this.stopLoginWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, validateCaptureDates, isRankingMetric, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
 import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
@@ -9,7 +9,7 @@ import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
+  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
@@ -184,6 +184,7 @@ test('catalogs update automatically even with no keywords; refresh errors preser
 
 test('browser applies both video paths, then keyword, period and sales sort for each group', async () => {
   const browser=new FeiguaBrowser({}); const calls=[];
+  browser.readRanking=async()=>({});
   browser.openSource=async()=>{};browser.settle=async()=>{};
   browser.execute=async(command,args)=>{calls.push([command,args]);return {verified:true};};
   await browser.collect('videos','拌饭',undefined,videoQueries[0]);
@@ -432,14 +433,107 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
   assert.equal(validateCapture('videos', '测试', capture('videos', '测试', { rows: [], emptyVerified: true })).rows.length, 0);
 });
 
+test('statistics dates validate calendar days and period length without relabelling stale provider data', () => {
+  const now = Date.parse('2026-10-02T00:00:00Z');
+  assert.deepEqual(validateCaptureDates('hotspots', '2026/10/1', now), { dateRange: '2026-10-01', dateWarning: null });
+  assert.equal(validateCaptureDates('hotspots', '2026-10-01 - 2026-10-01', now).dateRange, '2026-10-01');
+  assert.equal(validateCaptureDates('topics', '2026-09-21 - 2026-09-27', now).dateWarning, null);
+  assert.equal(validateCaptureDates('videos', '2026-09-26 - 2026-10-02', now).dateWarning, null);
+  assert.match(validateCaptureDates('hotspots', '2020-01-01', now).dateWarning, /较旧/);
+  assert.equal(validateCaptureDates('hotspots', '2020-01-01', now).dateRange, '2020-01-01');
+  assert.match(validateCaptureDates('topics', '2026-09-14 - 2026-09-20', now).dateWarning, /较旧/);
+  for (const raw of [null, '', '2026-02-30', '2026-10-03', '2026-09-25 - 2026-10-01', '日期：2026-10-01']) {
+    assert.throws(() => validateCaptureDates('hotspots', raw, now));
+  }
+  for (const kind of ['topics', 'videos']) for (const raw of ['2026-10-01', '2020-01-01 - 2020-12-31', '2026-10-01 - 2026-09-25', '2026-02-24 - 2026-02-30']) {
+    assert.throws(() => validateCaptureDates(kind, raw, now));
+  }
+});
+
+test('ranking metrics reject permission placeholders and retain actual provider units and ranges', () => {
+  const examples = { music: ['0', '88.2w', '1,234', '1.5万'], topics: ['97.2w%', '-12.5%', '+10%', '0%'], hotspots: ['1249.1w', '0'], videos: ['25w-50w', '10w~25w', '1,000-2,500', '<100', '0'] };
+  for (const [kind, values] of Object.entries(examples)) {
+    for (const raw of values) assert.equal(isRankingMetric(kind, raw), true, `${kind}: ${raw}`);
+    for (const raw of ['开通会员查看', '--', '暂无', '升级至123会员', '', null]) assert.equal(isRankingMetric(kind, raw), false, `${kind}: ${raw}`);
+  }
+  const invalid = capture('hotspots'); invalid.rows[0].peakHeat = '开通会员查看';
+  assert.throws(() => validateCapture('hotspots', null, invalid), /权限提示/);
+  const actual = capture('topics'); actual.rows[0].participantGrowth = '97.2w%';
+  assert.equal(validateCapture('topics', null, actual).rows[0].participantGrowth, '97.2w%');
+});
+
+test('a ranking placeholder fails its group while independent sources still collect', async () => {
+  const {service, browser} = fixture();
+  await service.start(); await service.job;
+  const before = await service.state();
+  browser.collect = async (kind, keyword) => {
+    const next = capture(kind, keyword);
+    if (kind === 'music') next.rows[0].yesterdayUsers = '开通会员查看';
+    return next;
+  };
+  await service.start(); await service.job;
+  const after = await service.state();
+  assert.equal(after.runs[0].status, 'partial');
+  assert.equal(after.runs[0].groups[0].status, 'failed');
+  assert.equal(after.runs[0].groups[0].result, undefined);
+  const latest = after.latestResults.find(group => group.kind === 'music');
+  assert.equal(latest.sourceRunId, before.runs[0].id);
+});
+
+test('result persistence failure never publishes unsaved rows and preserves durable results after restart', async () => {
+  let fail = false;
+  const {service, calls, disk} = fixture({write: async data => {
+    if (fail && data.runs[0]?.groups[0]?.result) throw new Error('private disk detail');
+  }});
+  await service.start(); await service.job;
+  const oldRun = (await service.state()).runs[0].id;
+  fail = true; calls.length = 0;
+  await service.start(); await service.job;
+  const state = await service.state();
+  assert.equal(state.runs[0].status, 'failed');
+  assert.equal(state.runs[0].groups[0].status, 'failed');
+  assert.equal(state.runs[0].groups[0].result, undefined);
+  assert.ok(state.runs[0].groups.slice(1).every(group => group.status === 'skipped'));
+  assert.equal(calls.length, 1);
+  assert.match(state.storageMessage, /保存失败/);
+  assert.doesNotMatch(JSON.stringify(state), /private disk detail/);
+  assert.equal(state.latestResults.find(group => group.kind === 'music').sourceRunId, oldRun);
+  assert.equal(disk().runs[0].groups[0].result, undefined);
+  const shown = displayedFeiguaGroups(state.runs, '', state.latestResults)[0];
+  assert.equal(shown.showingPrevious, true);
+  assert.equal(shown.refreshStatus, 'failed');
+  const reloaded = fixture({stored: disk()}).service;
+  assert.equal((await reloaded.state()).latestResults.find(group => group.kind === 'music').sourceRunId, oldRun);
+  fail = false;
+  await service.start(); await service.job;
+  assert.equal((await service.state()).storageMessage, null);
+});
+
+test('state polling cannot observe captured rows before the durable write resolves', async () => {
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { entered = resolve; });
+  const {service} = fixture({write: async data => {
+    if (data.runs[0]?.groups[0]?.result) { entered(); await gate; }
+  }});
+  await service.start(); await waiting;
+  const pending = await service.state();
+  assert.equal(pending.runs[0].groups[0].status, 'running');
+  assert.equal(pending.runs[0].groups[0].result, undefined);
+  assert.equal(pending.latestResults.length, 0);
+  release(); await service.job;
+  assert.equal((await service.state()).runs[0].status, 'completed');
+});
+
 test('hotspots select the daily hot ranking and verify descending peak heat before capture', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking = async () => capture('hotspots');
   const calls = [];
   browser.openSource = async kind => { calls.push(['source', FEIGUA_SOURCES[kind].navigation]); };
   browser.settle = async () => {};
   browser.execute = async (command, args) => {
     calls.push([command, args]);
-    return command === 'capture' ? capture('hotspots', null, args) : { verified: true };
+    return { verified: true };
   };
   const result = await browser.collect('hotspots');
   assert.deepEqual(calls, [
@@ -447,8 +541,8 @@ test('hotspots select the daily hot ranking and verify descending peak heat befo
     ['choice', { label: '热点榜' }],
     ['choice', { label: '日榜' }],
     ['optional-filters', undefined],
-    ['sort', { label: '峰值热度', verify: false }],
-    ['capture', { kind: 'hotspots', keyword: undefined, sort: '峰值热度', period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
   ]);
   assert.equal(validateCapture('hotspots', null, result).period, '日榜');
   for (const invalid of [{ period: '近7天' }, { period: '实时榜' }, { period: '周榜' }, { direction: 'asc' }]) {
@@ -503,6 +597,21 @@ test('session expiry halts remaining groups and preserves successful groups', as
   assert.equal(state.auth.status, 'expired'); assert.equal(state.runs[0].status, 'partial');
   assert.equal(state.runs[0].groups[2].status, 'skipped'); assert.equal(calls.length, 2);
   assert.doesNotMatch(JSON.stringify(state), /private network detail/);
+});
+
+test('exhausted provider quota stops remaining keyword requests while keeping completed rankings', async () => {
+  const {service,calls}=fixture({collect:async(kind,keyword)=>{
+    if(kind==='videos')throw Object.assign(new Error('quota'),{code:'FEIGUA_QUOTA',publicMessage:'飞瓜接口查询额度已用完'});
+    return capture(kind,keyword);
+  }});
+  await service.saveKeywords(['合成甲','合成乙']);
+  await service.start();await service.job;
+  const state=await service.state();
+  assert.equal(calls.length,4);
+  assert.equal(state.runs[0].status,'partial');
+  assert.equal(state.runs[0].groups[3].status,'failed');
+  assert.equal(state.runs[0].groups[4].status,'skipped');
+  assert.equal(state.runs[0].groups.filter(group=>group.result).length,3);
 });
 
 test('failed refresh does not overwrite older successful results', async () => {
@@ -742,6 +851,7 @@ test('topic results must confirm the complete shared path including the second l
 
 test('topic browser applies shared first/second levels without changing weekly ranking rules', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking=async()=>({});
   const calls=[];
   browser.openSource=async kind=>assert.equal(kind,'topics');
   browser.settle=async()=>{};
