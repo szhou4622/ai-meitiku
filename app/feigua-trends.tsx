@@ -17,7 +17,7 @@ type State = { keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptio
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
-  saveAndRefreshVideoQueries: (queries: VideoQuery[]) => Promise<State>;
+  saveAndRefreshVideoQueries: (queries: VideoQuery[], options?: { changedOnly: boolean }) => Promise<State>;
   saveMusicTag: (path: string[]) => Promise<State>;
   saveAndRefreshMusicTag: (path: string[]) => Promise<State>;
   refreshMusicTags: () => Promise<State>;
@@ -152,28 +152,29 @@ export function FeiguaTrends() {
     setAction(name); setError('');
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
-      if (name === 'video-save') {
+      if (name === 'video-save' || name === 'video-change') {
         setVideoQueries(savedVideoQueries(next)); setSelectedRun('');
-        if (settingsPanel.current) settingsPanel.current.open = false;
+        if (name === 'video-save' && settingsPanel.current) settingsPanel.current.open = false;
       }
       if (name === 'music-save') {
         setMusicTag(next.musicTag); setSelectedRun('');
         if (settingsPanel.current) settingsPanel.current.open = false;
       }
       if (name === 'start') setSelectedRun('');
+      return true;
     } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作失败，请重试'); }
     finally { setAction(''); }
   }
 
-  function addKeyword() {
+  async function addKeyword() {
     const keyword = input.trim();
     if (!keyword) return;
     if (keyword.length > 60 || /[\r\n\u0000-\u001f]/.test(keyword)) { setError('每个关键词限 60 字，不含换行'); return; }
     if (keywords.some((item, index) => item === keyword && index !== editing)) { setError('该关键词已存在'); return; }
     if (editing === null && keywords.length >= 50) { setError('最多保存 50 个关键词'); return; }
     const query = { keyword, categoryPath: [...inputCategoryPath], tagPath: [...inputTagPath] };
-    setVideoQueries(editing === null ? [...videoQueries, query] : videoQueries.map((item, index) => index === editing ? query : item));
-    clearEditor(); setError('');
+    const next = editing === null ? [...videoQueries, query] : videoQueries.map((item, index) => index === editing ? query : item);
+    if (await perform('video-change', api => api.saveAndRefreshVideoQueries(next, { changedOnly: true }))) clearEditor();
   }
 
   function clearEditor() {
@@ -198,7 +199,7 @@ export function FeiguaTrends() {
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
-    <p>全网热点日榜每天北京时间 07:00 自动采集；请保持应用运行并登录飞瓜。错过时间后，当天重新打开或恢复运行时补采一次。</p>
+    <p>本周品类新发布每天北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后当天打开或恢复运行会补采一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
@@ -221,24 +222,24 @@ export function FeiguaTrends() {
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
-      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组，分别设置带货品类和视频标签 · 近7天销售额前 5</p></div>
-      <form className={styles.queryEditor} onSubmit={event => { event.preventDefault(); addKeyword(); }}>
+      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组 · 每天 06:30 更新近7天销售额前 5 · 新增或修改分类后立即采集该组</p></div>
+      <form className={styles.queryEditor} onSubmit={event => { event.preventDefault(); void addKeyword(); }}>
         <label className={styles.queryField}>关键词<input aria-label="视频关键词" placeholder="输入关键词" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} /></label>
         <CategorySelect label="带货品类" options={state.videoFilterOptions.categoryPath} path={inputCategoryPath} disabled={disabled} onChange={setInputCategoryPath} />
         <CategorySelect label="视频标签" options={state.videoFilterOptions.tagPath} path={inputTagPath} disabled={disabled} onChange={setInputTagPath} />
         <div className={styles.queryActions}>
-          <button type="submit" disabled={disabled || !input.trim()}><Plus size={15} />{editing === null ? '添加' : '确认修改'}</button>
+          <button type="submit" disabled={disabled || state.busy || !input.trim()}><Plus size={15} />{editing === null ? '添加并采集' : '确认并采集'}</button>
           {editing !== null && <button type="button" disabled={disabled} onClick={clearEditor}>取消修改</button>}
-          <button type="button" className={styles.primary} disabled={disabled || state.busy || editorDirty} onClick={() => void perform('video-save', api => api.saveAndRefreshVideoQueries(videoQueries))}>{action === 'video-save' ? '正在保存并刷新…' : '保存并刷新关键词榜单'}</button>
+          <button type="button" className={styles.primary} disabled={disabled || state.busy || editorDirty || !videoQueries.length} onClick={() => void perform('video-save', api => api.saveAndRefreshVideoQueries(videoQueries))}>{action === 'video-save' ? '正在刷新…' : '刷新关键词榜单'}</button>
         </div>
       </form>
       {videoQueries.map((query, index) => <section className={styles.querySettings} key={index} aria-label={`关键词${query.keyword}设置`}>
         <strong>{query.keyword}</strong>
         <span>带货品类：{pathLabel(query.categoryPath)}</span><span>视频标签：{pathLabel(query.tagPath)}</span>
         <button disabled={disabled || editorDirty} aria-label={`修改关键词${query.keyword}`} onClick={() => editQuery(query, index)}>修改</button>
-        <button disabled={disabled || editorDirty} aria-label={`删除关键词${query.keyword}`} onClick={() => setVideoQueries(videoQueries.filter((_, current) => current !== index))}><X size={13} />删除</button>
+        <button disabled={disabled || state.busy || editorDirty} aria-label={`删除关键词${query.keyword}`} onClick={() => void perform('video-change', api => api.saveAndRefreshVideoQueries(videoQueries.filter((_, current) => current !== index), { changedOnly: true }))}><X size={13} />删除</button>
       </section>)}
-      <small>{editing !== null ? '正在修改这一组，确认修改后请保存。' : editorDirty ? '选择带货品类和视频标签后点击“添加”，每个关键词保存为独立一组。' : dirty ? '设置尚未保存，保存后立即刷新关键词榜单。' : keywords.length ? `已保存 ${keywords.length} 组，可分别修改或删除。` : '输入关键词，选择带货品类和视频标签，再点击“添加”。'}</small>
+      <small>{editing !== null ? '确认后自动保存，并立即采集有变化的这一组。' : editorDirty ? '选择带货品类和视频标签后点击“添加并采集”，自动保存并立即采集这一组。' : keywords.length ? `已保存 ${keywords.length} 组，每天 06:30 自动采集；也可手动刷新。` : '输入关键词，选择带货品类和视频标签，再点击“添加并采集”。'}</small>
     </section>
     </details>
 

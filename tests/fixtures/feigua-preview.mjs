@@ -20,9 +20,11 @@ export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog =
   window.desktopBridge = { ...window.desktopBridge, feigua: {
     state: async () => snapshot(),
     saveKeywords: async keywords => { state.keywords = [...keywords]; return snapshot(); },
-    saveAndRefreshVideoQueries: async queries => {
+    saveAndRefreshVideoQueries: async (queries, {changedOnly=false} = {}) => {
+      const previous=new Map(state.videoQueries.map(query=>[query.keyword,JSON.stringify(query)]));
+      const changed=changedOnly?queries.filter(query=>previous.get(query.keyword)!==JSON.stringify(query)):queries;
       state.videoQueries = structuredClone(queries); state.keywords = queries.map(query => query.keyword);
-      if (queries.length) state.runs.unshift({ id:String(Date.now()), startedAt:new Date().toISOString(), status:musicRefreshFails?'failed':'completed', message:'关键词榜单刷新（合成测试）', keywords:[...state.keywords], groups:queries.map(query => musicRefreshFails ? {kind:'videos',...query,status:'failed',message:'合成测试：刷新失败'} : group('videos', query.keyword)) });
+      if (changed.length) state.runs.unshift({ id:String(Date.now()), startedAt:new Date().toISOString(), status:musicRefreshFails?'failed':'completed', message:'关键词榜单刷新（合成测试）', keywords:changed.map(query=>query.keyword), groups:changed.map(query => musicRefreshFails ? {kind:'videos',...query,status:'failed',message:'合成测试：刷新失败'} : group('videos', query.keyword)) });
       return snapshot();
     },
     saveMusicTag: async path => { state.musicTag = [...path]; return snapshot(); },

@@ -8,7 +8,7 @@ const videoFilterDefaults = (cached) => ({
   categoryPath: normalizeVideoOptions(cached?.categoryPath?.length ? cached.categoryPath : builtInVideoFilters.categoryPath),
   tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
 });
-const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -26,6 +26,11 @@ function recoverLatestResults(runs, cached = []) {
 export function dueHotspotsDate(now = Date.now()) {
   const beijing = new Date(now + 8 * 60 * 60 * 1000);
   return beijing.getUTCHours() >= 7 ? beijing.toISOString().slice(0, 10) : null;
+}
+
+export function dueVideosDate(now = Date.now()) {
+  const beijing = new Date(now + 8 * 60 * 60 * 1000);
+  return beijing.getUTCHours() * 60 + beijing.getUTCMinutes() >= 390 ? beijing.toISOString().slice(0, 10) : null;
 }
 
 export class FeiguaService {
@@ -79,6 +84,7 @@ export class FeiguaService {
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
+      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? data.lastVideosScheduleDate : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
       latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
@@ -108,7 +114,7 @@ export class FeiguaService {
   startDailySchedule(canRun) {
     if (this.scheduleTimer || this.disposed) return;
     const tick = () => void this.checkDailySchedule(Date.now(), canRun).catch(() => {
-      this.scheduleMessage = '日榜定时采集未能启动，请检查本机存储或手动重试';
+      this.scheduleMessage = '每日定时采集未能启动，请检查本机存储或手动重试';
     });
     this.scheduleTimer = setInterval(tick, 30_000);
     this.scheduleTimer.unref?.();
@@ -120,11 +126,19 @@ export class FeiguaService {
     this.schedulePending = true;
     try {
       await this.ready;
-      const scheduledDate = dueHotspotsDate(now);
-      if (this.disposed || !scheduledDate || this.data.lastHotspotsScheduleDate >= scheduledDate || this.operation || this.controller || !canRun()) return;
+      if (this.disposed || this.operation || this.controller || !canRun()) return;
       await this.exclusive(async () => {
+        await this.configQueue;
         if (this.disposed || !canRun()) return;
-        await this.launchRun([], [], { onlyHotspots: true, verifyLogin: true, scheduledDate });
+        const videosDate = dueVideosDate(now);
+        const hotspotsDate = dueHotspotsDate(now);
+        // One browser session: catch up the earlier video task first, then the
+        // next timer tick starts hotspots once the session is idle.
+        if (videosDate && (!this.data.lastVideosScheduleDate || this.data.lastVideosScheduleDate < videosDate) && this.data.videoQueries.length) {
+          await this.launchRun([], [...this.data.keywords], { onlyVideos: true, verifyLogin: true, scheduledDate: videosDate });
+        } else if (hotspotsDate && (!this.data.lastHotspotsScheduleDate || this.data.lastHotspotsScheduleDate < hotspotsDate)) {
+          await this.launchRun([], [], { onlyHotspots: true, verifyLogin: true, scheduledDate: hotspotsDate });
+        } else return;
         this.scheduleMessage = null;
       });
     } finally { this.schedulePending = false; }
@@ -168,10 +182,13 @@ export class FeiguaService {
     return this.state();
   }
 
-  async saveAndRefreshVideoQueries(input) {
+  async saveAndRefreshVideoQueries(input, { changedOnly = false } = {}) {
     await this.exclusive(async () => {
+      await this.configQueue;
+      const previous = new Map(this.data.videoQueries.map(query => [query.keyword, JSON.stringify(query)]));
       await this.saveVideoQueries(input);
-      if (this.data.keywords.length) await this.launchRun([], [...this.data.keywords], { onlyVideos: true, verifyLogin: true });
+      const queries = changedOnly ? this.data.videoQueries.filter(query => previous.get(query.keyword) !== JSON.stringify(query)) : this.data.videoQueries;
+      if (queries.length) await this.launchRun([], queries.map(query => query.keyword), { onlyVideos: true, verifyLogin: true, videoQueries: structuredClone(queries), trigger: changedOnly ? 'video-settings' : 'manual-videos' });
     });
     return this.state();
   }
@@ -279,15 +296,16 @@ export class FeiguaService {
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries } = {}) {
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null } = {}) {
     const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: 'daily-hotspots' } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'daily-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
     const previousRuns = this.data.runs;
-    const previousScheduleDate = this.data.lastHotspotsScheduleDate;
-    if (scheduledDate) this.data.lastHotspotsScheduleDate = scheduledDate;
+    const scheduleKey = onlyVideos ? 'lastVideosScheduleDate' : 'lastHotspotsScheduleDate';
+    const previousScheduleDate = this.data[scheduleKey];
+    if (scheduledDate) this.data[scheduleKey] = scheduledDate;
     this.data.runs = [run, ...previousRuns].slice(0, 12);
-    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data.lastHotspotsScheduleDate = previousScheduleDate; throw error; }
+    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; throw error; }
     if (this.disposed) return;
     this.controller = new AbortController();
     const signal = this.controller.signal;
@@ -299,7 +317,7 @@ export class FeiguaService {
         } catch (error) {
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
-          run.message = onlyHotspots ? '日榜定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
+          run.message = scheduledDate ? '每日定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
           for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '设置已保存，飞瓜登录状态未确认，请登录后重试'); }
           await this.persist(); return;
         }

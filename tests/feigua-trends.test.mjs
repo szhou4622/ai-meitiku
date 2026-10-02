@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
-import { FeiguaService, dueHotspotsDate } from '../electron/feigua-service.mjs';
+import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigua-service.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
@@ -210,9 +210,109 @@ test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
   assert.equal(dueHotspotsDate(Date.parse('2026-10-02T16:00:00Z')), null);
 });
 
-test('daily collection catches up only hotspots once per day, including after restart', async () => {
+test('daily keyword videos start at exactly 06:30 Beijing time and reset at midnight',()=>{
+  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:29:59Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:30:00Z')),'2026-10-02');
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-01T22:30:00Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-02T15:59:59Z')),'2026-10-02');
+  assert.equal(dueVideosDate(Date.parse('2026-10-02T16:00:00Z')),null);
+});
+
+test('06:30 collects every saved video group once and preserves independent 07:00 schedule across restart',async()=>{
+  const {service,calls,disk}=fixture({stored:{version:1,keywords:videoQueries.map(q=>q.keyword),videoQueries,videoFilterOptions:videoCatalog,runs:[]}});
+  const now=Date.parse('2026-10-01T22:30:00Z');
+  await service.checkDailySchedule(now-1,()=>true);
+  await service.checkDailySchedule(now,()=>false);
+  assert.equal(calls.length,0);
+  await Promise.all([service.checkDailySchedule(now,()=>true),service.checkDailySchedule(now,()=>true)]);await service.job;
+  assert.deepEqual(calls,[['videos','拌饭'],['videos','收纳']]);
+  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastHotspotsScheduleDate,null);
+  assert.equal(disk().runs[0].trigger,'daily-videos');
+  assert.deepEqual(disk().runs[0].groups[0].result.filters,{...videoQueries[0],publishedAt:'不限'});
+  const restored=fixture({stored:disk()});
+  await restored.service.checkDailySchedule(now+1000,()=>true);
+  assert.equal(restored.calls.length,0);
+  await restored.service.checkDailySchedule(now+1800000,()=>true);await restored.service.job;
+  assert.deepEqual(restored.calls,[['hotspots',null]]);
+  await restored.service.checkDailySchedule(now+86400000,()=>true);await restored.service.job;
+  assert.deepEqual(restored.calls.slice(1),[['videos','拌饭'],['videos','收纳']]);
+});
+
+test('late startup catches up videos first, waits while busy, then independently catches up hotspots',async()=>{
+  let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const {service,calls,disk}=fixture({collect:async(kind,keyword,_signal,options)=>{if(kind==='videos')await gate;return capture(kind,keyword,options);}});
+  await service.saveKeywords(['晚启动关键词']);
+  const now=Date.parse('2026-10-02T05:00:00Z');
+  await service.checkDailySchedule(now,()=>true);
+  await service.checkDailySchedule(now,()=>true);
+  assert.equal(disk().runs.length,1);
+  release();await service.job;
+  await service.checkDailySchedule(now,()=>true);await service.job;
+  await service.checkDailySchedule(now,()=>true);
+  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null]]);
+  assert.equal(disk().runs.length,2);
+  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
+});
+
+test('video schedule failure and cancellation do not retry that day or consume hotspot schedule',async()=>{
+  for(const cancel of [false,true]) {
+    const {service,browser,calls,disk}=fixture();await service.saveKeywords(['词']);
+    let release;
+    browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
+    const now=Date.parse('2026-10-01T22:30:00Z');
+    await service.checkDailySchedule(now,()=>true);
+    if(cancel)await service.cancel();
+    release({status:cancel?'authenticated':'expired'});await service.job;
+    await service.checkDailySchedule(now+60000,()=>true);
+    assert.equal(disk().runs[0].status,cancel?'cancelled':'failed');
+    assert.equal(calls.length,0);assert.equal(disk().runs.length,1);
+    assert.equal(disk().lastVideosScheduleDate,'2026-10-02');assert.equal(disk().lastHotspotsScheduleDate,null);
+  }
+});
+
+test('video schedule must durably record its intent before any browser I/O',async()=>{
+  const {service,browser,calls}=fixture({stored:{version:1,keywords:['词'],runs:[]},write:async()=>{throw new Error('disk full');}});
+  let checks=0;browser.checkLogin=async()=>{checks++;return {status:'authenticated'};};
+  await assert.rejects(service.checkDailySchedule(Date.parse('2026-10-01T22:30:00Z'),()=>true),/disk full/);
+  assert.equal(checks,0);assert.equal(calls.length,0);
+  const state=await service.state();assert.equal(state.lastVideosScheduleDate,null);assert.equal(state.runs.length,0);
+});
+
+test('adding or editing a keyword immediately collects only changed groups; deletion and unchanged saves do not collect',async()=>{
+  const {service,calls,disk}=fixture({stored:{version:1,keywords:[],runs:[],videoFilterOptions:videoCatalog}});
+  await service.saveAndRefreshVideoQueries([videoQueries[0]],{changedOnly:true});await service.job;
+  assert.deepEqual(calls,[['videos','拌饭']]);calls.length=0;
+  await service.saveAndRefreshVideoQueries(videoQueries,{changedOnly:true});await service.job;
+  assert.deepEqual(calls,[['videos','收纳']]);calls.length=0;
+  const edited=[{...videoQueries[0],categoryPath:['家居'],tagPath:['生活']},videoQueries[1]];
+  await service.saveAndRefreshVideoQueries(edited,{changedOnly:true});await service.job;
+  assert.deepEqual(calls,[['videos','拌饭']]);calls.length=0;
+  assert.equal(disk().runs[0].trigger,'video-settings');
+  assert.deepEqual(disk().runs[0].groups[0].result.filters,{...edited[0],publishedAt:'不限'});
+  const runCount=disk().runs.length;
+  await service.saveAndRefreshVideoQueries([...edited].reverse(),{changedOnly:true});
+  await service.saveAndRefreshVideoQueries([edited[0]],{changedOnly:true});
+  assert.deepEqual(calls,[]);assert.equal(disk().runs.length,runCount);
+  assert.deepEqual(disk().keywords,['拌饭']);
+  await service.saveAndRefreshVideoQueries([edited[0]]);await service.job;
+  assert.deepEqual(calls,[['videos','拌饭']]);
+});
+
+test('new groups still collect immediately after the daily quota is used, without resetting it',async()=>{
+  const {service,calls,disk}=fixture();await service.saveKeywords(['旧关键词']);
+  const now=Date.parse('2026-10-01T22:30:00Z');
+  await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
+  await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
+  assert.deepEqual(calls,[['videos','新关键词']]);
+  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  await service.checkDailySchedule(now+1000,()=>true);assert.equal(calls.length,1);
+});
+
+test('without keywords the daily collection catches up only hotspots once per day, including after restart', async () => {
   const { service, calls, disk } = fixture();
-  await service.saveKeywords(['已保存关键词']);
   const now = Date.parse('2026-10-02T01:00:00Z');
   await Promise.all([service.checkDailySchedule(now, () => true), service.checkDailySchedule(now, () => true)]);
   await service.job;
@@ -303,11 +403,13 @@ test('daily-only history rotation preserves cached BGM, topics and keyword video
   for (let day = 0; day < 13; day++) {
     await service.checkDailySchedule(now + day * 86400000, () => true);
     await service.job;
+    await service.checkDailySchedule(now + day * 86400000, () => true);
+    await service.job;
   }
   const restored = fixture({ stored: disk() });
   const state = await restored.service.state();
   assert.equal(state.runs.length, 12);
-  assert.ok(state.runs.every(run => run.groups.length === 1 && run.groups[0].kind === 'hotspots'));
+  assert.ok(state.runs.every(run => run.groups.length === 1 && ['hotspots','videos'].includes(run.groups[0].kind)));
   assert.deepEqual(new Set(state.latestResults.map(group => group.kind)), new Set(['music', 'topics', 'hotspots', 'videos']));
 });
 
