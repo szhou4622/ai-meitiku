@@ -21,6 +21,10 @@ try {
   await mount(shell + '<div role="dialog"><h2>数据使用限制声明</h2><button>同意并继续使用</button><button>拒绝并退出</button></div>');
   assert('声明弹窗阻止后台登录就绪判定', run('auth').authenticated === false && run('auth').actionRequired === 'terms');
   assert('声明未处理时拒绝采集', run('capture', {kind:'music'}).actionRequired === 'terms');
+  let accepted = 0;
+  frame.contentDocument.querySelector('button').onclick = () => { accepted++; frame.contentDocument.querySelector('[role="dialog"]').remove(); };
+  assert('自动确认已授权的指定声明', run('accept-terms').accepted === true && accepted === 1);
+  assert('声明消失后不重复确认', run('accept-terms').accepted === false && accepted === 1);
   await mount(shell + `<div><span>视频标签</span><a class="active"><span>全部</span></a><a>时尚</a></div>
     <table><thead><tr><th>音乐</th><th>总使用人数</th><th aria-sort="descending">昨日使用人数</th></tr></thead>
     <tbody><tr><td><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></td><td>100w</td><td>3w</td></tr></tbody></table>`);
@@ -33,12 +37,23 @@ try {
   assert('升序拒绝采集', Boolean(run('capture', {sort:'昨日使用人数'}).error));
   frame.contentDocument.querySelector('[aria-sort]').removeAttribute('aria-sort');
   assert('未知排序不能伪装降序', Boolean(run('sort', {label:'昨日使用人数',verify:true}).error));
-  await mount(shell + `<div><span>视频关键词</span><input><button id="search">模糊搜索</button></div><p id="filters"></p>
-    <input value="2026-09-25 - 2026-10-01">
+  await mount(shell + `<div class="dy-side-bar-poper" style="display:none"><div class="child-wrapper"><div class="child-label">热门音乐</div></div></div>
+    <section><div><div class="list-hd"><div class="col-item">音乐</div><div class="col-item">总使用人数</div><div class="col-item"><div class="define-sort-th sorting">昨日使用人数<i class="arrow v-bottom active"></i></div></div></div></div>
+    <div><div class="col-item"><a href="https://dy.feigua.cn/synthetic/music/1">合成音乐</a><p>作者：合成作者</p></div><div class="col-item">20w</div><div class="col-item">5w</div></div></section>`);
+  let menuClicked = false;
+  frame.contentDocument.querySelector('.child-wrapper').onclick = () => { menuClicked = true; };
+  assert('识别新版事件菜单入口', run('navigate', {labels:['热门音乐']}).clicked === true && menuClicked);
+  assert('新版自定义列表降序核验', run('sort', {label:'昨日使用人数',verify:true}).verified === true);
+  const customMusic = run('capture', {kind:'music',sort:'昨日使用人数',period:'昨日使用人数'});
+  assert('新版列表表头与数据行分离仍正确提取', customMusic.rows.length === 1 && customMusic.rows[0].yesterdayUsers === '5w');
+  await mount(shell + `<div><input readonly value="视频关键词"><input placeholder="请输入视频标题关键词或链接搜索"><button id="search">模糊搜索</button></div><p id="filters"></p>
+    <div class="permission-wrapper active"><button><span>近7天</span></button></div>
+    <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01">
     <table><thead><tr><th>带货视频/发布时间</th><th>关联商品</th><th>达人</th><th aria-sort="descending">视频销售额</th><th>点赞</th></tr></thead><tbody>
     <tr><td><a href="https://dy.feigua.cn/synthetic/video/1" title="合成完整标题">合成标题…</a><p>09/26 16:00</p></td><td><a href="https://dy.feigua.cn/synthetic/product/1">合成商品</a><span>佣金率 5.00%</span></td><td><a href="https://dy.feigua.cn/synthetic/author/1">合成达人</a><span>粉丝数：10w</span></td><td>10w~25w</td><td>5000</td></tr>
     </tbody></table>`);
-  frame.contentDocument.querySelector('#search').onclick = () => { frame.contentDocument.querySelector('#filters').textContent = `视频关键词：${frame.contentDocument.querySelector('input').value}`; };
+  assert('新版时间周期选中状态核验', run('choice', {label:'近7天',verify:true}).verified === true);
+  frame.contentDocument.querySelector('#search').onclick = () => { frame.contentDocument.querySelector('#filters').textContent = `视频关键词：${frame.contentDocument.querySelector('input:not([readonly])').value}`; };
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
   assert('其他关键词无法混入', run('keyword', {keyword:'其他词',verify:true}).verified === false);

@@ -9,8 +9,18 @@ export class FeiguaService {
   constructor({ userDataPath, browser, storage }) {
     this.browser = browser;
     this.data = initial();
-    this.auth = { status: 'unknown', message: '请登录飞瓜后检查登录状态' };
-    this.browser.onAuthChange = auth => { this.auth = auth; };
+    this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
+    this.autoCollectRequested = false;
+    this.loginSequence = 0;
+    this.browser.onAuthChange = auth => {
+      this.auth = auth;
+      if (auth.status !== 'authenticated' || !this.autoCollectRequested) return;
+      this.autoCollectRequested = false;
+      const sequence = this.loginSequence;
+      this.autoStart = Promise.resolve(this.operation).then(() => {
+        if (!this.controller && sequence === this.loginSequence) return this.start();
+      }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
+    };
     this.controller = null;
     this.writeQueue = Promise.resolve();
     this.configQueue = Promise.resolve();
@@ -79,7 +89,12 @@ export class FeiguaService {
   }
 
   async login() {
-    await this.exclusive(() => this.browser.openLogin());
+    await this.exclusive(async () => {
+      this.autoCollectRequested = true;
+      this.loginSequence++;
+      try { await this.browser.openLogin(); }
+      catch (error) { this.autoCollectRequested = false; throw error; }
+    });
     return this.state();
   }
 
@@ -127,8 +142,8 @@ export class FeiguaService {
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }
-        if (error.code === 'FEIGUA_USER_ACTION_REQUIRED') {
-          this.auth = { status: 'action_required', message: error.publicMessage }; stop = true;
+        if (error.code === 'FEIGUA_NOTICE_FAILED') {
+          this.auth = { status: 'error', message: error.publicMessage }; stop = true;
         }
       }
       await this.persist();
@@ -141,10 +156,12 @@ export class FeiguaService {
   }
 
   async cancel() {
+    this.autoCollectRequested = false;
+    this.loginSequence++;
     this.controller?.abort();
     this.browser.stop?.();
     return this.state();
   }
 
-  dispose() { this.controller?.abort(); this.browser.dispose?.(); }
+  dispose() { this.autoCollectRequested = false; this.loginSequence++; this.controller?.abort(); this.browser.dispose?.(); }
 }

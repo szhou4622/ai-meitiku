@@ -110,12 +110,11 @@ export function FeiguaTrends() {
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
         <button disabled={disabled || state.busy} onClick={() => void perform('login', api => api.login())}><LogIn size={16} />登录飞瓜</button>
-        <button disabled={disabled || state.busy} onClick={() => void perform('auth', api => api.checkLogin())}><RefreshCw size={15} />检查登录</button>
         {state.busy ? <button disabled={disabled} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止采集</button>
           : <button className={styles.primary} disabled={disabled || dirty || !!input.trim() || editing !== null || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
       </div>
     </header>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : state.auth.message}<span>数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
 
     <section className={styles.configuration} aria-label="关键词配置">

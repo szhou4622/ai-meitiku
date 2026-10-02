@@ -220,25 +220,46 @@ test('persisted homepage session is resolved to the workspace during login check
   assert.equal(entered, true);
 });
 
-test('provider agreement requires user action and keeps the login window open', async () => {
-  let closed = 0, notified;
+test('known provider notice is confirmed once and login then closes automatically', async () => {
+  let closed = 0, notified, accepted = 0;
   const browser = new FeiguaBrowser({});
   browser.ensureWindow = () => {};
   browser.window = { isDestroyed: () => false, webContents: { getURL: () => 'https://dy.feigua.cn/app/' }, close: () => { closed++; } };
-  browser.execute = async () => ({ authenticated: false, actionRequired: 'terms' });
+  browser.execute = async command => {
+    if (command === 'accept-terms') { accepted++; return { accepted: true }; }
+    return { authenticated: accepted > 0, actionRequired: accepted ? null : 'terms' };
+  };
   browser.onAuthChange = state => { notified = state; };
-  assert.equal((await browser.checkLogin()).status, 'action_required');
+  assert.equal((await browser.checkLogin()).status, 'authenticated');
   browser.startLoginWatch();
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(closed, 0); assert.equal(notified.status, 'action_required');
+  assert.equal(closed, 1); assert.equal(notified.status, 'authenticated'); assert.equal(accepted, 1);
   browser.stopLoginWatch();
 });
 
-test('agreement appearing during a run stops remaining reads without claiming success', async () => {
-  const { service, calls } = fixture({ collect: async () => { throw Object.assign(new Error('terms'), { code: 'FEIGUA_USER_ACTION_REQUIRED', publicMessage: '请本人处理声明' }); } });
+test('login success starts a single collection automatically using saved keywords', async () => {
+  const {service,browser,calls} = fixture();
+  await service.saveKeywords(['测试词']);
+  browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); };
+  await service.login(); await service.autoStart; await service.job;
+  browser.onAuthChange({status:'authenticated',message:'已登录'});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await service.state()).runs.length,1);
+  assert.deepEqual(calls.at(-1),['videos','测试词']);
+});
+
+test('cancelling pending automatic startup prevents a collection from starting', async () => {
+  const {service,browser,calls} = fixture();
+  browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); await service.cancel(); };
+  await service.login(); await service.autoStart;
+  assert.equal(calls.length,0);
+});
+
+test('failed automatic notice confirmation stops remaining reads without claiming success', async () => {
+  const { service, calls } = fixture({ collect: async () => { throw Object.assign(new Error('terms'), { code: 'FEIGUA_NOTICE_FAILED', publicMessage: '声明确认未生效' }); } });
   await service.start(); await service.job;
   const state = await service.state();
-  assert.equal(state.auth.status, 'action_required'); assert.equal(calls.length, 1);
+  assert.equal(state.auth.status, 'error'); assert.equal(calls.length, 1);
   assert.equal(state.runs[0].status, 'failed');
   assert.equal(state.runs[0].groups[1].status, 'skipped');
 });

@@ -44,6 +44,7 @@ export class FeiguaBrowser {
     window.webContents.on('will-redirect', guard);
     window.webContents.on('will-attach-webview', event => event.preventDefault());
     window.webContents.setWindowOpenHandler(({ url }) => {
+      try { const parsed = new URL(url); this.lastNavigation = { path: parsed.origin + parsed.pathname, allowed: isFeiguaNavigation(url) }; } catch { this.lastNavigation = { allowed: false }; }
       if (isFeiguaNavigation(url)) void window.loadURL(url).catch(() => {});
       return { action: 'deny' };
     });
@@ -58,16 +59,32 @@ export class FeiguaBrowser {
     catch { throw issue('飞瓜页面加载失败，请检查网络后重试', 'FEIGUA_NETWORK'); }
   }
 
-  async execute(command, argument = {}) {
+  async execute(command, argument = {}, retryNotice = true) {
     if (!this.window || this.window.isDestroyed()) throw issue('飞瓜窗口已关闭，请重新打开');
     if (!isFeiguaDataUrl(this.window.webContents.getURL())) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
     let result;
     try { result = await this.window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
     catch { throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
     if (result?.authRequired) throw issue('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
-    if (command !== 'auth' && result?.actionRequired) throw issue('请在飞瓜窗口本人阅读并处理数据使用限制声明，完成后再采集', 'FEIGUA_USER_ACTION_REQUIRED');
+    if (command !== 'auth' && result?.actionRequired) {
+      if (retryNotice) { await this.resolveAuth(); return this.execute(command, argument, false); }
+      throw issue('飞瓜声明确认后仍未消失，已停止重复操作', 'FEIGUA_NOTICE_FAILED');
+    }
     if (result?.error) throw issue(result.error);
     return result;
+  }
+
+  async resolveAuth(signal) {
+    let auth = await this.execute('auth');
+    if (auth.actionRequired !== 'terms') return auth;
+    this.onAuthChange?.({ status: 'checking', message: '正在自动处理飞瓜声明…' });
+    await this.execute('accept-terms');
+    for (let attempt = 0; attempt < 25; attempt++) {
+      await delay(300, undefined, { signal });
+      auth = await this.execute('auth');
+      if (!auth.actionRequired) return auth;
+    }
+    throw issue('飞瓜声明确认未生效，请稍后重试', 'FEIGUA_NOTICE_FAILED');
   }
 
   async settle(signal) {
@@ -105,11 +122,7 @@ export class FeiguaBrowser {
       const loginWindow = this.window;
       try {
         if (!isFeiguaDataUrl(loginWindow.webContents.getURL())) return;
-        const auth = await this.execute('auth');
-        if (auth.actionRequired) {
-          this.onAuthChange?.({ status: 'action_required', message: '飞瓜需要你本人阅读并处理数据使用限制声明' });
-          return;
-        }
+        const auth = await this.resolveAuth();
         if (!auth.authenticated && auth.workspaceAvailable) {
           const currentUrl = loginWindow.webContents.getURL();
           if (enteredUrls.has(currentUrl)) return;
@@ -123,7 +136,12 @@ export class FeiguaBrowser {
         this.onAuthChange?.({ status: 'authenticated', message: '已登录飞瓜' });
         this.stopLoginWatch();
         loginWindow.close(); // Session is persistent; closing only dismisses the login UI.
-      } catch { /* The user may be navigating, scanning, or closing the login page. */ }
+      } catch (error) {
+        if (error.code === 'FEIGUA_NOTICE_FAILED') {
+          this.stopLoginWatch();
+          this.onAuthChange?.({ status: 'error', message: error.publicMessage });
+        }
+      }
       finally { this.loginCheckPending = false; }
     };
     this.loginTimer = setInterval(() => void check(), 1000);
@@ -135,12 +153,11 @@ export class FeiguaBrowser {
     this.ensureWindow();
     if (!this.window.webContents.getURL()) await this.navigate(FEIGUA_HOME);
     if (!isFeiguaDataUrl(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在飞瓜窗口完成登录' };
-    let auth = await this.execute('auth');
+    let auth = await this.resolveAuth();
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();
       auth = await this.waitForWorkspace();
     }
-    if (auth.actionRequired) return { status: 'action_required', message: '请点击登录飞瓜，本人阅读并处理数据使用限制声明' };
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
     return { status: this.wasAuthenticated ? 'expired' : 'signed_out', message: this.wasAuthenticated ? '飞瓜登录已失效，请重新登录' : '请先在飞瓜窗口完成登录' };
   }
@@ -154,7 +171,7 @@ export class FeiguaBrowser {
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
-      const auth = await this.execute('auth');
+      const auth = await this.resolveAuth(signal);
       if (auth.authenticated || auth.loginVisible || auth.actionRequired) return auth;
       await delay(300, undefined, { signal });
     }
@@ -175,15 +192,20 @@ export class FeiguaBrowser {
     if (signal.aborted) throw issue('已取消采集');
     // Discover routes from the signed-in application's menu; never guess API paths.
     await this.navigate(FEIGUA_HOME);
-    const auth = await this.execute('auth');
+    const auth = await this.resolveAuth(signal);
     if (auth.workspaceAvailable) {
       await this.enterWorkspace();
       await this.waitForWorkspace(signal);
     }
     await this.settle(signal);
+    const previousUrl = this.window.webContents.getURL();
     let destination = await this.execute('navigate', { labels: source.navigation });
     if (destination.expanded) { await this.settle(signal); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
-    await this.navigate(destination.url);
+    if (destination.url) await this.navigate(destination.url);
+    if (destination.clicked) {
+      for (let attempt = 0; attempt < 40 && this.window.webContents.getURL() === previousUrl; attempt++) await delay(250, undefined, { signal });
+      if (this.window.webContents.getURL() === previousUrl) throw issue('飞瓜菜单未完成跳转，已停止读取旧页面');
+    }
     await this.settle(signal);
     if (kind === 'videos') {
       await this.execute('clear'); await this.settle(signal);
