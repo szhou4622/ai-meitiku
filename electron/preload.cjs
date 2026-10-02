@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     saveMusicTag: (path) => ipcRenderer.invoke("feigua-save-music-tag", path),
     saveAndRefreshMusicTag: (path) => ipcRenderer.invoke("feigua-save-refresh-music-tag", path),
     refreshMusicTags: () => ipcRenderer.invoke("feigua-refresh-music-tags"),
-    login: () => ipcRenderer.invoke("feigua-login"),
+    login: (options) => ipcRenderer.invoke("feigua-login", options),
     checkLogin: () => ipcRenderer.invoke("feigua-check-login"),
     start: () => ipcRenderer.invoke("feigua-start"),
     cancel: () => ipcRenderer.invoke("feigua-cancel"),

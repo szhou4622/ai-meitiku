@@ -31,7 +31,10 @@ export function feiguaPage(command, argument = {}) {
     // Read only the options/value already supplied to this visible filter widget.
     // Do not change the provider component or its permission flags.
     const props = root?.__vue__?.$props;
-    if (!root || !Array.isArray(props?.options) || !Array.isArray(props.value)) return null;
+    if (!root || !Array.isArray(props?.options)) return null;
+    // The video tag widget uses a scalar ID; ranking widgets use ID arrays.
+    const values = Array.isArray(props.value) ? props.value : [props.value];
+    if (!values.length || values.at(-1) == null) return null;
     const findPath = (nodes, id, parents = [], depth = 0) => {
       if (depth > 5) return null;
       for (const node of nodes) {
@@ -48,7 +51,7 @@ export function feiguaPage(command, argument = {}) {
     };
     let fullOptions;
     try { fullOptions = tree(props.options); } catch { return null; }
-    return { root, path: findPath(props.options, props.value.at(-1)), fullOptions,
+    return { root, path: findPath(props.options, values.at(-1)), fullOptions,
       unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };

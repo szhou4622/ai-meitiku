@@ -1,9 +1,14 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
-const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
+const videoFilterDefaults = (cached) => ({
+  categoryPath: normalizeVideoOptions(cached?.categoryPath?.length ? cached.categoryPath : builtInVideoFilters.categoryPath),
+  tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
+});
+const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -29,14 +34,17 @@ export class FeiguaService {
     this.data = initial();
     this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
     this.autoCollectRequested = false;
+    this.autoCatalogRequested = false;
     this.loginSequence = 0;
     this.browser.onAuthChange = auth => {
       this.auth = auth;
-      if (auth.status !== 'authenticated' || !this.autoCollectRequested) return;
+      if (auth.status !== 'authenticated' || !this.autoCollectRequested && !this.autoCatalogRequested) return;
+      const collectAfterLogin = this.autoCollectRequested;
       this.autoCollectRequested = false;
+      this.autoCatalogRequested = false;
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
-        if (!this.controller && sequence === this.loginSequence) return this.start();
+        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start() : this.prepareCatalogs();
       }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
     };
     this.controller = null;
@@ -67,7 +75,7 @@ export class FeiguaService {
     if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
     this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
-      videoFilterOptions: { categoryPath: normalizeVideoOptions(data.videoFilterOptions?.categoryPath || []), tagPath: normalizeVideoOptions(data.videoFilterOptions?.tagPath || []) },
+      videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
@@ -180,12 +188,25 @@ export class FeiguaService {
     await save;
   }
 
-  async login() {
+  async prepareCatalogs() {
     await this.exclusive(async () => {
-      this.autoCollectRequested = true;
+      this.auth = await this.browser.checkLogin();
+      if (this.auth.status !== 'authenticated') throw new Error('请先登录飞瓜');
+      const errors = [];
+      try { await this.syncMusicTags(); } catch { errors.push('榜单分类'); }
+      try { await this.syncVideoFilters(); } catch { errors.push('视频分类'); }
+      this.catalogMessage = errors.length ? `${errors.join('、')}更新暂未完成，仍可使用已有分类；采集时将核验实际筛选。` : null;
+    });
+    return this.state();
+  }
+
+  async login({ collectAfterLogin = true } = {}) {
+    await this.exclusive(async () => {
+      this.autoCollectRequested = collectAfterLogin === true;
+      this.autoCatalogRequested = true;
       this.loginSequence++;
       try { await this.browser.openLogin(); }
-      catch (error) { this.autoCollectRequested = false; throw error; }
+      catch (error) { this.autoCollectRequested = false; this.autoCatalogRequested = false; throw error; }
     });
     return this.state();
   }
@@ -336,11 +357,12 @@ export class FeiguaService {
 
   async cancel() {
     this.autoCollectRequested = false;
+    this.autoCatalogRequested = false;
     this.loginSequence++;
     this.controller?.abort();
     this.browser.stop?.();
     return this.state();
   }
 
-  dispose() { this.disposed = true; clearInterval(this.scheduleTimer); this.scheduleTimer = null; this.autoCollectRequested = false; this.loginSequence++; this.controller?.abort(); this.browser.dispose?.(); }
+  dispose() { this.disposed = true; clearInterval(this.scheduleTimer); this.scheduleTimer = null; this.autoCollectRequested = false; this.autoCatalogRequested = false; this.loginSequence++; this.controller?.abort(); this.browser.dispose?.(); }
 }

@@ -1,9 +1,15 @@
 // Synthetic UI fixture, explicitly installed only by a developer in a preview tab.
 // Never imported by the production entrypoint. Reload the tab to remove it.
-export function installFeiguaPreview({ musicRefreshFails = false } = {}) {
+/**
+ * @typedef {{ label: string, children: CatalogNode[] }} CatalogNode
+ * @param {{ musicRefreshFails?: boolean, videoCatalog?: { categoryPath: CatalogNode[], tagPath: CatalogNode[] } | null, signedOut?: boolean }} [options]
+ */
+export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog = null, signedOut = false } = {}) {
   let state = { keywords: [], musicTag: [], musicTagOptions: [{ label: '合成一级甲', children: [{label:'合成二级甲'}, {label:'合成二级乙'}] }, { label:'合成一级乙', children:[{label:'合成二级丙'}] }], musicTagOptionsLoadedAt: '2026-10-02T00:00:00Z', musicTagRestricted: false, runs: [], busy: false, auth: { status: 'authenticated', message: '合成测试：已登录' } };
   state.videoQueries = [];
   state.videoFilterOptions = { categoryPath: [{label:'合成食品',children:[{label:'合成调味品',children:[{label:'合成酱料',children:[]}]}]}, {label:'合成家居',children:[]}], tagPath: [{label:'合成美食',children:[{label:'合成教程',children:[]}]}, {label:'合成生活',children:[]}] };
+  if (videoCatalog) state.videoFilterOptions = structuredClone(videoCatalog);
+  if (signedOut) state.auth = {status:'signed_out',message:'回归测试：未登录，仅验证离线分类设置'};
   const snapshot = () => structuredClone(state);
   const group = (kind, keyword = null) => ({ kind, keyword, ...(['music','topics'].includes(kind)?{musicTag:[...state.musicTag]}:{}), status: 'completed', result: {
     ...(['music','topics'].includes(kind)?{filters:{category:state.musicTag.join(' > ')||'全部',categoryPath:[...state.musicTag]}}:{}),

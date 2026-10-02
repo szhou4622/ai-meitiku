@@ -78,6 +78,15 @@ try {
   }
   const videoCatalog = run('video-filter-options');
   assert('带货品类和视频标签目录独立读取，保留三级', videoCatalog.categoryPath[0].children[0].children[0].label === '带货品类三级' && videoCatalog.tagPath[0].label === '视频标签一级');
+  const scalarWidget = [...frame.contentDocument.querySelectorAll('.tag-cascader')].find(root=>root.querySelector('.tag-label').textContent==='视频标签');
+  scalarWidget.__vue__.$props.value='0';
+  assert('真实视频标签使用字符串 ID 时目录仍可读取',run('video-filter-options').tagPath[0].label==='视频标签一级');
+  assert('字符串全部 ID 可核验',run('video-filter',{label:'视频标签',path:[],verify:true}).verified===true);
+  scalarWidget.__vue__.$props.value='11';
+  assert('字符串子级 ID 可回读完整路径',run('video-filter',{label:'视频标签',path:['视频标签一级','视频标签二级'],verify:true}).verified===true);
+  scalarWidget.__vue__.$props.value='unknown';
+  assert('未知字符串 ID 不能视为全部',run('video-filter',{label:'视频标签',path:[],verify:true}).verified===false);
+  scalarWidget.__vue__.$props.value='0';
   const categoryPath=['带货品类一级','带货品类二级','带货品类三级'], tagPath=['视频标签一级','视频标签二级'];
   for (const [label,path] of [['带货品类',categoryPath],['视频标签',tagPath]]) {
     for (let depth=0; depth<path.length-1; depth++) run('video-filter',{label,path,phase:'expand',depth});

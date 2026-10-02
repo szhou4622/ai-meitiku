@@ -21,7 +21,7 @@ export type FeiguaBridge = {
   saveMusicTag: (path: string[]) => Promise<State>;
   saveAndRefreshMusicTag: (path: string[]) => Promise<State>;
   refreshMusicTags: () => Promise<State>;
-  login: () => Promise<State>;
+  login: (options?: { collectAfterLogin: boolean }) => Promise<State>;
   checkLogin: () => Promise<State>;
   start: () => Promise<State>;
   cancel: () => Promise<State>;
@@ -106,6 +106,8 @@ export function FeiguaTrends() {
   const keywords = videoQueries.map(query => query.keyword);
   const [musicTag, setMusicTag] = useState<string[]>([]);
   const [input, setInput] = useState('');
+  const [inputCategoryPath, setInputCategoryPath] = useState<string[]>([]);
+  const [inputTagPath, setInputTagPath] = useState<string[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [desktop, setDesktop] = useState(false);
@@ -116,6 +118,7 @@ export function FeiguaTrends() {
   const settingsPanel = useRef<HTMLDetailsElement>(null);
   const dirty = JSON.stringify(videoQueries) !== JSON.stringify(savedVideoQueries(state));
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
+  const editorDirty = !!input.trim() || editing !== null || !!inputCategoryPath.length || !!inputTagPath.length;
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
   const secondTags = firstTag?.children || [];
   const effectiveRunId = state.runs.some(item => item.id === selectedRun) ? selectedRun : '';
@@ -168,8 +171,17 @@ export function FeiguaTrends() {
     if (keyword.length > 60 || /[\r\n\u0000-\u001f]/.test(keyword)) { setError('每个关键词限 60 字，不含换行'); return; }
     if (keywords.some((item, index) => item === keyword && index !== editing)) { setError('该关键词已存在'); return; }
     if (editing === null && keywords.length >= 50) { setError('最多保存 50 个关键词'); return; }
-    setVideoQueries(editing === null ? [...videoQueries, { keyword, categoryPath: [], tagPath: [] }] : videoQueries.map((item, index) => index === editing ? { ...item, keyword } : item));
-    setInput(''); setEditing(null); setError('');
+    const query = { keyword, categoryPath: [...inputCategoryPath], tagPath: [...inputTagPath] };
+    setVideoQueries(editing === null ? [...videoQueries, query] : videoQueries.map((item, index) => index === editing ? query : item));
+    clearEditor(); setError('');
+  }
+
+  function clearEditor() {
+    setInput(''); setInputCategoryPath([]); setInputTagPath([]); setEditing(null);
+  }
+
+  function editQuery(query: VideoQuery, index: number) {
+    setInput(query.keyword); setInputCategoryPath([...query.categoryPath]); setInputTagPath([...query.tagPath]); setEditing(index);
   }
 
   const disabled = !desktop || !loaded || !!action;
@@ -177,9 +189,9 @@ export function FeiguaTrends() {
     <header className={styles.heading}>
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
-        <button disabled={disabled || state.busy || dirty || musicDirty} onClick={() => void perform('login', api => api.login())}><LogIn size={16} />登录飞瓜</button>
+        <button disabled={disabled || state.busy} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />登录飞瓜</button>
         {state.busy ? <button disabled={disabled} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止采集</button>
-          : <button className={styles.primary} disabled={disabled || dirty || musicDirty || !!input.trim() || editing !== null || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
+          : <button className={styles.primary} disabled={disabled || dirty || musicDirty || editorDirty || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
       </div>
     </header>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
@@ -189,7 +201,7 @@ export function FeiguaTrends() {
     <p>全网热点日榜每天北京时间 07:00 自动采集；请保持应用运行并登录飞瓜。错过时间后，当天重新打开或恢复运行时补采一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
-      <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty ? ' · 有未保存修改' : ''}</span></summary>
+      <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">
       <div><h2>BGM 与话题 · 榜单分类</h2><p>共用已核对一致的一级、二级分类，保存后同步刷新两个榜单</p></div>
       <div className={styles.tagSelectors}>
@@ -210,17 +222,23 @@ export function FeiguaTrends() {
 
     <section className={styles.configuration} aria-label="关键词配置">
       <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组，分别设置带货品类和视频标签 · 近7天销售额前 5</p></div>
-      <form onSubmit={event => { event.preventDefault(); addKeyword(); }}>
-        <input aria-label="视频关键词" placeholder="输入关键词，按回车添加" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} />
-        <button type="submit" disabled={disabled || !input.trim()}><Plus size={15} />{editing === null ? '添加' : '确认修改'}</button>
-        <button type="button" className={styles.primary} disabled={disabled || state.busy || editing !== null || !!input.trim()} onClick={() => void perform('video-save', api => api.saveAndRefreshVideoQueries(videoQueries))}>{action === 'video-save' ? '正在保存并刷新…' : '保存并刷新关键词榜单'}</button>
+      <form className={styles.queryEditor} onSubmit={event => { event.preventDefault(); addKeyword(); }}>
+        <label className={styles.queryField}>关键词<input aria-label="视频关键词" placeholder="输入关键词" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} /></label>
+        <CategorySelect label="带货品类" options={state.videoFilterOptions.categoryPath} path={inputCategoryPath} disabled={disabled} onChange={setInputCategoryPath} />
+        <CategorySelect label="视频标签" options={state.videoFilterOptions.tagPath} path={inputTagPath} disabled={disabled} onChange={setInputTagPath} />
+        <div className={styles.queryActions}>
+          <button type="submit" disabled={disabled || !input.trim()}><Plus size={15} />{editing === null ? '添加' : '确认修改'}</button>
+          {editing !== null && <button type="button" disabled={disabled} onClick={clearEditor}>取消修改</button>}
+          <button type="button" className={styles.primary} disabled={disabled || state.busy || editorDirty} onClick={() => void perform('video-save', api => api.saveAndRefreshVideoQueries(videoQueries))}>{action === 'video-save' ? '正在保存并刷新…' : '保存并刷新关键词榜单'}</button>
+        </div>
       </form>
       {videoQueries.map((query, index) => <section className={styles.querySettings} key={index} aria-label={`关键词${query.keyword}设置`}>
-        <div className={styles.tags}><span><button disabled={disabled} title={`修改「${query.keyword}」`} onClick={() => { setEditing(index); setInput(query.keyword); }}>{query.keyword}</button><button disabled={disabled} aria-label={`删除关键词${query.keyword}`} onClick={() => { setVideoQueries(videoQueries.filter((_, current) => current !== index)); setEditing(null); setInput(''); }}><X size={13} /></button></span></div>
-        <CategorySelect label={`${query.keyword} · 带货品类`} options={state.videoFilterOptions.categoryPath} path={query.categoryPath} disabled={disabled} onChange={categoryPath => setVideoQueries(videoQueries.map((item, current) => current === index ? { ...item, categoryPath } : item))} />
-        <CategorySelect label={`${query.keyword} · 视频标签`} options={state.videoFilterOptions.tagPath} path={query.tagPath} disabled={disabled} onChange={tagPath => setVideoQueries(videoQueries.map((item, current) => current === index ? { ...item, tagPath } : item))} />
+        <strong>{query.keyword}</strong>
+        <span>带货品类：{pathLabel(query.categoryPath)}</span><span>视频标签：{pathLabel(query.tagPath)}</span>
+        <button disabled={disabled || editorDirty} aria-label={`修改关键词${query.keyword}`} onClick={() => editQuery(query, index)}>修改</button>
+        <button disabled={disabled || editorDirty} aria-label={`删除关键词${query.keyword}`} onClick={() => setVideoQueries(videoQueries.filter((_, current) => current !== index))}><X size={13} />删除</button>
       </section>)}
-      <small>{editing !== null ? '正在修改关键词，确认后请保存。' : dirty ? '设置尚未保存，保存后立即刷新关键词榜单。' : keywords.length ? `已保存 ${keywords.length} 组，点击关键词可修改名称，分类独立保存。` : '尚未配置关键词。仍可采集 BGM、话题和全网热点三个榜单。'}{!state.videoFilterOptions.categoryPath.length || !state.videoFilterOptions.tagPath.length ? ' 登录后自动加载分类。' : ''}</small>
+      <small>{editing !== null ? '正在修改这一组，确认修改后请保存。' : editorDirty ? '选择带货品类和视频标签后点击“添加”，每个关键词保存为独立一组。' : dirty ? '设置尚未保存，保存后立即刷新关键词榜单。' : keywords.length ? `已保存 ${keywords.length} 组，可分别修改或删除。` : '输入关键词，选择带货品类和视频标签，再点击“添加”。'}</small>
     </section>
     </details>
 

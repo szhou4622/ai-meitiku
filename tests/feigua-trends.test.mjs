@@ -31,6 +31,53 @@ function fixture({ stored, collect, auth, write } = {}) {
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
 
+test('new and legacy installs can choose actual bundled categories before login or collection', async () => {
+  for(const videoFilterOptions of [undefined,{categoryPath:[],tagPath:[]}]) {
+    const {service,calls}=fixture({stored:{version:1,keywords:[],runs:[],videoFilterOptions}});
+    const state=await service.state();
+    assert.equal(state.videoFilterOptions.categoryPath.length,22);
+    assert.equal(state.videoFilterOptions.tagPath.length,29);
+    assert.ok(state.videoFilterOptions.categoryPath.some(option=>option.label==='美妆'));
+    const selected=[{keyword:'素颜霜',categoryPath:['美妆'],tagPath:['时尚']}];
+    await service.saveVideoQueries(selected);
+    assert.deepEqual((await service.state()).videoQueries,selected);
+    assert.equal(calls.length,0);
+  }
+});
+
+test('cached live directories take precedence over the bundled snapshot', async()=>{
+  const {service}=fixture({stored:{version:1,keywords:[],runs:[],videoFilterOptions:videoCatalog}});
+  assert.deepEqual((await service.state()).videoFilterOptions,videoCatalog);
+});
+
+test('login with an unsaved draft refreshes catalogs without collecting saved or draft keywords',async()=>{
+  const {service,browser,calls}=fixture();
+  browser.getVideoFilters=async()=>videoCatalog;
+  browser.getMusicTags=async()=>({options:[{label:'目录标签',children:[]}]});
+  await service.saveKeywords(['已保存词']);
+  await service.login({collectAfterLogin:false});
+  browser.onAuthChange({status:'authenticated'});
+  await service.autoStart;
+  const state=await service.state();
+  assert.deepEqual(state.keywords,['已保存词']);
+  assert.equal(state.runs.length,0);
+  assert.deepEqual(calls,[]);
+  assert.deepEqual(state.videoFilterOptions,videoCatalog);
+  await service.login({collectAfterLogin:false}); await service.cancel();
+  browser.onAuthChange({status:'authenticated'});
+  assert.equal(service.autoCatalogRequested,false);
+});
+
+test('offline catalogs remain usable when automatic provider refresh fails',async()=>{
+  const {service,browser}=fixture();
+  browser.getVideoFilters=async()=>{throw new Error('unavailable');};
+  browser.getMusicTags=async()=>{throw new Error('unavailable');};
+  await service.login({collectAfterLogin:false});browser.onAuthChange({status:'authenticated'});await service.autoStart;
+  assert.equal((await service.state()).videoFilterOptions.categoryPath.length,22);
+  await service.saveVideoQueries([{keyword:'素颜霜',categoryPath:['美妆'],tagPath:['时尚']}]);
+  assert.match((await service.state()).catalogMessage,/仍可使用已有分类/);
+});
+
 test('per-keyword filters validate full paths, duplicate names and parent changes', () => {
   assert.deepEqual(validateVideoQueries(videoQueries, videoCatalog), videoQueries);
   assert.deepEqual(normalizeVideoQueries([{keyword:'  旧关键词  '}]), [{keyword:'旧关键词',categoryPath:[],tagPath:[]}]);
