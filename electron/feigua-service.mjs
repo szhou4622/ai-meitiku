@@ -108,7 +108,7 @@ export class FeiguaService {
 
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
   }
 
   startDailySchedule(canRun) {
@@ -306,6 +306,7 @@ export class FeiguaService {
     if (scheduledDate) this.data[scheduleKey] = scheduledDate;
     this.data.runs = [run, ...previousRuns].slice(0, 12);
     try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; throw error; }
+    this.storageMessage = null;
     if (this.disposed) return;
     this.controller = new AbortController();
     const signal = this.controller.signal;
@@ -335,7 +336,35 @@ export class FeiguaService {
       await this.execute(run, signal);
     })().catch(() => {
       run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
+      run.finishedAt = new Date().toISOString();
+      this.storageMessage = run.message;
+      for (const group of run.groups) {
+        if (group.status === 'running') { group.status = 'failed'; group.message = run.message; }
+        else if (group.status === 'pending') group.status = 'skipped';
+      }
     }).finally(() => { this.controller = null; });
+  }
+
+  async saveCapturedGroup(run, group, result) {
+    const save = this.writeQueue.then(async () => {
+      const snapshot = structuredClone(this.data);
+      const savedRun = snapshot.runs.find(item => item.id === run.id);
+      const savedGroup = savedRun.groups[run.groups.indexOf(group)];
+      Object.assign(savedGroup, { result, status: 'completed' });
+      snapshot.latestResults = recoverLatestResults([{ id: run.id, groups: [savedGroup] }], snapshot.latestResults);
+      await this.storage.write(snapshot);
+      // Publishing follows the durable write. Polling must never see a result
+      // that would disappear on restart after a failed save.
+      Object.assign(group, { result, status: 'completed' });
+      this.data.latestResults = snapshot.latestResults;
+    });
+    this.writeQueue = save.catch(() => {});
+    try { await save; }
+    catch (error) {
+      throw Object.assign(new Error('本机结果保存失败，已保留上次结果并停止采集'), {
+        code: 'FEIGUA_STORAGE', publicMessage: '本机结果保存失败，已保留上次结果并停止采集', cause: error,
+      });
+    }
   }
 
   async execute(run, signal) {
@@ -350,13 +379,14 @@ export class FeiguaService {
         const capture = await this.browser.collect(group.kind, group.keyword, signal, options);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
-        group.result = validateCapture(group.kind, group.keyword, capture, options);
-        group.status = 'completed';
-        this.data.latestResults = recoverLatestResults([{ id: run.id, groups: [group] }], this.data.latestResults);
+        const result = validateCapture(group.kind, group.keyword, capture, options);
+        await this.saveCapturedGroup(run, group, result);
+        continue;
       } catch (error) {
         group.status = signal.aborted ? 'cancelled' : 'failed';
         // Only adapter-owned messages are exposed, never raw browser/network errors.
         group.message = signal.aborted ? '已取消' : error.publicMessage || '本组采集未通过校验，请打开飞瓜核对页面后重试';
+        if (error.code === 'FEIGUA_STORAGE') throw error;
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }
