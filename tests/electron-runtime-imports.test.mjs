@@ -35,7 +35,7 @@ test("packaging preflight rejects a relative main-process import omitted from bu
   await writeFile(path.join(projectRoot, "app", "shared.mjs"), "export const shared = true;\n");
   await assert.rejects(
     () => verifyElectronRuntimeImports({ projectRoot }),
-    /app\/shared\.mjs 未包含在 build\.files/,
+    /app[\\/]shared\.mjs 未包含在 build\.files/,
   );
 });
 

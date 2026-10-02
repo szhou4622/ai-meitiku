@@ -1,6 +1,7 @@
 "use client";
 
 import { AliyunSubtitleAutoSync, AliyunSubtitleSettings, AliyunSubtitleWorkbench, type AliyunSubtitleBridge } from "./aliyun-subtitle";
+import { FeiguaTrends, type FeiguaBridge } from "./feigua-trends";
 
 import {
   AlertTriangle,
@@ -844,6 +845,7 @@ declare global {
   interface Window {
     desktopBridge?: {
       aliyunSubtitle: AliyunSubtitleBridge;
+      feigua: FeiguaBridge;
       licenseBootstrap: () => Promise<LicenseState>;
       licenseDiagnosticLog: () => Promise<LicenseDiagnosticSnapshot>;
       licenseCopyDiagnosticLog: () => Promise<{ ok: boolean }>;
@@ -3260,7 +3262,7 @@ const activeApplicationModuleStorageKey = "active-application-module-v1";
 const applicationModules = featureRegistry.list().map((feature) => feature.id);
 type ApplicationModule = string;
 const featureMenuIcons: Record<string, typeof Images> = {
-  media: Images, "qianchuan-videos": Film, "viral-visuals": Images, "viral-copy": FileSpreadsheet,
+  media: Images, "qianchuan-videos": Film, "viral-visuals": Images, "viral-copy": FileSpreadsheet, "feigua-trends": Globe2,
   "subtitle-removal": Film, downloads: Download, schemes: Tag, classifier: Boxes, voice: Mic2, settings: Settings,
 };
 
@@ -8829,6 +8831,8 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
           )}
           </>
         </section>
+        ) : activeModule === "feigua-trends" ? (
+          <FeiguaTrends />
         ) : activeModule === "qianchuan-videos" ? (
           <QianchuanVideoLibrary
             bootstrap={qianchuanBootstrap}

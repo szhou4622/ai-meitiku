@@ -63,6 +63,8 @@ import { licenseUserDataDirectoryName, licenseUserDataPath } from "./license-use
 import { MachineIdentityRepair } from "./machine-identity-repair.mjs";
 import { createStableMachineIdentity, publicMachineIdentity } from "./machine-code.mjs";
 import { QianchuanService, qianchuanInternals } from "./qianchuan-service.mjs";
+import { FeiguaService } from "./feigua-service.mjs";
+import { FeiguaBrowser } from "./feigua-browser.mjs";
 import { buildFolderRelinkPlan } from "./media-folder-relink.mjs";
 import { extractProductInfoFiles, extractScannedProductInfoFiles, PRODUCT_INFO_SUPPORTED_EXTENSIONS } from "./product-info-files.mjs";
 import { StorageManagementService } from "./storage-management.mjs";
@@ -161,6 +163,14 @@ async function getAliyunSubtitleService() {
 }
 
 let qianchuanService = null;
+let feiguaService = null;
+function getFeiguaService() {
+  if (!feiguaService) feiguaService = new FeiguaService({
+    userDataPath: app.getPath("userData"),
+    browser: new FeiguaBrowser({ BrowserWindow, session }),
+  });
+  return feiguaService;
+}
 let licenseRefreshTimer = null;
 let licenseEntitlementTimer = null;
 let updateService = null;
@@ -2633,6 +2643,20 @@ if (hasSingleInstanceLock) {
   });
 
   registerProtectedHandle("aliyun-subtitle-state", async () => (await getAliyunSubtitleService()).publicState());
+  for (const [channel, method] of Object.entries({
+    "feigua-state": "state", "feigua-save-keywords": "saveKeywords", "feigua-login": "login",
+    "feigua-check-login": "checkLogin", "feigua-start": "start", "feigua-cancel": "cancel",
+    "feigua-save-music-tag": "saveMusicTag", "feigua-refresh-music-tags": "refreshMusicTags",
+    "feigua-save-refresh-music-tag": "saveAndRefreshMusicTag",
+    "feigua-save-refresh-video-queries": "saveAndRefreshVideoQueries",
+  })) {
+    registerProtectedHandle(channel, async (event, ...args) => {
+      if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+        throw new Error("热点采集只允许从媒体库主界面调用");
+      }
+      return getFeiguaService()[method](...args);
+    });
+  }
   registerProtectedHandle("aliyun-subtitle-save", async (_event, payload) => (await getAliyunSubtitleService()).saveConfig(payload));
   registerProtectedHandle("aliyun-subtitle-verify", async () => (await getAliyunSubtitleService()).verify());
   registerProtectedHandle("aliyun-subtitle-open", async (_event, page, mode) => openAliyunPage(page, mode));
@@ -3810,6 +3834,7 @@ async function createMainWindow() {
   });
 
   mainWindow.on("closed", () => {
+    feiguaService?.dispose();
     mainWindow = null;
   });
 
@@ -3834,6 +3859,13 @@ if (hasSingleInstanceLock) {
       await initializeStorageManagementService();
       await startLocalServer();
       await createMainWindow();
+      getFeiguaService().startDailySchedule(() => {
+        try {
+          if (!licenseService || applicationQuitRequested) return false;
+          licenseService.assertFeature("feigua-trends");
+          return true;
+        } catch { return false; }
+      });
       // Strictly after the first paint. start() never throws and is not awaited.
       const factorCollection = machineIdentityService?.start();
       if (factorCollection) {
@@ -3895,6 +3927,7 @@ app.on("before-quit", (event) => {
     return;
   }
   applicationQuitRequested = true;
+  feiguaService?.dispose();
   if (suddenTerminationDisabled && process.platform === "darwin" && typeof app.enableSuddenTermination === "function") {
     app.enableSuddenTermination();
     suddenTerminationDisabled = false;
