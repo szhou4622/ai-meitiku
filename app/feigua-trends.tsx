@@ -78,14 +78,15 @@ function MusicCaption({group, kind, selection, dirty, history}: {group?: Group; 
   const selected = (history ? group?.musicTag || group?.result?.filters?.categoryPath || [] : selection).join(' > ') || '全部';
   const actual = group?.result?.filters?.category || group?.musicTag?.join(' > ') || '全部';
   const status = group?.refreshStatus || group?.status;
-  const refreshing = !history && ['pending', 'running'].includes(status || '');
+  const queued = !history && status === 'pending';
+  const refreshing = !history && status === 'running';
   const failed = !history && ['failed','cancelled','interrupted'].includes(status || '');
   return <>
     <p>飞瓜数据 · {kind === 'music' ? '热门音乐 · 视频标签' : '话题周榜 · 话题分类'}：<strong>{selected}</strong>{dirty && !history ? '（未保存）' : ''} · {kind === 'music' ? '昨日使用人数降序' : '参与人数增长率降序'}</p>
-    {refreshing && <p className={styles.refreshing} role="status">正在刷新「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」{kind === 'music' ? '热门 BGM' : '话题榜单'}…</p>}
+    {(refreshing || queued) && <p className={styles.refreshing} role="status">{queued ? '等待采集' : '正在刷新'}「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」{kind === 'music' ? '热门 BGM' : '话题榜单'}…</p>}
     {failed && <p className={styles.refreshError} role="status">「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」刷新未完成：{group?.refreshMessage || group?.message || names[status || 'failed']}</p>}
     {group?.result && (actual !== selected || group.showingPrevious) && <p>当前显示：{actual} · 上次采集结果</p>}
-    {!group?.result && !refreshing && !failed && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
+    {!group?.result && !refreshing && !queued && !failed && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
   </>;
 }
 

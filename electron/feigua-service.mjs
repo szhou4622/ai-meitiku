@@ -51,7 +51,7 @@ export class FeiguaService {
       this.autoCatalogRequested = false;
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
-        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start() : this.prepareCatalogs();
+        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
       }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
     };
     this.controller = null;
@@ -221,7 +221,10 @@ export class FeiguaService {
   }
 
   async syncVideoFilters(signal) {
-    const catalog = await this.browser.getVideoFilters(signal);
+    return this.cacheVideoFilters(await this.browser.getVideoFilters(signal));
+  }
+
+  async cacheVideoFilters(catalog) {
     const videoFilterOptions = { categoryPath: normalizeVideoOptions(catalog.categoryPath), tagPath: normalizeVideoOptions(catalog.tagPath) };
     if (!videoFilterOptions.categoryPath.length || !videoFilterOptions.tagPath.length) throw new Error('视频分类目录为空');
     const save = this.writeQueue.then(async () => {
@@ -335,7 +338,7 @@ export class FeiguaService {
     return this.state();
   }
 
-  async start() {
+  async start({ trigger = null } = {}) {
     await this.exclusive(async () => {
       await this.configQueue;
       const musicTag = [...this.data.musicTag];
@@ -343,7 +346,7 @@ export class FeiguaService {
       const videoQueries = structuredClone(this.data.videoQueries);
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      await this.launchRun(musicTag, keywords, { videoQueries });
+      await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null });
     });
     return this.state();
   }
@@ -379,16 +382,7 @@ export class FeiguaService {
           await this.persist(); return;
         }
       }
-      if (!onlyHotspots) {
-        const errors = [];
-        if (!onlyVideos && this.browser.getMusicTags && !signal.aborted) {
-          try { await this.syncMusicTags(signal); } catch { errors.push('榜单分类自动加载失败'); }
-        }
-        if (!onlyMusic && !onlyRankings && this.browser.getVideoFilters && !signal.aborted) {
-          try { await this.syncVideoFilters(signal); } catch { errors.push('带货视频分类自动加载失败'); }
-        }
-        this.catalogMessage = errors.length ? `${errors.join('；')}，保留已有目录，请重新登录后重试。` : null;
-      }
+      this.catalogMessage = null;
       await this.execute(run, signal);
     })().catch(() => {
       run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
@@ -425,16 +419,18 @@ export class FeiguaService {
 
   async execute(run, signal) {
     let stop = false;
-    for (const group of run.groups) {
+    for (const [index, group] of run.groups.entries()) {
       if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; continue; }
       group.status = 'running';
-      run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}`;
+      run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}（${index + 1}/${run.groups.length}）`;
       await this.persist();
       try {
         const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
         const capture = await this.browser.collect(group.kind, group.keyword, signal, options);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
+        if (group.kind === 'videos' && capture.videoFilterOptions) await this.cacheVideoFilters(capture.videoFilterOptions);
+        if (capture.catalogWarning) this.catalogMessage = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验';
         const result = validateCapture(group.kind, group.keyword, capture, { ...options, sourceOrigin: this.browser.sourceOrigin?.() });
         await this.saveCapturedGroup(run, group, result);
         continue;

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, validateCaptureDates, isRankingMetric, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
 import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigua-service.mjs';
-import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
+import { FeiguaBrowser, isFeiguaNavigation, isCollectionLoadingRequest } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
 
@@ -166,20 +166,57 @@ test('busy keyword refresh cannot replace saved groups, and login failure preser
   assert.equal(state.runs[0].status,'failed');
 });
 
-test('catalogs update automatically even with no keywords; refresh errors preserve cached selections', async () => {
+test('catalogs update on their visited source pages and failed rereads preserve cached selections', async () => {
   const {service,browser}=fixture();
-  browser.getVideoFilters=async()=>videoCatalog;
-  browser.getMusicTags=async()=>({options:[{label:'榜单分类',children:[]}]});
+  const original=browser.collect;
+  browser.getVideoFilters=async()=>{throw new Error('separate catalog navigation must not run');};
+  browser.getMusicTags=async()=>{throw new Error('separate catalog navigation must not run');};
+  browser.collect=async(kind,...args)=>({...await original(kind,...args),...(kind==='music'?{musicTagOptions:[{label:'榜单分类',children:[]}]}:kind==='videos'?{videoFilterOptions:videoCatalog}:{})});
+  await service.start(); await service.job;
+  assert.deepEqual((await service.state()).musicTagOptions,[{label:'榜单分类',children:[]}]);
+  assert.equal((await service.state()).videoFilterOptions.categoryPath.length,22);
+  await service.saveKeywords(['目录测试词']);
   await service.start(); await service.job;
   assert.deepEqual((await service.state()).videoFilterOptions,videoCatalog);
   await service.saveVideoQueries(videoQueries);
-  browser.getVideoFilters=async()=>{throw new Error('private payload');};
+  browser.collect=async(kind,...args)=>({...await original(kind,...args),...(kind==='videos'?{catalogWarning:'分类目录更新暂未完成'}:{})});
   await service.start(); await service.job;
   const state=await service.state();
   assert.deepEqual(state.videoQueries,videoQueries);
   assert.deepEqual(state.videoFilterOptions,videoCatalog);
-  assert.match(state.catalogMessage,/自动加载失败/);
-  assert.doesNotMatch(JSON.stringify(state),/private payload/);
+  assert.match(state.catalogMessage,/目录更新暂未完成/);
+});
+
+test('login confirmation starts collection before any separate catalog work',async()=>{
+  const {service,browser}=fixture();
+  let started,release;
+  const first=new Promise(resolve=>{started=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  browser.getMusicTags=()=>new Promise(()=>{});
+  browser.getVideoFilters=()=>new Promise(()=>{});
+  const original=browser.collect;
+  browser.collect=async(...args)=>{if(args[0]==='music'){started();await gate;}return original(...args);};
+  browser.openLogin=async()=>{browser.onAuthChange({status:'authenticated',message:'已登录'});};
+  await service.login();await service.autoStart;
+  let timer;
+  try {
+    await Promise.race([first,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('catalog work delayed first collection')),1000);})]);
+    const state=await service.state();
+    assert.equal(state.runs[0].trigger,'login');
+    assert.equal(state.runs[0].groups[0].status,'running');
+    assert.match(state.runs[0].message,/正在采集/);
+  }finally{clearTimeout(timer);release();}
+  await service.job;
+  assert.equal((await service.state()).runs[0].status,'completed');
+});
+
+test('page settling tracks only the current provider ranking loads, excluding analytics and other windows',()=>{
+  const origin='http://192.0.2.10:13042';
+  const details={webContentsId:123,url:`${origin}/api/v1/music/search/page`,resourceType:'xhr'};
+  assert.equal(isCollectionLoadingRequest(details,123,origin),true);
+  assert.equal(isCollectionLoadingRequest({...details,url:`${origin}/app/`,resourceType:'mainFrame'},123,origin),true);
+  for(const changed of [{webContentsId:456},{url:'https://log.example/collect'},{url:`${origin}/api/v1/other/getUserNotice`},{resourceType:'image'}])assert.equal(isCollectionLoadingRequest({...details,...changed},123,origin),false);
+  assert.equal(isCollectionLoadingRequest(details,123,'http://192.0.2.10:13045'),false);
 });
 
 test('browser applies both video paths, then keyword, period and sales sort for each group', async () => {

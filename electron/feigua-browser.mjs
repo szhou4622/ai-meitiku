@@ -2,12 +2,19 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
 import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
-import { observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
+import { FEIGUA_ENDPOINTS, observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 import { normalizeLoginCredentials, loginFormMemory } from './feigua-login-credentials.mjs';
 import { fileURLToPath } from 'node:url';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
+}
+
+export function isCollectionLoadingRequest(details, windowId, sourceOrigin) {
+  if (windowId == null || details.webContentsId !== windowId || !isFeiguaDataUrl(details.url, sourceOrigin)) return false;
+  if (details.resourceType === 'mainFrame') return true;
+  try { return ['xhr', 'fetch'].includes(details.resourceType) && Object.values(FEIGUA_ENDPOINTS).includes(new URL(details.url).pathname); }
+  catch { return false; }
 }
 
 export function isFeiguaNavigation(value, loginEntryUrl = '') {
@@ -147,14 +154,14 @@ export class FeiguaBrowser {
       this.partition.setPermissionCheckHandler(() => false);
       this.partition.on('will-download', event => event.preventDefault());
       this.partition.webRequest.onBeforeRequest((details, callback) => {
-        if (['xhr', 'mainFrame'].includes(details.resourceType)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
+        if (isCollectionLoadingRequest(details, this.window?.webContents.id, this.verifiedSourceOrigin)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
         if (this.window && details.webContentsId === this.window.webContents.id) {
           const request = observeFeiguaRequest(details, this.verifiedSourceOrigin);
           if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
         }
         callback({});
       });
-      const done = details => { this.pending.delete(details.id); this.lastNetwork = Date.now(); };
+      const done = details => { if (this.pending.delete(details.id)) this.lastNetwork = Date.now(); };
       this.partition.webRequest.onCompleted(done);
       this.partition.webRequest.onErrorOccurred(done);
     }
@@ -430,6 +437,15 @@ export class FeiguaBrowser {
     await this.settle(signal);
     const after = await this.execute('capture-context', args);
     if (JSON.stringify(after) !== JSON.stringify(context)) throw issue('接口返回期间页面筛选发生变化，本组未保存');
+    // Read catalogs from this already visited source page. A separate catalog
+    // navigation must never delay the first ranking after login.
+    try {
+      if (kind === 'music') {
+        const catalog = await this.execute('music-tag-options');
+        capture.musicTagOptions = catalog.options;
+        capture.musicTagRestricted = catalog.restricted;
+      } else if (kind === 'videos') capture.videoFilterOptions = await this.execute('video-filter-options');
+    } catch { capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验'; }
     return capture;
   }
 
