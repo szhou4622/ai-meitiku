@@ -4,7 +4,7 @@ export const FEIGUA_SOURCES = Object.freeze({
   music: { label: '本周爆款 BGM Top5', navigation: ['热门音乐'], sort: '昨日使用人数', period: '昨日使用人数', fields: ['title', 'author', 'totalUsers', 'yesterdayUsers'] },
   topics: { label: '本周话题热点 Top5', navigation: ['热门话题榜', '热门话题', '话题榜'], sort: '参与人数增长率', period: '周榜', fields: ['title', 'author', 'followers', 'participantGrowth', 'playGrowth'] },
   hotspots: { label: '全网热点 Top5', navigation: ['抖音热点榜'], sort: '峰值热度', period: '日榜', fields: ['title', 'peakHeat'] },
-  videos: { label: '关键词带货视频 Top5', navigation: ['带货视频库'], sort: '视频销售额', period: '近7天', fields: ['title', 'products', 'author', 'followers', 'plays', 'likes', 'sales', 'publishedAt'] },
+  videos: { label: '关键词带货视频 Top5', navigation: ['带货视频库'], sort: '视频销售额', period: '近7天', fields: ['title', 'products', 'author', 'followers', 'sales', 'salesCount', 'likes', 'publishedAt'] },
 });
 
 export function isFeiguaDataUrl(value, sourceOrigin = null) {

@@ -89,7 +89,7 @@ export async function readFeiguaApi({ endpoint, params }) {
   return { code: response?.Code, success: response?.Status, data: {
     ...pick(data, ['Total', 'PageIndex', 'TimeRangeStr', 'UpdateTime', 'Remainder', 'AllowCount']),
     list: list && list.length <= 100 ? list.map(row => ({
-      ...pick(row, ['MusicId', 'Title', 'Author', 'UserCount', 'TodayUserCount', 'DetailUrl', 'TopicId', 'RankNum', 'ViewCountIncRatioStr', 'UserCountIncRatioStr', 'HotId', 'Rank', 'HotValueStr', 'AwemeId', 'Desc', 'BloggerNickName', 'Fans', 'PlayCount', 'LikeCount', 'CommentCount', 'ShareCount', 'CollectCount', 'SalesGmv', 'PubTimeStr', 'IsHasProduct']),
+      ...pick(row, ['MusicId', 'Title', 'Author', 'UserCount', 'TodayUserCount', 'DetailUrl', 'TopicId', 'RankNum', 'ViewCountIncRatioStr', 'UserCountIncRatioStr', 'HotId', 'Rank', 'HotValueStr', 'AwemeId', 'Desc', 'BloggerNickName', 'Fans', 'PlayCount', 'LikeCount', 'CommentCount', 'ShareCount', 'CollectCount', 'SalesGmv', 'SaleCount', 'PubTimeStr', 'IsHasProduct']),
       topic: pick(row.BaseTopicDto, ['TopicName', 'TopicFullDetailUrl']),
       blogger: pick(row.BaseBloggerDto, ['BloggerName', 'MPlatform_Fans', 'Fans']),
       product: pick(row.ExtInfo, ['Gid', 'Title', 'Name', 'CosRatioShow', 'PromotionsCount']),
@@ -122,7 +122,7 @@ export function captureFeiguaResponse(kind, request, context, response) {
     if (kind === 'music') return { id: shown(row.MusicId), url: link(row.DetailUrl, context.url), title: shown(row.Title), author: shown(row.Author), totalUsers: shown(row.UserCount), yesterdayUsers: shown(row.TodayUserCount) };
     if (kind === 'topics') return { id: shown(row.TopicId), url: link(row.topic?.TopicFullDetailUrl, context.url), title: shown(row.topic?.TopicName), author: shown(row.blogger?.BloggerName), followers: shown(row.blogger?.MPlatform_Fans ?? row.blogger?.Fans), participantGrowth: shown(row.UserCountIncRatioStr), playGrowth: shown(row.ViewCountIncRatioStr) };
     if (kind === 'hotspots') return { id: shown(row.HotId), url: null, title: shown(row.Title), peakHeat: shown(row.HotValueStr) };
-    return { id: shown(row.AwemeId), url: link(row.DetailUrl, context.url), title: shown(row.Desc), author: shown(row.BloggerNickName), followers: shown(row.Fans), plays: shown(row.PlayCount), likes: shown(row.LikeCount), comments: shown(row.CommentCount), shares: shown(row.ShareCount), collects: shown(row.CollectCount), sales: shown(row.SalesGmv), publishedAt: shown(row.PubTimeStr),
+    return { id: shown(row.AwemeId), url: link(row.DetailUrl, context.url), title: shown(row.Desc), author: shown(row.BloggerNickName), followers: shown(row.Fans), plays: shown(row.PlayCount), likes: shown(row.LikeCount), comments: shown(row.CommentCount), shares: shown(row.ShareCount), collects: shown(row.CollectCount), sales: shown(row.SalesGmv), salesCount: shown(row.SaleCount), publishedAt: shown(row.PubTimeStr),
       products: row.IsHasProduct && shown(row.product?.Title || row.product?.Name) ? [{ id: shown(row.product.Gid), title: shown(row.product.Title || row.product.Name), commission: shown(row.product.CosRatioShow) }] : [],
       productCount: Number(row.product?.PromotionsCount) || 0,
       productsIncomplete: Number(row.product?.PromotionsCount) > 1,

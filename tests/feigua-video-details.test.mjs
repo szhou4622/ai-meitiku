@@ -4,7 +4,7 @@ import { VIDEO_DETAIL_ENDPOINTS, videoPublishedDate, observeVideoDetailRequest, 
 import { validateCapture, FEIGUA_SOURCES } from '../electron/feigua-contract.mjs';
 
 const origin='https://dy.feigua.cn',id='synthetic-video',dateCode='20261002';
-const row={id,url:`${origin}/app/#/synthetic/detail`,title:'合成视频',author:'合成达人',followers:'100',plays:null,likes:'166',comments:'0',shares:'2',collects:'3',sales:'10w~25w',publishedAt:'2026/10/02 12:11',products:[{id:'synthetic-goods',title:'合成商品',commission:null}],productCount:1};
+const row={id,url:`${origin}/app/#/synthetic/detail`,title:'合成视频',author:'合成达人',followers:'100',plays:null,likes:'166',comments:'0',shares:'2',collects:'3',sales:'10w~25w',salesCount:'2500-5000',publishedAt:'2026/10/02 12:11',products:[{id:'synthetic-goods',title:'合成商品',commission:null}],productCount:1};
 const detail={state:'verified',videoId:id,dateCode,playsCount:0,playsText:null,products:[{id:'synthetic-goods',title:'合成商品',commission:'0.00%',hasCommission:false}]};
 
 test('source-provided 0.00% is displayed while raw zero playback placeholders remain unavailable',()=>{
@@ -60,6 +60,6 @@ test('quota, login and sample responses stop subsequent detail calls without pub
 test('saved video rows retain availability, supplemental engagement, zero commission and safe provenance',()=>{
   const enriched=enrichVideoRow(row,detail);
   const clean=validateCapture('videos','合成词',{url:`${origin}/app/#/synthetic/list`,keyword:'合成词',period:'近7天',sort:FEIGUA_SOURCES.videos.sort,direction:'desc',filtersVerified:true,categoryPath:[],tagPath:[],dateRange:'2026-10-01 - 2026-10-07',rows:[enriched]});
-  assert.equal(clean.rows[0].products[0].commission,'0.00%');assert.equal(clean.rows[0].products[0].hasCommission,false);assert.equal(clean.rows[0].comments,'0');assert.equal(clean.rows[0].fieldAvailability.plays,'source_unavailable');assert.deepEqual(clean.rows[0].missingFields,['plays']);
+  assert.equal(clean.rows[0].products[0].commission,'0.00%');assert.equal(clean.rows[0].products[0].hasCommission,false);assert.equal(clean.rows[0].salesCount,'2500-5000');assert.deepEqual(clean.rows[0].missingFields,[]);
   assert.deepEqual(clean.rows[0].detailProvenance.endpoints,Object.values(VIDEO_DETAIL_ENDPOINTS));
 });

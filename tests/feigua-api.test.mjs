@@ -33,7 +33,7 @@ const row = {
   MusicId:'music-1',Title:'合成标题',Author:'合成作者',UserCount:'100w',TodayUserCount:'88.2w',DetailUrl:'https://dy.feigua.cn/synthetic/item',
   TopicId:'topic-1',RankNum:1,topic:{TopicName:'合成话题',TopicFullDetailUrl:'https://dy.feigua.cn/synthetic/topic'},blogger:{BloggerName:'合成发起人',MPlatform_Fans:'10w'},UserCountIncRatioStr:'97.2w%',ViewCountIncRatioStr:'2.1w%',
   HotId:'hot-1',Rank:1,HotValueStr:'1200w',
-  AwemeId:'video-1',Desc:'合成视频',BloggerNickName:'合成达人',Fans:'12w',PlayCount:'--',LikeCount:'1000',SalesGmv:'2w-10w',PubTimeStr:'2026/09/30 10:00',IsHasProduct:true,product:{Title:'合成商品',CosRatioShow:'5.00%',PromotionsCount:1},
+  AwemeId:'video-1',Desc:'合成视频',BloggerNickName:'合成达人',Fans:'12w',PlayCount:'--',LikeCount:'1000',SalesGmv:'2w-10w',SaleCount:'1000-2500',PubTimeStr:'2026/09/30 10:00',IsHasProduct:true,product:{Title:'合成商品',CosRatioShow:'5.00%',PromotionsCount:1},
 };
 const response = () => ({code:200,success:true,data:{Total:1,PageIndex:1,TimeRangeStr:null,list:[structuredClone(row)]}});
 
@@ -95,8 +95,8 @@ test('response-provided dates must agree and missing optional values remain miss
   assert.throws(()=>captureFeiguaResponse('topics',request('topics'),contexts.topics,{...response(),data:{...response().data,TimeRangeStr:'2026-09-14 - 2026-09-20'}}),/日期/);
   const input=response();input.data.list[0].product.PromotionsCount=3;
   const result=validateCapture('videos','合成词',captureFeiguaResponse('videos',request('videos'),contexts.videos,input));
-  assert.equal(result.rows[0].plays,null);assert.equal(result.rows[0].sales,'2w-10w');
-  assert.ok(result.rows[0].missingFields.includes('plays'));assert.ok(result.rows[0].missingFields.includes('products'));
+  assert.equal(result.rows[0].salesCount,'1000-2500');assert.equal(result.rows[0].sales,'2w-10w');
+  assert.equal(result.rows[0].missingFields.includes('plays'),false);assert.ok(result.rows[0].missingFields.includes('products'));
 });
 
 test('provider client uses observed params and exports only the allowed response fields',async()=>{

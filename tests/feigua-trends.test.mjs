@@ -461,8 +461,10 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
   assert.equal(result.rows.length, 5);
   assert.equal(result.rows[0].sales, '10w~25w');
   assert.equal(result.rows[0].products[0].commission, '5.00%');
-  assert.equal(result.rows[0].plays, null);
-  assert.ok(result.rows[0].missingFields.includes('plays'));
+  assert.equal(result.rows[0].salesCount, null);
+  assert.ok(result.rows[0].missingFields.includes('salesCount'));
+  assert.equal(result.rows[0].missingFields.includes('plays'),false);
+  assert.equal(validateCapture('videos','测试',capture('videos','测试',{rows:[{...capture('videos','测试').rows[0],salesCount:'2500-5000'}]})).rows[0].salesCount,'2500-5000');
   assert.equal(result.filters.publishedAt, '不限');
   for (const invalid of [{ sort: '视频销量' }, { direction: 'asc' }, { period: '本周' }, { keyword: '其他词' }, { filtersVerified: false }, { dateRange: null }, { rows: [] }, { url: 'https://evil.example/' }]) {
     assert.throws(() => validateCapture('videos', '测试', capture('videos', '测试', invalid)));
