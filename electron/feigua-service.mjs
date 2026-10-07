@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { normalizeLoginEntryUrl } from './feigua-login-entry.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -8,7 +9,7 @@ const videoFilterDefaults = (cached) => ({
   categoryPath: normalizeVideoOptions(cached?.categoryPath?.length ? cached.categoryPath : builtInVideoFilters.categoryPath),
   tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
 });
-const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, loginEntryUrl: '', keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -78,7 +79,7 @@ export class FeiguaService {
   async load() {
     const data = await this.storage.read();
     if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
-    this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
+    this.data = { version: 1, loginEntryUrl: normalizeLoginEntryUrl(data.loginEntryUrl ?? ''), keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
       videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
@@ -88,6 +89,8 @@ export class FeiguaService {
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
       latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
+    this.browser.setLoginEntryUrl?.(this.data.loginEntryUrl);
+    if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     let recovered = false;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
@@ -217,8 +220,31 @@ export class FeiguaService {
     return this.state();
   }
 
+  async saveLoginEntryUrl(input) {
+    const loginEntryUrl = normalizeLoginEntryUrl(input);
+    await this.exclusive(async () => {
+      await this.configQueue;
+      if (loginEntryUrl === this.data.loginEntryUrl) return;
+      const save = this.writeQueue.then(async () => {
+        await this.storage.write({ ...structuredClone(this.data), loginEntryUrl });
+        this.data.loginEntryUrl = loginEntryUrl;
+      });
+      this.writeQueue = save.catch(() => {});
+      this.configQueue = save.catch(() => {});
+      await save;
+      this.autoCollectRequested = false;
+      this.autoCatalogRequested = false;
+      this.loginSequence++;
+      this.browser.setLoginEntryUrl?.(loginEntryUrl);
+      this.auth = { status: 'signed_out', message: loginEntryUrl ? '登录入口已保存，请打开入口完成登录并进入飞瓜工作台' : '请先配置并保存登录入口网址' };
+    });
+    return this.state();
+  }
+
   async login({ collectAfterLogin = true } = {}) {
     await this.exclusive(async () => {
+      await this.configQueue;
+      if (!this.data.loginEntryUrl) throw new Error('请先配置并保存登录入口网址');
       this.autoCollectRequested = collectAfterLogin === true;
       this.autoCatalogRequested = true;
       this.loginSequence++;

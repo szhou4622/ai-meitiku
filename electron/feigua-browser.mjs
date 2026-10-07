@@ -1,13 +1,15 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
+import { normalizeLoginEntryUrl, isLoginEntryNavigation } from './feigua-login-entry.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
 }
 
-export function isFeiguaNavigation(value) {
+export function isFeiguaNavigation(value, loginEntryUrl = '') {
   if (isFeiguaDataUrl(value)) return true;
+  if (isLoginEntryNavigation(value, loginEntryUrl)) return true;
   try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'open.weixin.qq.com' && !url.port && !url.username && !url.password; }
   catch { return false; }
 }
@@ -19,6 +21,16 @@ export class FeiguaBrowser {
     this.wasAuthenticated = false;
     this.loginTimer = null; this.loginCheckPending = false;
     this.onAuthChange = null;
+    this.loginEntryUrl = '';
+  }
+
+  setLoginEntryUrl(value) {
+    const next = normalizeLoginEntryUrl(value);
+    if (next === this.loginEntryUrl) return;
+    this.stopLoginWatch();
+    this.wasAuthenticated = false;
+    if (this.window && !this.window.isDestroyed()) this.window.close();
+    this.loginEntryUrl = next;
   }
 
   ensureWindow(show = false) {
@@ -39,13 +51,13 @@ export class FeiguaBrowser {
     const window = new this.BrowserWindow({ width: 1320, height: 900, show, title: '飞瓜 · 热点采集',
       webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
     this.window = window;
-    const guard = (event, url) => { if (!isFeiguaNavigation(url)) event.preventDefault(); };
+    const guard = (event, url) => { if (!isFeiguaNavigation(url, this.loginEntryUrl)) event.preventDefault(); };
     window.webContents.on('will-navigate', guard);
     window.webContents.on('will-redirect', guard);
     window.webContents.on('will-attach-webview', event => event.preventDefault());
     window.webContents.setWindowOpenHandler(({ url }) => {
-      try { const parsed = new URL(url); this.lastNavigation = { path: parsed.origin + parsed.pathname, allowed: isFeiguaNavigation(url) }; } catch { this.lastNavigation = { allowed: false }; }
-      if (isFeiguaNavigation(url)) void window.loadURL(url).catch(() => {});
+      try { const parsed = new URL(url); this.lastNavigation = { path: parsed.origin + parsed.pathname, allowed: isFeiguaNavigation(url, this.loginEntryUrl) }; } catch { this.lastNavigation = { allowed: false }; }
+      if (isFeiguaNavigation(url, this.loginEntryUrl)) void window.loadURL(url).catch(() => {});
       return { action: 'deny' };
     });
     window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); });
@@ -101,10 +113,16 @@ export class FeiguaBrowser {
   }
 
   async openLogin() {
+    if (!this.loginEntryUrl) throw issue('请先配置并保存登录入口网址', 'FEIGUA_ENTRY_REQUIRED');
+    this.stopLoginWatch();
+    this.onAuthChange?.({ status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台' });
     this.ensureWindow(true);
-    if (!isFeiguaDataUrl(this.window.webContents.getURL())) await this.navigate(FEIGUA_HOME);
-    const auth = await this.execute('auth');
-    if (!auth.authenticated && !auth.workspaceAvailable && !auth.actionRequired) await this.execute('login');
+    try { await this.window.loadURL(this.loginEntryUrl); }
+    catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
+    if (isFeiguaDataUrl(this.window.webContents.getURL())) {
+      const auth = await this.execute('auth');
+      if (!auth.authenticated && !auth.workspaceAvailable && !auth.actionRequired) await this.execute('login');
+    }
     this.startLoginWatch();
   }
 
@@ -123,6 +141,7 @@ export class FeiguaBrowser {
       try {
         if (!isFeiguaDataUrl(loginWindow.webContents.getURL())) return;
         const auth = await this.resolveAuth();
+        if (this.window !== loginWindow || loginWindow.isDestroyed()) return;
         if (!auth.authenticated && auth.workspaceAvailable) {
           const currentUrl = loginWindow.webContents.getURL();
           if (enteredUrls.has(currentUrl)) return;
@@ -150,9 +169,14 @@ export class FeiguaBrowser {
   }
 
   async checkLogin() {
+    if (!this.loginEntryUrl && (!this.window || this.window.isDestroyed?.())) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     this.ensureWindow();
-    if (!this.window.webContents.getURL()) await this.navigate(FEIGUA_HOME);
-    if (!isFeiguaDataUrl(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在飞瓜窗口完成登录' };
+    if (!this.window.webContents.getURL()) {
+      if (!this.loginEntryUrl) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
+      try { await this.window.loadURL(this.loginEntryUrl); }
+      catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
+    }
+    if (!isFeiguaDataUrl(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台' };
     let auth = await this.resolveAuth();
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();

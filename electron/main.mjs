@@ -2645,6 +2645,7 @@ if (hasSingleInstanceLock) {
   registerProtectedHandle("aliyun-subtitle-state", async () => (await getAliyunSubtitleService()).publicState());
   for (const [channel, method] of Object.entries({
     "feigua-state": "state", "feigua-save-keywords": "saveKeywords", "feigua-login": "login",
+    "feigua-save-login-entry": "saveLoginEntryUrl",
     "feigua-check-login": "checkLogin", "feigua-start": "start", "feigua-cancel": "cancel",
     "feigua-save-music-tag": "saveMusicTag", "feigua-refresh-music-tags": "refreshMusicTags",
     "feigua-save-refresh-music-tag": "saveAndRefreshMusicTag",

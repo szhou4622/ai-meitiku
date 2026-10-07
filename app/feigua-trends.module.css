@@ -11,6 +11,9 @@
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .heading p { margin-top: 5px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.loginEntry { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; color: #34595c; font-size: 12px; }
+.loginEntry input { flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #d5e1e2; border-radius: 7px; background: white; color: #29494c; font: inherit; }
+.loginEntry small { flex-basis: 100%; color: #728489; font-size: 11px; }
 .connection { display: flex; align-items: center; gap: 8px; color: #718185; font-size: 12px; margin: 22px 0; }
 .connection > span:last-child { margin-left: auto; }
 .dot,.online { width: 7px; height: 7px; border-radius: 50%; background: #a3afb0; }

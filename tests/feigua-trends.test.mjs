@@ -15,7 +15,7 @@ const capture = (kind, keyword = null, extra = {}) => ({
 });
 
 function fixture({ stored, collect, auth, write } = {}) {
-  let disk = stored || { version: 1, keywords: [], runs: [] };
+  let disk = stored || { version: 1, loginEntryUrl: 'https://dy.feigua.cn/', keywords: [], runs: [] };
   const calls = [];
   const browser = {
     async openLogin() {}, async checkLogin() { return auth || { status: 'authenticated', message: '已登录' }; },

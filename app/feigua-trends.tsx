@@ -13,9 +13,10 @@ type Run = { id: string; startedAt: string; finishedAt: string | null; status: s
 type MusicTagOption = { label: string; children: { label: string }[] };
 type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
 type CategoryOption = { label: string; children: CategoryOption[] };
-type State = { keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null; catalogMessage?: string | null };
+type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
+  saveLoginEntryUrl: (url: string) => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
   saveAndRefreshVideoQueries: (queries: VideoQuery[], options?: { changedOnly: boolean }) => Promise<State>;
   saveMusicTag: (path: string[]) => Promise<State>;
@@ -102,6 +103,7 @@ function CategorySelect({ label, options, path, disabled, onChange }: { label: s
 
 export function FeiguaTrends() {
   const [state, setState] = useState<State>(emptyState);
+  const [loginEntryUrl, setLoginEntryUrl] = useState('');
   const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
   const keywords = videoQueries.map(query => query.keyword);
   const [musicTag, setMusicTag] = useState<string[]>([]);
@@ -118,6 +120,7 @@ export function FeiguaTrends() {
   const settingsPanel = useRef<HTMLDetailsElement>(null);
   const dirty = JSON.stringify(videoQueries) !== JSON.stringify(savedVideoQueries(state));
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
+  const loginEntryDirty = loginEntryUrl.trim() !== (state.loginEntryUrl || '');
   const editorDirty = !!input.trim() || editing !== null || !!inputCategoryPath.length || !!inputTagPath.length;
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
   const secondTags = firstTag?.children || [];
@@ -137,7 +140,7 @@ export function FeiguaTrends() {
         const next = await api.state();
         if (!alive) return;
         setDesktop(true); setState({ ...emptyState, ...next }); setLoaded(true);
-        if (!initialized.current) { setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
+        if (!initialized.current) { setLoginEntryUrl(next.loginEntryUrl || ''); setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
       } catch { if (alive) { setError('热点数据读取失败，请重试；原有数据不会被覆盖。'); setLoaded(true); } }
       finally { pending = false; }
     };
@@ -152,6 +155,7 @@ export function FeiguaTrends() {
     setAction(name); setError('');
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
+      if (name === 'entry-save') setLoginEntryUrl(next.loginEntryUrl || '');
       if (name === 'video-save' || name === 'video-change') {
         setVideoQueries(savedVideoQueries(next)); setSelectedRun('');
         if (name === 'video-save' && settingsPanel.current) settingsPanel.current.open = false;
@@ -190,11 +194,17 @@ export function FeiguaTrends() {
     <header className={styles.heading}>
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
-        <button disabled={disabled || state.busy} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />登录飞瓜</button>
+        <button disabled={disabled || state.busy || loginEntryDirty || !state.loginEntryUrl} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />打开登录入口</button>
         {state.busy ? <button disabled={disabled} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止采集</button>
-          : <button className={styles.primary} disabled={disabled || dirty || musicDirty || editorDirty || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
+          : <button className={styles.primary} disabled={disabled || loginEntryDirty || dirty || musicDirty || editorDirty || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
       </div>
     </header>
+    <form className={styles.loginEntry} onSubmit={event => { event.preventDefault(); void perform('entry-save', api => api.saveLoginEntryUrl(loginEntryUrl)); }}>
+      <label htmlFor="feigua-login-entry">登录入口网址</label>
+      <input id="feigua-login-entry" type="url" value={loginEntryUrl} onChange={event => setLoginEntryUrl(event.target.value)} placeholder="输入你的登录入口（http:// 或 https://）" maxLength={2048} disabled={disabled || state.busy} autoComplete="off" spellCheck={false} />
+      <button type="submit" disabled={disabled || state.busy || !loginEntryDirty}>{action === 'entry-save' ? '保存中…' : '保存网址'}</button>
+      <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
+    </form>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
