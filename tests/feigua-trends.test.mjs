@@ -558,7 +558,7 @@ test('provider window is sandboxed and reuses its own persistent session without
   const partition = new EventEmitter();
   Object.assign(partition, { setPermissionRequestHandler: handler => { permissions = handler; }, setPermissionCheckHandler() {}, webRequest: { onBeforeRequest() {}, onCompleted() {}, onErrorOccurred() {} } });
   class Window extends EventEmitter {
-    constructor(opts) { super(); options = opts; this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler: handler => { popup = handler; } }); }
+    constructor(opts) { super(); options = opts; this.webContents = new EventEmitter(); Object.assign(this.webContents, { getURL: () => '', setWindowOpenHandler: handler => { popup = handler; } }); }
     isDestroyed() { return false; } show() {} focus() {} loadURL() { return Promise.resolve(); }
   }
   const browser = new FeiguaBrowser({ BrowserWindow: Window, session: { fromPartition: name => { assert.equal(name, 'persist:feigua-trends'); return partition; } } });

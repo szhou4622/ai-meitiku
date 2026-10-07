@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { normalizeLoginEntryUrl } from '../electron/feigua-login-entry.mjs';
+import { normalizeLoginEntryUrl, isLoginEntryHandoff } from '../electron/feigua-login-entry.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { FeiguaService } from '../electron/feigua-service.mjs';
 
@@ -59,6 +59,28 @@ test('a failed save keeps the previous entry and browser session active', async 
   assert.equal((await service.state()).loginEntryUrl, entry);
   assert.equal((await service.state()).auth.status, 'authenticated');
   assert.deepEqual(calls, [['configure', entry]]);
+});
+
+test('a portal may open its same-server gateway on another port without trusting unrelated hosts', async () => {
+  const { browser, loaded, handlers } = browserFixture();
+  browser.setLoginEntryUrl(entry);
+  await browser.openLogin();
+  const gateway = 'http://192.0.2.10:13042/login?session=synthetic';
+  assert.equal(isFeiguaNavigation(gateway, entry), false);
+  assert.equal(isLoginEntryHandoff(gateway, entry), true);
+  for (const url of ['http://foreign.example:13042/', 'http://user:password@192.0.2.10:13042/', 'https://192.0.2.10:13042/']) assert.equal(isLoginEntryHandoff(url, entry), false);
+  handlers.get('popup')({ url: gateway });
+  assert.equal(loaded.at(-1), gateway);
+  let prevented = false;
+  browser.window.webContents.emit('will-redirect', { preventDefault: () => { prevented = true; } }, 'http://192.0.2.10:13042/workspace');
+  assert.equal(prevented, false);
+  browser.window.webContents.emit('will-redirect', { preventDefault: () => { prevented = true; } }, 'http://192.0.2.10:13045/workspace');
+  assert.equal(prevented, true);
+  handlers.get('popup')({ url: 'http://192.0.2.10:13045/' });
+  assert.equal(loaded.at(-1), gateway); // A gateway cannot grant itself new ports.
+  browser.setLoginEntryUrl('https://new-portal.example/');
+  assert.equal(browser.loginRelayOrigins.size, 0);
+  browser.stopLoginWatch();
 });
 
 function browserFixture() {

@@ -13,3 +13,14 @@ export function isLoginEntryNavigation(value, entryUrl) {
   try { return new URL(normalizeLoginEntryUrl(value)).origin === new URL(normalizeLoginEntryUrl(entryUrl)).origin; }
   catch { return false; }
 }
+
+// Some login portals open their provider gateway on another port of the same
+// server. Permit that handoff only when processing a popup from the portal.
+export function isLoginEntryHandoff(value, entryUrl) {
+  if (!entryUrl) return false;
+  try {
+    const target = new URL(normalizeLoginEntryUrl(value));
+    const entry = new URL(normalizeLoginEntryUrl(entryUrl));
+    return target.protocol === entry.protocol && target.hostname === entry.hostname;
+  } catch { return false; }
+}
