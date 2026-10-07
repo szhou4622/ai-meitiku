@@ -40,6 +40,10 @@ export class FeiguaService {
     this.browser = browser;
     this.retryWait = retryWait;
     this.browser.onWorkspaceVerified = hint => this.saveWorkspaceHint(hint);
+    this.browser.onVideoDetailProgress = ({ index, total }) => {
+      const run = this.data.runs[0];
+      if (this.controller && run?.status === 'running') run.message = `已取得视频榜单，正在核验补充信息（${index}/${total} 条）`;
+    };
     this.data = initial();
     this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
     this.autoCollectRequested = false;

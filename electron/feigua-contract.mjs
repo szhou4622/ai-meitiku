@@ -1,3 +1,4 @@
+import { VIDEO_DETAIL_ENDPOINTS } from './feigua-video-details.mjs';
 export const FEIGUA_HOME = 'https://dy.feigua.cn/';
 export const FEIGUA_SOURCES = Object.freeze({
   music: { label: '本周爆款 BGM Top5', navigation: ['热门音乐'], sort: '昨日使用人数', period: '昨日使用人数', fields: ['title', 'author', 'totalUsers', 'yesterdayUsers'] },
@@ -176,10 +177,17 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     const clean = { id, url, rank: rows.length + 1 };
     for (const field of source.fields) {
       clean[field] = field === 'products'
-        ? (Array.isArray(row.products) ? row.products.slice(0, 30).map(product => ({ title: value(product?.title), commission: value(product?.commission, 60) })).filter(product => product.title) : [])
+        ? (Array.isArray(row.products) ? row.products.slice(0, 30).map(product => ({ title: value(product?.title), commission: value(product?.commission, 60),
+          ...(value(product?.id,160) ? {id:value(product.id,160)} : {}), ...(typeof product?.hasCommission==='boolean'?{hasCommission:product.hasCommission}:{}) })).filter(product => product.title) : [])
         : value(row[field]);
     }
     clean.missingFields = source.fields.filter(field => field === 'products' ? row.productsIncomplete === true || !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
+    if (kind === 'videos') {
+      for (const field of ['comments','shares','collects']) clean[field] = value(row[field]);
+      if (row.playsScope === 'detail-total' && clean.plays) clean.playsScope = 'detail-total';
+      clean.fieldAvailability = Object.fromEntries(['plays','commission'].filter(field => ['source_unavailable','restricted','lookup_failed'].includes(row.fieldAvailability?.[field])).map(field => [field,row.fieldAvailability[field]]));
+      if (row.detailProvenance?.transport === 'provider-api' && /^\d{8}$/.test(row.detailProvenance.dateCode)) clean.detailProvenance = {transport:'provider-api',dateCode:row.detailProvenance.dateCode,endpoints:Object.values(VIDEO_DETAIL_ENDPOINTS)};
+    }
     rows.push(clean);
     if (rows.length === 5) break;
   }

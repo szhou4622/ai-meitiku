@@ -5,6 +5,7 @@ import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, no
 import { FEIGUA_ENDPOINTS, observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 import { normalizeLoginCredentials, loginFormMemory } from './feigua-login-credentials.mjs';
 import { fileURLToPath } from 'node:url';
+import { VIDEO_DETAIL_ENDPOINTS, observeVideoDetailRequest, readVideoDetailsApi, enrichVideoRow, videoPublishedDate } from './feigua-video-details.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
@@ -13,7 +14,7 @@ function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
 export function isCollectionLoadingRequest(details, windowId, sourceOrigin) {
   if (windowId == null || details.webContentsId !== windowId || !isFeiguaDataUrl(details.url, sourceOrigin)) return false;
   if (details.resourceType === 'mainFrame') return true;
-  try { return ['xhr', 'fetch'].includes(details.resourceType) && Object.values(FEIGUA_ENDPOINTS).includes(new URL(details.url).pathname); }
+  try { return ['xhr', 'fetch'].includes(details.resourceType) && [...Object.values(FEIGUA_ENDPOINTS), ...Object.values(VIDEO_DETAIL_ENDPOINTS)].includes(new URL(details.url).pathname); }
   catch { return false; }
 }
 
@@ -35,6 +36,7 @@ export class FeiguaBrowser {
     this.loginRelayOrigins = new Set();
     this.requestSequence = 0;
     this.rankingRequests = [];
+    this.detailRequests = [];
     this.verifiedSourceOrigin = null;
     this.workspaceHint = null;
     this.credentialStore = credentialStore;
@@ -158,6 +160,8 @@ export class FeiguaBrowser {
         if (this.window && details.webContentsId === this.window.webContents.id) {
           const request = observeFeiguaRequest(details, this.verifiedSourceOrigin);
           if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
+          const detailRequest = observeVideoDetailRequest(details, this.verifiedSourceOrigin);
+          if (detailRequest) this.detailRequests = [...this.detailRequests, { ...detailRequest, sequence: ++this.requestSequence }].slice(-30);
         }
         callback({});
       });
@@ -446,7 +450,48 @@ export class FeiguaBrowser {
         capture.musicTagRestricted = catalog.restricted;
       } else if (kind === 'videos') capture.videoFilterOptions = await this.execute('video-filter-options');
     } catch { capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验'; }
+    if (kind === 'videos' && Array.isArray(capture.rows)) await this.enrichVideoFields(capture, signal);
     return capture;
+  }
+
+  async enrichVideoFields(capture, signal) {
+    let blocked = null;
+    for (let index = 0; index < Math.min(capture.rows.length, 5); index++) {
+      if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+      const row = capture.rows[index];
+      if (row.plays && !row.productsIncomplete && row.products?.every(product => product.commission)) continue;
+      this.onVideoDetailProgress?.({ index: index + 1, total: Math.min(capture.rows.length, 5) });
+      let detail = { state: blocked || 'lookup_failed' };
+      const dateCode = videoPublishedDate(row.publishedAt);
+      if (!blocked && row.url && dateCode && new URL(row.url).origin === new URL(capture.url).origin) {
+        try {
+          await this.navigate(row.url);
+          await this.resolveAuth(signal);
+          await this.settle(signal);
+          const since = this.requestSequence;
+          const response = this.window.webContents.executeJavaScript(`(${readVideoDetailsApi.toString()})(${JSON.stringify({ videoId: String(row.id), dateCode })})`);
+          detail = await new Promise((resolve, reject) => {
+            const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+            const abort = () => { cleanup(); reject(issue('已取消采集', 'FEIGUA_CANCELLED')); };
+            const timer = setTimeout(() => { cleanup(); reject(issue('视频详情核验超时', 'FEIGUA_NETWORK')); }, 25000);
+            signal?.addEventListener('abort', abort, { once: true });
+            Promise.resolve(response).then(value => { cleanup(); resolve(value); }, () => { cleanup(); resolve({ state: 'lookup_failed' }); });
+            if (signal?.aborted) abort();
+          });
+          if (detail?.state === 'verified') {
+            const observed = this.detailRequests.filter(request => request.sequence > since);
+            const verified = Object.values(VIDEO_DETAIL_ENDPOINTS).every(endpoint => observed.some(request => request.endpoint === endpoint && request.videoId === String(row.id) && request.dateCode === dateCode));
+            if (!verified || new URL(this.window.webContents.getURL()).origin !== new URL(capture.url).origin) detail = { state: 'lookup_failed' };
+          }
+        } catch (error) {
+          if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+          detail = { state: error.code === 'FEIGUA_AUTH_REQUIRED' ? 'auth_required' : 'lookup_failed' };
+        }
+      }
+      if (['auth_required', 'quota_exhausted', 'rate_limited'].includes(detail?.state)) blocked = detail.state;
+      if (detail?.state === 'auth_required') this.onAuthChange?.({ status: 'expired', message: '飞瓜登录已失效，列表已保留，请重新登录后补充详情' });
+      capture.rows[index] = enrichVideoRow(row, detail);
+    }
   }
 
   async readRanking(kind, context, since, signal) {

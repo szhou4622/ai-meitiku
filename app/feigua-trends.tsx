@@ -6,7 +6,7 @@ import styles from './feigua-trends.module.css';
 import { displayedFeiguaGroups } from './feigua-results.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
-type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
+type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
 type Result = { collectedAt: string; dateRange: string | null; dateWarning?: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
 type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; categoryPath?: string[]; tagPath?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
@@ -34,6 +34,8 @@ const names: Record<string, string> = { pending: '等待采集', running: '采�
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
+const unavailable = (state?: string) => state === 'source_unavailable' ? '来源未提供' : state === 'restricted' ? '来源访问受限' : state === 'lookup_failed' ? '详情暂未核验' : '未取得';
+const missingLabels: Record<string,string> = {plays:'播放数',products:'商品 / 佣金率',author:'达人名称',followers:'粉丝数',likes:'点赞数',sales:'销售额',publishedAt:'发布时间',title:'视频标题'};
 const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
 
 function ResultFooter({ result }: { result: Result }) {
@@ -63,12 +65,12 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
       <div className={styles.rowContent}>
         <h4 title={row.title}>{row.title}</h4>
         {kind === 'videos' && <>
-          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{product.title}<small>佣金率 {display(product.commission)}</small></p>) : <p>关联商品未取得</p>}</div>
+          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{product.title}<small title={product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}</small></p>) : <p>关联商品未取得</p>}</div>
           <p>{display(row.author)} · 粉丝 {display(row.followers)}</p>
-          <dl><div><dt>播放</dt><dd>{display(row.plays)}</dd></div><div><dt>点赞</dt><dd>{display(row.likes)}</dd></div><div><dt>销售额</dt><dd>{display(row.sales)}</dd></div></dl>
+          <dl><div><dt>{row.playsScope === 'detail-total' ? '累计播放（详情）' : '播放'}</dt><dd>{row.plays || unavailable(row.fieldAvailability?.plays)}</dd></div><div><dt>点赞</dt><dd>{display(row.likes)}</dd></div><div><dt>销售额</dt><dd>{display(row.sales)}</dd></div><div><dt>评论</dt><dd>{display(row.comments)}</dd></div><div><dt>分享</dt><dd>{display(row.shares)}</dd></div><div><dt>收藏</dt><dd>{display(row.collects)}</dd></div></dl>
           {row.publishedAt && <small>发布时间 {row.publishedAt}</small>}
         </>}
-        {!!row.missingFields.length && <small className={styles.missing}>部分字段未取得</small>}
+        {!!row.missingFields.length && <small className={styles.missing}>{kind === 'videos' ? `未取得：${row.missingFields.map(field=>missingLabels[field]||field).join('、')}` : '部分字段未取得'}</small>}
       </div>
     </li>)}
   </ol>;
@@ -276,7 +278,7 @@ export function FeiguaTrends() {
         const actual = group.result ? group.result.filters : group;
         const changed = configured && (JSON.stringify(configured.categoryPath) !== JSON.stringify(actual?.categoryPath || []) || JSON.stringify(configured.tagPath) !== JSON.stringify(actual?.tagPath || []));
         const status = group.refreshStatus || group.status;
-        return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : names[group.status]}</small></h3>
+        return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : group.result?.rows.some(row=>row.missingFields.length) ? '榜单已采集 · 部分信息不可用' : names[group.status]}</small></h3>
           <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
           {changed && <p>已保存设置 · 带货品类：{pathLabel(configured.categoryPath)} · 视频标签：{pathLabel(configured.tagPath)}（当前结果尚未更新）</p>}
           {['pending', 'running', 'retrying', 'failed', 'cancelled', 'interrupted'].includes(status) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
