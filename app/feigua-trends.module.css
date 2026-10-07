@@ -63,6 +63,9 @@
 .rank { font-size: 12px; color: #8aa3a5; font-variant-numeric: tabular-nums; padding-top: 2px; }
 .rowContent { flex: 1; min-width: 0; }
 .rowContent h4 { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.contentLink { color: inherit; text-decoration: underline; text-decoration-color: #b7d5d1; text-underline-offset: 3px; }
+.contentLink:hover { color: #168c82; text-decoration-color: currentColor; }
+.contentLink:focus-visible { outline: 2px solid #229d93; outline-offset: 3px; border-radius: 2px; }
 .rowContent p { font-size: 11px; margin-top: 4px; }
 .rowContent dl { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
 .rowContent dt { color: #8a9b9e; font-size: 10px; }

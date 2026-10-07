@@ -37,6 +37,18 @@ const row = {
 };
 const response = () => ({code:200,success:true,data:{Total:1,PageIndex:1,TimeRangeStr:null,list:[structuredClone(row)]}});
 
+test('ranking response retains verified public video and product links while ignoring gateway destinations', () => {
+  const raw = response(); const entry = raw.data.list[0];
+  entry.AwemeId = '7000000000000000001';
+  entry.VideoUrl = 'https://www.douyin.com/share/video/7000000000000000001/?mid=7000000000000000002';
+  entry.product.PromotionUrl = 'https://haohuo.jinritemai.com/ecommerce/trade/detail/index.html?id=3000000000000000001';
+  const result = captureFeiguaResponse('videos',request('videos'),contexts.videos,raw).rows[0];
+  assert.equal(result.videoUrl, 'https://www.douyin.com/video/7000000000000000001');
+  assert.equal(result.products[0].url, entry.product.PromotionUrl);
+  entry.product.PromotionUrl = 'https://dy.feigua.cn/app/#/goods-detail/index';
+  assert.equal(captureFeiguaResponse('videos',request('videos'),contexts.videos,raw).rows[0].products[0].url, null);
+});
+
 test('observes only verified ranking GET endpoints and excludes transport secrets',()=>{
   for(const kind of Object.keys(FEIGUA_ENDPOINTS)){
     const expected=request(kind);

@@ -1,3 +1,5 @@
+import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
+
 export const VIDEO_DETAIL_ENDPOINTS = Object.freeze({
   main: '/api/v3/aweme/detail/detail/mainPart',
   products: '/api/v3/aweme/detail/detail/promotions',
@@ -50,8 +52,8 @@ export async function readVideoDetailsApi({ videoId, dateCode }) {
   const [main, products] = responses;
   if (String(main?.AwemeId) !== videoId || String(main?.DateCode) !== dateCode || !Array.isArray(products) || products.length > 30) return { state: 'lookup_failed' };
   const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) || value === null ? value : null;
-  return { state: 'verified', videoId, dateCode, playsText: scalar(main.PlayCountStr), playsCount: scalar(main.PlayCount),
-    products: products.map(row => ({ id: row.Goods?.Gid == null ? null : String(row.Goods.Gid), title: scalar(row.Goods?.Title), commission: scalar(row.Goods?.CosRatio), hasCommission: scalar(row.Goods?.HasCos) })) };
+  return { state: 'verified', videoId, dateCode, videoUrl: scalar(main.VideoUrl), playsText: scalar(main.PlayCountStr), playsCount: scalar(main.PlayCount),
+    products: products.map(row => ({ id: row.Goods?.Gid == null ? null : String(row.Goods.Gid), title: scalar(row.Goods?.Title), commission: scalar(row.Goods?.CosRatio), hasCommission: scalar(row.Goods?.HasCos), url: scalar(row.Goods?.PromotionLink) })) };
 }
 
 const count = value => {
@@ -71,6 +73,7 @@ export function enrichVideoRow(row, detail) {
     if (clean.products?.some(product => !product.commission)) clean.fieldAvailability.commission = state;
     return clean;
   }
+  clean.videoUrl = feiguaVideoLink(clean.videoUrl, row.id) || feiguaVideoLink(detail.videoUrl, row.id);
   if (!clean.plays) {
     // A raw zero with no formatted display value is the provider's placeholder.
     const plays = count(detail.playsText) || (Number(detail.playsCount) > 0 ? count(detail.playsCount) : null);
@@ -86,7 +89,7 @@ export function enrichVideoRow(row, detail) {
       // Display a source-provided 0.00% verbatim, including when HasCos is false.
       // Preserve that flag so the UI doesn't imply an available promotion.
       const ratio = commission(product.commission);
-      return { id: product.id, title: product.title, commission: previous?.commission || ratio,
+      return { id: product.id, title: product.title, commission: previous?.commission || ratio, url: feiguaProductLink(product.url) || feiguaProductLink(previous?.url),
         hasCommission: previous?.commission ? previous.hasCommission : product.hasCommission,
         commissionAvailability: previous?.commission || ratio ? product.hasCommission === false ? 'source_display_only' : 'available' : 'source_unavailable' };
     });
