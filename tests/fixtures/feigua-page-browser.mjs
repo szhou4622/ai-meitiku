@@ -93,12 +93,13 @@ try {
   const customMusic = run('capture', {kind:'music',sort:'昨日使用人数',period:'昨日使用人数'});
   assert('新版列表表头与数据行分离仍正确提取', customMusic.rows.length === 1 && customMusic.rows[0].yesterdayUsers === '5w');
   await mount(shell + `<div><input readonly value="视频关键词"><input placeholder="请输入视频标题关键词或链接搜索"><button id="search">模糊搜索</button></div><span id="filters"></span>
-    <div class="permission-wrapper active"><button><span>近7天</span></button></div>
-    <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01">
+    <div id="video-period"><span>时间周期</span><div class="permission-wrapper active"><button><span>近7天</span></button></div>
+    <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01"></div>
     <table><thead><tr><th>带货视频/发布时间</th><th>关联商品</th><th>达人</th><th aria-sort="descending">视频销售额</th><th>点赞</th></tr></thead><tbody>
     <tr><td><a href="https://dy.feigua.cn/synthetic/video/1" title="合成完整标题">合成标题…</a><p>09/26 16:00</p></td><td><a href="https://dy.feigua.cn/synthetic/product/1">合成商品</a><span>佣金率 5.00%</span></td><td><a href="https://dy.feigua.cn/synthetic/author/1">合成达人</a><span>粉丝数：10w</span></td><td>10w~25w</td><td>5000</td></tr>
     </tbody></table>`);
   assert('新版时间周期选中状态核验', run('choice', {label:'近7天',verify:true}).verified === true);
+  assert('视频快捷周期同时核验七天日期',run('video-period',{verify:true}).dateRange==='2026-09-25 - 2026-10-01');
   frame.contentDocument.querySelector('#search').onclick = () => { frame.contentDocument.querySelector('#filters').textContent = `视频关键词：${frame.contentDocument.querySelector('input:not([readonly])').value}`; };
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
@@ -256,5 +257,49 @@ try {
   assert('接口采集上下文只回读控件，不携带表格数据',context.dateRange==='2026-10-01'&&!Object.hasOwn(context,'rows'));
   frame.contentDocument.querySelector('section').remove();
   assert('表格不存在也能完成接口请求的筛选上下文核验',run('capture-context',hotspotArgs).filtersVerified===true);
+  {
+    const dates='<div id="statistics"><span>时间周期</span><div class="el-date-editor--daterange"><input placeholder="开始日期" value="2026-10-01"><input placeholder="结束日期" value="2026-10-07"></div></div>';
+    const categories=['带货品类','视频标签'].map(label=>`<div class="tag-cascader"><span class="tag-label">${label}</span></div>`).join('');
+    await mount(shell + dates + categories + '<div><input readonly value="视频关键词"><input value="合成词"><button>模糊搜索</button></div><span>视频关键词：合成词</span><section id="publication"><span>发布时间段</span><button class="active">近7天</button><input placeholder="开始日期" value="2026-09-01"><input placeholder="结束日期" value="2026-10-07"></section>');
+    frame.contentWindow.Date.now=()=>Date.parse('2026-10-07T14:00:00Z');
+    for(const root of frame.contentDocument.querySelectorAll('.tag-cascader'))root.__vue__={$props:{value:['0'],options:[{Id:'0',Name:'全部',Sub:[]}]}};
+    const doc=frame.contentDocument,root=doc.querySelector('#statistics'),start=root.querySelector('input'),end=root.querySelectorAll('input')[1];
+    let clicks=0;root.onclick=()=>{clicks++;};
+    assert('没有快捷按钮时直接核验真实近7天日期',run('video-period').verified===true&&clicks===0);
+    assert('无快捷按钮的 API 上下文忽略发布时间筛选日期',run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).dateRange==='2026-10-01 - 2026-10-07');
+    start.value='2026-09-24';end.value='2026-09-30';
+    assert('任意历史七天不冒充当前近7天',run('video-period',{verify:true}).verified===false);
+    assert('其他筛选区的同名快捷按钮不能代替统计周期',run('video-period').calendar===true);
+    assert('请求期间周期变化不能继续保存',Boolean(run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).error));
+    start.value='2026-02-30';end.value='2026-03-08';
+    assert('无效日历日期不能通过',run('video-period',{verify:true}).verified===false);
+    start.value='2026-10-01';end.value='2026-10-07';
+    const duplicate=start.cloneNode();root.append(duplicate);
+    assert('同一统计控件日期重复时拒绝猜测',Boolean(run('video-period',{verify:true}).error));duplicate.remove();
+    const mask=doc.createElement('div');mask.className='purview-mask-layer';root.append(mask);
+    assert('时间周期权限遮罩不可穿透',/权限/.test(run('video-period').error)&&clicks===0);mask.remove();
+    root.querySelector('span').textContent='未知时间';
+    assert('缺少时间周期标识不能使用发布时间',Boolean(run('video-period').error));
+  }
+  {
+    await mount(shell + '<div><span>时间周期</span><div class="el-date-editor--daterange"><input placeholder="开始日期" value="2026-11-01"><input placeholder="结束日期" value="2026-11-07"></div></div><div id="own" class="el-date-range-picker" style="display:none"><div class="el-date-range-picker__content"><div class="el-date-range-picker__header"><button class="el-icon-arrow-left"></button><div>2026 年 10 月</div></div><table class="el-date-table"><tbody><tr><td class="available"><span>28</span></td></tr></tbody></table></div><div class="el-date-range-picker__content"><div class="el-date-range-picker__header"><button class="el-icon-arrow-right"></button><div>2026 年 11 月</div></div><table class="el-date-table"><tbody><tr><td class="available"><span>3</span></td></tr></tbody></table></div></div><div class="el-date-range-picker"><button>28</button></div>');
+    frame.contentWindow.Date.now=()=>Date.parse('2027-01-02T16:00:00Z');
+    const doc=frame.contentDocument,editor=doc.querySelector('.el-date-editor--daterange'),panel=doc.querySelector('#own');
+    const props=Object.freeze({disabled:false});editor.__vue__={$props:props,picker:{$el:panel}};
+    editor.onclick=()=>{panel.style.display='block';};
+    let picked=0;const cells=panel.querySelectorAll('td');
+    for(const cell of cells)cell.onclick=()=>{if(++picked===2){editor.querySelectorAll('input')[0].value='2026-12-28';editor.querySelectorAll('input')[1].value='2027-01-03';panel.style.display='none';}};
+    let moves=0;
+    panel.querySelector('.el-icon-arrow-right').onclick=()=>{const headers=panel.querySelectorAll('.el-date-range-picker__header > div');moves++;headers[0].textContent=moves===1?'2026 年 11 月':'2026 年 12 月';headers[1].textContent=moves===1?'2026 年 12 月':'2027 年 1 月';cells[1].querySelector('span').textContent=moves===1?'28':'3';};
+    assert('错误周期请求正常日历选择',run('video-period').calendar===true);
+    assert('通过控件点击打开所属面板',run('video-period',{phase:'open'}).opened===true);
+    assert('跨月仅点击普通月份导航',run('video-period',{phase:'start'}).moved===true);
+    cells[1].classList.add('disabled');
+    assert('禁用日期不能被点击',Boolean(run('video-period',{phase:'start'}).error)&&picked===0);cells[1].classList.remove('disabled');
+    assert('跨年起始日按完整年月识别',run('video-period',{phase:'start'}).picked===true&&picked===1);
+    assert('终止日在下一月时继续普通导航',run('video-period',{phase:'end'}).moved===true&&moves===2);
+    assert('终止日通过正常点击提交',run('video-period',{phase:'end'}).picked===true&&picked===2);
+    assert('选择后核验日期值且不修改 Vue 状态',run('video-period',{verify:true}).dateRange==='2026-12-28 - 2027-01-03'&&editor.__vue__.$props===props);
+  }
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');

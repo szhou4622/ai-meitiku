@@ -185,6 +185,65 @@ export function feiguaPage(command, argument = {}) {
     if (!selected(all)) { if (argument.verify) return { verified: false }; all.click(); return { changed: true }; }
     return { verified: true };
   }
+  if (command === 'video-period') {
+    // Scope to statistics time, never the optional video publication filter.
+    const labels = exact('时间周期');
+    if (labels.length !== 1) return failure('无法唯一识别视频统计时间周期');
+    let root = null;
+    for (let cursor = labels[0].parentElement, depth = 0; cursor && depth < 3; depth++, cursor = cursor.parentElement) {
+      if (elements('input[placeholder="开始日期"]', cursor).length || exact('近7天', cursor).length) { root = cursor; break; }
+    }
+    if (!root || root === document.body || root === document.documentElement) return failure('未能识别视频统计日期控件');
+    if (elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none')) return failure('视频统计时间筛选权限受限');
+    const starts = elements('input[placeholder="开始日期"]', root), ends = elements('input[placeholder="结束日期"]', root);
+    if (starts.length !== 1 || ends.length !== 1) return failure('无法唯一回读视频统计起止日期');
+    const parse = input => {
+      const parts = input.value.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+      if (!parts) return null;
+      const [, y, m, d] = parts.map(Number), date = new Date(Date.UTC(y, m - 1, d));
+      return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date.toISOString().slice(0, 10) : null;
+    };
+    const start = parse(starts[0]), end = parse(ends[0]);
+    const sevenDays = start && end && Date.parse(end) - Date.parse(start) === 6 * 86400000;
+    const shortcuts = exact('近7天', root);
+    if (shortcuts.length > 1) return failure('无法唯一定位统计时间的「近7天」');
+    if (shortcuts.length) {
+      if (selected(shortcuts[0])) return sevenDays ? { verified: true, label: '近7天', dateRange: `${start} - ${end}` } : failure('近7天选项与实际统计日期不一致');
+      if (argument.verify) return { verified: false };
+      shortcuts[0].click(); return { changed: true };
+    }
+    const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    const first = new Date(Date.parse(today) - 6 * 86400000).toISOString().slice(0, 10);
+    const verified = start === first && end === today;
+    if (verified) return { verified: true, label: '近7天', dateRange: `${start} - ${end}` };
+    if (argument.verify) return { verified: false };
+    if (!argument.phase) return { calendar: true };
+    const editors = elements('.el-date-editor--daterange', root);
+    const editor = editors.length === 1 ? editors[0] : null;
+    if (!editor || editor.classList.contains('is-disabled') || editor.__vue__?.$props?.disabled) return failure('视频统计日期控件不可用');
+    if (argument.phase === 'open') { editor.click(); return { opened: true }; }
+    if (!['start', 'end'].includes(argument.phase)) return failure('未知视频统计日期操作');
+    // Read this widget's own detached panel, and interact through normal clicks.
+    const panel = editor.__vue__?.picker?.$el;
+    if (!visible(panel) || !panel.matches('.el-date-range-picker')) return failure('未能打开视频统计日期面板');
+    const target = argument.phase === 'start' ? first : today;
+    const calendars = elements('.el-date-range-picker__content', panel).map(calendar => {
+      const match = text(calendar.querySelector('.el-date-range-picker__header')).match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+      return match ? { calendar, year: Number(match[1]), month: Number(match[2]), key: Number(match[1]) * 12 + Number(match[2]) - 1 } : null;
+    });
+    if (calendars.length !== 2 || calendars.some(item => !item || item.month < 1 || item.month > 12)) return failure('无法核对日期面板的年月');
+    const [year, month, day] = target.split('-').map(Number), key = year * 12 + month - 1;
+    const matching = calendars.filter(item => item.key === key);
+    if (!matching.length) {
+      const direction = key < Math.min(...calendars.map(item => item.key)) ? 'left' : key > Math.max(...calendars.map(item => item.key)) ? 'right' : null;
+      const buttons = direction ? elements(`button.el-icon-arrow-${direction}`, panel).filter(button => !button.disabled && !button.classList.contains('is-disabled')) : [];
+      if (buttons.length !== 1) return failure('无法切换到近7天所在月份');
+      buttons[0].click(); return { moved: true };
+    }
+    const cells = matching.flatMap(item => elements('.el-date-table td', item.calendar)).filter(cell => !cell.classList.contains('prev-month') && !cell.classList.contains('next-month') && compact(cell) === String(day));
+    if (cells.length !== 1 || cells[0].classList.contains('disabled') || !cells[0].classList.contains('available')) return failure('近7天所需日期不可选择');
+    cells[0].click(); return { picked: true };
+  }
   if (command === 'choice') {
     const matches = exact(argument.label);
     if (matches.length !== 1) return failure(`无法唯一定位「${argument.label}」`);
@@ -238,8 +297,10 @@ export function feiguaPage(command, argument = {}) {
     const videoTag = argument.kind === 'videos' ? musicTagData('视频标签') : null;
     if (hasCategory && (!Array.isArray(category?.path) || category.unsupportedDepth)) return failure('无法核对榜单分类，本组未保存');
     if (argument.kind === 'videos' && (!Array.isArray(videoCategory?.path) || !Array.isArray(videoTag?.path))) return failure('无法核对视频分类，本组未保存');
-    const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : argument.kind === 'videos' ? [argument.period] : [];
-    let period = '昨日使用人数';
+    const videoPeriod = argument.kind === 'videos' ? feiguaPage('video-period', { verify: true }) : null;
+    if (videoPeriod && !videoPeriod.verified) return failure(videoPeriod.error || '视频统计周期未生效，本组未保存');
+    const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : [];
+    let period = videoPeriod?.label || '昨日使用人数';
     for (const label of choices) {
       const current = feiguaPage('choice', { label, verify: true });
       if (!current.verified) return failure('榜单类型或周期未生效，本组未保存');
@@ -258,7 +319,7 @@ export function feiguaPage(command, argument = {}) {
     const date = '\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}';
     const ranges = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}\\s*[-~～至]\\s*${date}$`).test(value)))];
     const days = [...new Set(inputs.map(input => input.value.trim()).filter(value => new RegExp(`^${date}$`).test(value)))];
-    const dateRange = argument.kind === 'music' ? null : argument.kind === 'hotspots' ? days.length === 1 ? days[0] : null
+    const dateRange = argument.kind === 'videos' ? videoPeriod.dateRange : argument.kind === 'music' ? null : argument.kind === 'hotspots' ? days.length === 1 ? days[0] : null
       : starts.length === 1 && ends.length === 1 ? `${starts[0].value} - ${ends[0].value}` : ranges.length === 1 ? ranges[0] : null;
     if (argument.kind !== 'music' && !dateRange) return failure('未能唯一回读实际统计日期，本组未保存');
     return { url: location.href, period, keyword, dateRange, filtersVerified: true,

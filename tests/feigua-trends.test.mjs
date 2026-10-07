@@ -326,12 +326,43 @@ test('browser applies both video paths, then keyword, period and sales sort for 
     ['video-filter',{label:'视频标签',path:videoQueries[0].tagPath,phase:'select'}],
   ]);
   assert.ok(calls.some(([command,args])=>command==='keyword' && args.keyword==='拌饭'));
-  assert.ok(calls.some(([command,args])=>command==='choice' && args.label==='近7天'));
+  assert.ok(calls.some(([command])=>command==='video-period'));
   assert.ok(calls.some(([command,args])=>command==='sort' && args.label==='视频销售额'));
   calls.length=0;
   await browser.collect('videos','全部');
   assert.equal(calls[0][0],'clear');
   assert.deepEqual(calls.filter(([command])=>command==='video-filter').map(([,args])=>args.path),[[],[]]);
+});
+
+test('video period adaptation handles verified ranges, shortcuts and calendar clicks then rereads dates', async () => {
+  for (const mode of ['verified','shortcut','calendar']) {
+    const browser=new FeiguaBrowser({}), calls=[];let moved=false;
+    browser.settle=async()=>{};
+    browser.execute=async(command,args={})=>{calls.push([command,args]);
+      if(args.verify)return{verified:true};
+      if(mode==='verified')return{verified:true};
+      if(mode==='shortcut')return{changed:true};
+      if(!args.phase)return{calendar:true};
+      if(args.phase==='open')return{opened:true};
+      if(args.phase==='start'&&!moved){moved=true;return{moved:true};}
+      return{picked:true};
+    };
+    await browser.chooseVideoPeriod();
+    assert.equal(calls[0][0],'video-period');
+    if(mode==='verified')assert.equal(calls.length,1);
+    else assert.equal(calls.at(-1)[1].verify,true);
+    if(mode==='calendar')assert.deepEqual(calls.filter(([,a])=>a.phase).map(([,a])=>a.phase),['open','start','start','end']);
+  }
+});
+
+test('calendar traversal is bounded and cancellation or failed reread prevents collection', async () => {
+  const browser=new FeiguaBrowser({});browser.settle=async()=>{};let calls=0;
+  browser.execute=async(_command,args={})=>{calls++;return !args.phase?{calendar:true}:args.phase==='open'?{opened:true}:{moved:true};};
+  await assert.rejects(browser.chooseVideoPeriod(),/跨度过大/);assert.equal(calls,15);
+  const signal=AbortSignal.abort();calls=0;
+  await assert.rejects(browser.chooseVideoPeriod(signal),/已取消/);assert.equal(calls,0);
+  browser.execute=async(_command,args={})=>args.verify?{verified:false}:{changed:true};
+  await assert.rejects(browser.chooseVideoPeriod(),/未能确认近7天/);
 });
 
 test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {

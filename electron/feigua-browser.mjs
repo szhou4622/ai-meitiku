@@ -358,6 +358,30 @@ export class FeiguaBrowser {
     if (!verified.verified) throw issue('未能确认筛选条件，已停止本组采集');
   }
 
+  async chooseVideoPeriod(signal) {
+    if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+    const selected = await this.execute('video-period');
+    if (selected.verified) return;
+    if (selected.calendar) {
+      if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+      await this.execute('video-period', { phase: 'open' });
+      await this.settle(signal);
+      for (const phase of ['start', 'end']) {
+        let picked = false;
+        for (let attempt = 0; attempt < 13; attempt++) {
+          if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+          const result = await this.execute('video-period', { phase });
+          if (result.picked) { picked = true; break; }
+          if (!result.moved) throw issue('视频统计日期选择未完成');
+          await this.settle(signal);
+        }
+        if (!picked) throw issue('视频统计日期跨度过大，请打开飞瓜核对时间周期');
+      }
+    }
+    await this.settle(signal);
+    if (!(await this.execute('video-period', { verify: true })).verified) throw issue('未能确认近7天统计日期，已停止本组采集');
+  }
+
   async openSource(kind, signal) {
     const source = FEIGUA_SOURCES[kind];
     if (!source) throw issue('未知飞瓜来源');
@@ -406,7 +430,7 @@ export class FeiguaBrowser {
         }
         await this.choose('video-filter', { label, path, phase: 'select' }, signal);
       }
-      await this.choose('choice', { label: '近7天' }, signal);
+      await this.chooseVideoPeriod(signal);
       await this.choose('keyword', { keyword }, signal);
     } else {
       if (kind === 'topics') {
