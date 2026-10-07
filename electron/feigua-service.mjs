@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { normalizeLoginEntryUrl } from './feigua-login-entry.mjs';
+import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -37,6 +37,7 @@ export function dueVideosDate(now = Date.now()) {
 export class FeiguaService {
   constructor({ userDataPath, browser, storage }) {
     this.browser = browser;
+    this.browser.onWorkspaceVerified = hint => this.saveWorkspaceHint(hint);
     this.data = initial();
     this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
     this.autoCollectRequested = false;
@@ -90,6 +91,18 @@ export class FeiguaService {
       latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
     this.browser.setLoginEntryUrl?.(this.data.loginEntryUrl);
+    // Upgrade existing API results into an untrusted reload hint once. An
+    // explicit null (e.g. after editing the entry) must never resurrect it.
+    let hint = data.workspaceHint;
+    if (!Object.hasOwn(data, 'workspaceHint')) {
+      const result = this.data.latestResults.find(group => group.result?.provenance?.transport === 'provider-api' && group.result.provenance.responseCode === 200)?.result;
+      try {
+        const source = new URL(result?.sourceUrl);
+        if (source.pathname.startsWith('/app/')) hint = { entryUrl: this.data.loginEntryUrl, origin: source.origin };
+      } catch { /* No previously verified provider result. */ }
+    }
+    this.data.workspaceHint = normalizeWorkspaceHint(hint, this.data.loginEntryUrl);
+    this.browser.setWorkspaceHint?.(this.data.workspaceHint);
     if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     let recovered = false;
     for (const run of this.data.runs) {
@@ -107,6 +120,17 @@ export class FeiguaService {
     const write = this.writeQueue.then(() => this.storage.write(structuredClone(this.data)));
     this.writeQueue = write.catch(() => {});
     return write;
+  }
+
+  async saveWorkspaceHint(input) {
+    const save = this.writeQueue.then(async () => {
+      const workspaceHint = normalizeWorkspaceHint(input, this.data.loginEntryUrl);
+      if (!workspaceHint) throw new Error('工作台复查地址与当前登录入口不一致');
+      await this.storage.write({ ...structuredClone(this.data), workspaceHint });
+      this.data.workspaceHint = workspaceHint;
+    });
+    this.writeQueue = save.catch(() => {});
+    await save;
   }
 
   async state() {
@@ -226,8 +250,9 @@ export class FeiguaService {
       await this.configQueue;
       if (loginEntryUrl === this.data.loginEntryUrl) return;
       const save = this.writeQueue.then(async () => {
-        await this.storage.write({ ...structuredClone(this.data), loginEntryUrl });
+        await this.storage.write({ ...structuredClone(this.data), loginEntryUrl, workspaceHint: null });
         this.data.loginEntryUrl = loginEntryUrl;
+        this.data.workspaceHint = null;
       });
       this.writeQueue = save.catch(() => {});
       this.configQueue = save.catch(() => {});
@@ -236,6 +261,7 @@ export class FeiguaService {
       this.autoCatalogRequested = false;
       this.loginSequence++;
       this.browser.setLoginEntryUrl?.(loginEntryUrl);
+      this.browser.setWorkspaceHint?.(null);
       this.auth = { status: 'signed_out', message: loginEntryUrl ? '登录入口已保存，请打开入口完成登录并进入飞瓜工作台' : '请先配置并保存登录入口网址' };
     });
     return this.state();
@@ -339,13 +365,17 @@ export class FeiguaService {
     this.job = (async () => {
       if (verifyLogin) {
         try {
+          this.auth = { status: 'checking', message: '正在检查飞瓜登录状态…' };
+          run.message = '正在检查飞瓜登录状态…';
+          await this.persist();
           this.auth = await this.browser.checkLogin();
           if (this.auth.status !== 'authenticated') throw new Error(onlyHotspots ? '请登录飞瓜后刷新日榜' : '设置已保存，请登录飞瓜后刷新榜单');
         } catch (error) {
+          if (this.auth.status === 'checking') this.auth = { status: 'error', message: error.publicMessage || '飞瓜登录状态检查失败，请重试' };
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
           run.message = scheduledDate ? '每日定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
-          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '设置已保存，飞瓜登录状态未确认，请登录后重试'); }
+          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : `设置已保存；${error.publicMessage || this.auth.message || '请点击“打开登录入口”重新登录'}`; }
           await this.persist(); return;
         }
       }

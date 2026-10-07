@@ -24,3 +24,16 @@ export function isLoginEntryHandoff(value, entryUrl) {
     return target.protocol === entry.protocol && target.hostname === entry.hostname;
   } catch { return false; }
 }
+
+// This is a reload destination, never proof of authentication. Bind it to the
+// exact configured entry and store only an origin, without signed login URLs.
+export function normalizeWorkspaceHint(value, entryUrl) {
+  if (!value || !entryUrl) return null;
+  try {
+    const entry = normalizeLoginEntryUrl(entryUrl);
+    if (value.entryUrl !== entry || !isLoginEntryHandoff(value.origin, entry)) return null;
+    const source = new URL(normalizeLoginEntryUrl(value.origin));
+    if (source.pathname !== '/' || source.search || source.hash) return null;
+    return { entryUrl: entry, origin: source.origin };
+  } catch { return null; }
+}

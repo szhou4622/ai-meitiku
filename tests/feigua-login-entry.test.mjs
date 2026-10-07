@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { normalizeLoginEntryUrl, isLoginEntryHandoff } from '../electron/feigua-login-entry.mjs';
+import { normalizeLoginEntryUrl, isLoginEntryHandoff, normalizeWorkspaceHint } from '../electron/feigua-login-entry.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { FeiguaService } from '../electron/feigua-service.mjs';
 
 const entry = 'http://192.0.2.10:16888/'; // Documentation-only address, never contacted.
-function fixture({ stored = { version: 1, keywords: ['保留词'], runs: [] }, failWrite = false } = {}) {
+function fixture({ stored = { version: 1, keywords: ['保留词'], runs: [] }, failWrite = false, providerBrowser } = {}) {
   let disk = structuredClone(stored);
   const calls = [];
-  const browser = { setLoginEntryUrl: url => calls.push(['configure', url]), openLogin: async () => calls.push(['login']), stopLoginWatch() {} };
+  const browser = providerBrowser || { setLoginEntryUrl: url => calls.push(['configure', url]), openLogin: async () => calls.push(['login']), stopLoginWatch() {} };
   const service = new FeiguaService({ userDataPath: '/unused', browser, storage: {
     read: async () => structuredClone(disk),
     write: async data => { if (failWrite) throw new Error('磁盘不可写'); disk = structuredClone(data); },
@@ -59,6 +59,66 @@ test('a failed save keeps the previous entry and browser session active', async 
   assert.equal((await service.state()).loginEntryUrl, entry);
   assert.equal((await service.state()).auth.status, 'authenticated');
   assert.deepEqual(calls, [['configure', entry]]);
+});
+
+test('a reload hint is bound to the saved entry and cannot contain credentials or signed paths', () => {
+  const hint = {entryUrl:entry,origin:'http://192.0.2.10:13042'};
+  assert.deepEqual(normalizeWorkspaceHint(hint,entry),hint);
+  assert.equal(normalizeWorkspaceHint(hint,`${entry}different-entry`),null);
+  for (const origin of ['http://foreign.example:13042','https://192.0.2.10:13042','http://user:password@192.0.2.10:13042','http://192.0.2.10:13042/?token=synthetic','http://192.0.2.10:13042/login']) assert.equal(normalizeWorkspaceHint({...hint,origin},entry),null);
+});
+
+test('restart rechecks the saved workspace session before trusting it, without reopening the portal', async () => {
+  const hint = {entryUrl:entry,origin:'http://192.0.2.10:13042'};
+  const {browser,loaded}=browserFixture();
+  const {service,disk}=fixture({providerBrowser:browser,stored:{version:1,loginEntryUrl:entry,workspaceHint:hint,keywords:[],runs:[]}});
+  await service.ready;
+  assert.equal(browser.sourceOrigin(),null);
+  const state=await service.checkLogin();
+  assert.equal(state.auth.status,'authenticated');
+  assert.deepEqual(loaded,[`${hint.origin}/app/`]);
+  assert.equal(browser.sourceOrigin(),hint.origin);
+  await browser.onWorkspaceVerified(hint);
+  assert.deepEqual(disk().workspaceHint,hint);
+  await service.saveLoginEntryUrl(`${entry}new-entry`);
+  assert.equal(disk().workspaceHint,null);
+  assert.equal(browser.workspaceHint,null);
+});
+
+test('an expired saved session gives a relogin prompt and never enables collection scripts', async () => {
+  const {browser,loaded}=browserFixture();
+  browser.setLoginEntryUrl(entry);
+  browser.setWorkspaceHint({entryUrl:entry,origin:'http://192.0.2.10:13042'});
+  browser.ensureWindow();
+  browser.window.webContents.executeJavaScript=async()=>({authenticated:false,loginVisible:true});
+  const auth=await browser.checkLogin();
+  assert.equal(auth.status,'expired');
+  assert.match(auth.message,/打开登录入口.*重新登录/);
+  assert.deepEqual(loaded,['http://192.0.2.10:13042/app/']);
+  assert.equal(browser.sourceOrigin(),null);
+  await assert.rejects(browser.execute('capture-context'),/先核验/);
+});
+
+test('a saved gateway redirecting to its login page prompts relogin without executing provider code', async () => {
+  const {browser,executed}=browserFixture();
+  browser.setLoginEntryUrl(entry);
+  browser.setWorkspaceHint({entryUrl:entry,origin:'http://192.0.2.10:13042'});
+  browser.ensureWindow();
+  browser.window.loadURL=async()=>{browser.window.url='http://192.0.2.10:13042/login';};
+  const auth=await browser.checkLogin();
+  assert.equal(auth.status,'expired');
+  assert.match(auth.message,/重新登录/);
+  assert.equal(browser.sourceOrigin(),null);
+  assert.deepEqual(executed,[]);
+});
+
+test('legacy verified API results provide a recheck hint, but an explicit reset cannot resurrect it', async () => {
+  const result={sourceUrl:'http://192.0.2.10:13042/app/#/music/index',rows:[],provenance:{transport:'provider-api',responseCode:200}};
+  const base={version:1,loginEntryUrl:entry,keywords:[],runs:[],latestResults:[{kind:'music',keyword:null,result}]};
+  const migrated=fixture({stored:base});
+  assert.deepEqual((await migrated.service.state()).workspaceHint,{entryUrl:entry,origin:'http://192.0.2.10:13042'});
+  assert.equal((await fixture({stored:{...base,workspaceHint:null}}).service.state()).workspaceHint,null);
+  assert.equal((await fixture({stored:{...base,loginEntryUrl:'http://other.example/'}}).service.state()).workspaceHint,null);
 });
 
 test('a portal may open its same-server gateway on another port without trusting unrelated hosts', async () => {

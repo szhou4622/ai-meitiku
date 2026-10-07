@@ -9,6 +9,20 @@ const run = (command, args = {}) => frame.contentWindow.eval(`(${feiguaPage.toSt
 const assert = (name, passed) => { outputs.push(`${passed ? 'PASS' : 'FAIL'} ${name}`); if (!passed) throw new Error(name); };
 const shell = '<aside>个人中心 收藏夹 视频/素材</aside>';
 try {
+  {
+    await mount(shell + `<div class="tag-cascader"><span class="tag-label">视频标签</span><ul class="tag-list"><li class="tag-element"><span class="tag-text">时尚</span></li></ul></div>
+      <div class="el-popover" id="own-panel" style="display:none"><label><span>护肤</span></label></div>
+      <div class="el-popover"><label><span>护肤</span></label></div>`);
+    const root=frame.contentDocument.querySelector('.tag-cascader');
+    const own=frame.contentDocument.querySelector('#own-panel');
+    const props={value:['0'],options:[{Id:'0',Name:'全部',Sub:[]},{Id:'fashion',Name:'时尚',Sub:[{Id:'skin',Name:'护肤',Sub:[]}]}]};
+    root.__vue__={$props:props,popover:{$refs:{popper:own}}};
+    root.querySelector('.tag-text').onmouseenter=()=>{own.style.display='block';};
+    own.querySelector('label').onclick=()=>{props.value=['fashion','skin'];};
+    assert('二级分类展开使用实际文字事件节点',run('music-tag',{path:['时尚','护肤'],phase:'expand'}).changed===true&&own.style.display==='block');
+    assert('二级浮层可挂在控件外且不误选别的控件',!root.contains(own)&&run('music-tag',{path:['时尚','护肤'],phase:'select'}).changed===true);
+    assert('选择后回读完整二级路径',run('music-tag',{path:['时尚','护肤'],verify:true}).verified===true);
+  }
   await mount('<h1>微信扫码登录/注册飞瓜数据</h1>');
   assert('登录页面不能视为已登录', run('auth').authenticated === false);
   assert('登录页不能采集为空榜单', run('capture', {kind:'videos'}).authRequired === true);

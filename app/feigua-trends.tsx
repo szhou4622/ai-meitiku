@@ -209,7 +209,7 @@ export function FeiguaTrends() {
       <button type="submit" disabled={disabled || state.busy || !loginEntryDirty}>{action === 'entry-save' ? '保存中…' : '保存网址'}</button>
       <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
     </form>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}

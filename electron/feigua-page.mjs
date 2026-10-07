@@ -57,7 +57,7 @@ export function feiguaPage(command, argument = {}) {
     };
     let fullOptions;
     try { fullOptions = tree(props.options); } catch { return null; }
-    return { root, path: findPath(props.options, values.at(-1)), selectionId: String(values.at(-1)), fullOptions,
+    return { root, popover: root.__vue__?.popover?.$refs?.popper, path: findPath(props.options, values.at(-1)), selectionId: String(values.at(-1)), fullOptions,
       unsupportedDepth: props.options.some(node => (node.Sub || []).some(child => child.Sub?.length)),
       restricted: elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none'),
       options: props.options.filter(node => node.Name !== '全部').map(node => ({ label: node.Name, children: (Array.isArray(node.Sub) ? node.Sub : []).filter(child => child.Name !== '全部').map(child => ({ label: child.Name })) })) };
@@ -146,13 +146,17 @@ export function feiguaPage(command, argument = {}) {
     if (path.length && (!parent || path.length > 1 && !parent.children.some(child => child.label === path[1]))) return failure(`所选${categoryLabel}已不在飞瓜目录中`);
     const first = elements('.tag-list > .tag-element', data.root).find(node => compact(node) === (path[0] || '全部'));
     if (!first) return failure(`未找到${categoryLabel}一级分类入口`);
-    if (path.length < 2) { first.click(); return { changed: true }; }
+    const firstTarget = first.querySelector('.tag-text') || first;
+    if (path.length < 2) { firstTarget.click(); return { changed: true }; }
     if (argument.phase === 'expand') {
-      first.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-      first.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      firstTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+      firstTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       return { changed: true };
     }
-    const children = elements('.el-popover', data.root).flatMap(popover => exact(path[1], popover));
+    // appendToBody detaches the panel from its filter. Read only this widget's
+    // own mounted popper reference, never another filter's global popup.
+    const popovers = [...new Set([...elements('.el-popover', data.root), ...(visible(data.popover) ? [data.popover] : [])])];
+    const children = popovers.flatMap(popover => exact(path[1], popover));
     if (children.length !== 1) return failure(`未能唯一识别${categoryLabel}二级分类选项`);
     (children[0].closest('label') || children[0]).click();
     return { changed: true };

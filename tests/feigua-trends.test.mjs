@@ -953,6 +953,28 @@ test('save and refresh keeps selection and records a visible failure when login 
   assert.equal(state.runs[0].status,'failed');assert.match(state.runs[0].groups[0].message,/已保存/);
 });
 
+test('saving a category checks the current session once, collects if valid, and prompts relogin if expired', async () => {
+  for (const status of ['authenticated','expired']) {
+    const {service,browser,calls}=fixture();
+    await service.ready;
+    await service.cacheMusicTags({options:tagOptions});
+    let checks=0;
+    browser.checkLogin=async()=>{checks++;return {status,message:status==='expired'?'飞瓜登录已失效，请点击“打开登录入口”重新登录':'已登录飞瓜'};};
+    await service.saveAndRefreshMusicTag(['测试一级甲','测试二级甲']);
+    await service.job;
+    const state=await service.state();
+    assert.equal(checks,1);
+    assert.deepEqual(state.musicTag,['测试一级甲','测试二级甲']);
+    if(status==='authenticated') assert.deepEqual(calls.map(([kind])=>kind),['music','topics']);
+    else {
+      assert.equal(calls.length,0);
+      assert.equal(state.auth.status,'expired');
+      assert.equal(state.runs[0].status,'failed');
+      assert.ok(state.runs[0].groups.every(group=>/重新登录/.test(group.message)));
+    }
+  }
+});
+
 test('busy refresh refuses to overwrite settings or start a second BGM job', async () => {
   let release;
   const gate=new Promise(resolve=>{release=resolve;});

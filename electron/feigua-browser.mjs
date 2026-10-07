@@ -1,7 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
-import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff } from './feigua-login-entry.mjs';
+import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
@@ -27,6 +27,7 @@ export class FeiguaBrowser {
     this.requestSequence = 0;
     this.rankingRequests = [];
     this.verifiedSourceOrigin = null;
+    this.workspaceHint = null;
   }
 
   setLoginEntryUrl(value) {
@@ -36,11 +37,26 @@ export class FeiguaBrowser {
     this.wasAuthenticated = false;
     this.loginRelayOrigins.clear();
     this.verifiedSourceOrigin = null;
+    this.workspaceHint = null;
     if (this.window && !this.window.isDestroyed()) this.window.close();
     this.loginEntryUrl = next;
   }
 
   sourceOrigin() { return this.verifiedSourceOrigin; }
+
+  setWorkspaceHint(value) {
+    this.workspaceHint = normalizeWorkspaceHint(value, this.loginEntryUrl);
+    if (this.workspaceHint) this.loginRelayOrigins.add(this.workspaceHint.origin);
+  }
+
+  async verifyWorkspace(auth) {
+    if (!auth.authenticated || !this.isRelayWorkspace(this.window.webContents.getURL())) return;
+    const origin = new URL(this.window.webContents.getURL()).origin;
+    const hint = normalizeWorkspaceHint({ entryUrl: this.loginEntryUrl, origin }, this.loginEntryUrl);
+    if (JSON.stringify(hint) !== JSON.stringify(this.workspaceHint)) await this.onWorkspaceVerified?.(hint);
+    this.workspaceHint = hint;
+    this.verifiedSourceOrigin = origin;
+  }
 
   isProviderUrl(url) { return isFeiguaDataUrl(url, this.verifiedSourceOrigin); }
 
@@ -122,7 +138,7 @@ export class FeiguaBrowser {
       auth = await this.execute('auth');
     }
     if (auth.loading) throw issue('飞瓜工作台尚未加载完成，请稍后重试', 'FEIGUA_NETWORK');
-    if (auth.authenticated && this.isRelayWorkspace(this.window.webContents.getURL())) this.verifiedSourceOrigin = new URL(this.window.webContents.getURL()).origin;
+    await this.verifyWorkspace(auth);
     if (auth.actionRequired !== 'terms') return auth;
     this.onAuthChange?.({ status: 'checking', message: '正在自动处理飞瓜声明…' });
     await this.execute('accept-terms');
@@ -130,7 +146,7 @@ export class FeiguaBrowser {
       await delay(300, undefined, { signal });
       auth = await this.execute('auth');
       if (!auth.actionRequired) {
-        if (auth.authenticated && this.isRelayWorkspace(this.window.webContents.getURL())) this.verifiedSourceOrigin = new URL(this.window.webContents.getURL()).origin;
+        await this.verifyWorkspace(auth);
         return auth;
       }
     }
@@ -209,19 +225,23 @@ export class FeiguaBrowser {
   async checkLogin() {
     if (!this.loginEntryUrl && (!this.window || this.window.isDestroyed?.())) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     this.ensureWindow();
-    if (!this.window.webContents.getURL()) {
+    const currentUrl = this.window.webContents.getURL();
+    if (!currentUrl || this.workspaceHint && isLoginEntryNavigation(currentUrl, this.loginEntryUrl) && !this.isRelayWorkspace(currentUrl)) {
       if (!this.loginEntryUrl) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-      try { await this.window.loadURL(this.verifiedSourceOrigin ? `${this.verifiedSourceOrigin}/app/` : this.loginEntryUrl); }
+      const workspaceOrigin = this.verifiedSourceOrigin || this.workspaceHint?.origin;
+      try { await this.window.loadURL(workspaceOrigin ? `${workspaceOrigin}/app/` : this.loginEntryUrl); }
       catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
     }
-    if (!this.isProviderUrl(this.window.webContents.getURL()) && !this.isRelayWorkspace(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台；代理页面的采集登录状态尚未核验' };
+    if (!this.isProviderUrl(this.window.webContents.getURL()) && !this.isRelayWorkspace(this.window.webContents.getURL())) return this.wasAuthenticated || this.workspaceHint
+      ? { status: 'expired', message: '飞瓜登录已失效，请点击“打开登录入口”重新登录' }
+      : { status: 'signed_out', message: '请点击“打开登录入口”完成登录，并进入飞瓜工作台' };
     let auth = await this.resolveAuth();
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();
       auth = await this.waitForWorkspace();
     }
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
-    return { status: this.wasAuthenticated ? 'expired' : 'signed_out', message: this.wasAuthenticated ? '飞瓜登录已失效，请重新登录' : '请先在飞瓜窗口完成登录' };
+    return { status: this.wasAuthenticated || this.workspaceHint ? 'expired' : 'signed_out', message: this.wasAuthenticated || this.workspaceHint ? '飞瓜登录已失效，请点击“打开登录入口”重新登录' : '请点击“打开登录入口”完成飞瓜登录' };
   }
 
   async enterWorkspace() {
