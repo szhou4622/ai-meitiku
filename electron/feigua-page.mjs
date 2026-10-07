@@ -202,7 +202,7 @@ export function feiguaPage(command, argument = {}) {
       if (elements('input[placeholder="开始日期"]', cursor).length || exact('近7天', cursor).length) { root = cursor; break; }
     }
     if (!root || root === document.body || root === document.documentElement) return failure('未能识别视频统计日期控件');
-    if (elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none')) return failure('视频统计时间筛选权限受限');
+    const restricted = target => elements('.purview-mask-layer', root).some(mask => getComputedStyle(mask).pointerEvents !== 'none' && mask.parentElement.contains(target));
     const starts = elements('input[placeholder="开始日期"]', root), ends = elements('input[placeholder="结束日期"]', root);
     if (starts.length !== 1 || ends.length !== 1) return failure('无法唯一回读视频统计起止日期');
     const parse = input => {
@@ -216,10 +216,12 @@ export function feiguaPage(command, argument = {}) {
     const shortcuts = exact('近7天', root);
     if (shortcuts.length > 1) return failure('无法唯一定位统计时间的「近7天」');
     if (shortcuts.length) {
+      if (restricted(shortcuts[0])) return failure('视频统计时间筛选权限受限');
       if (selected(shortcuts[0])) return sevenDays ? { verified: true, label: '近7天', dateRange: `${start} - ${end}` } : failure('近7天选项与实际统计日期不一致');
       if (argument.verify) return { verified: false };
       shortcuts[0].click(); return { changed: true };
     }
+    if (restricted(starts[0]) || restricted(ends[0])) return failure('视频统计时间筛选权限受限');
     const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
     const first = new Date(Date.parse(today) - 6 * 86400000).toISOString().slice(0, 10);
     const verified = start === first && end === today;

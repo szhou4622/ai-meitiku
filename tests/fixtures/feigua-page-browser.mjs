@@ -128,6 +128,8 @@ try {
     </tbody></table>`);
   assert('新版时间周期选中状态核验', run('choice', {label:'近7天',verify:true}).verified === true);
   assert('视频快捷周期同时核验七天日期',run('video-period',{verify:true}).dateRange==='2026-09-25 - 2026-10-01');
+  const restrictedPeriod=frame.contentDocument.createElement('div');restrictedPeriod.className='permission-wrapper';restrictedPeriod.innerHTML='<button>近180天</button><div class="purview-mask-layer"></div>';frame.contentDocument.querySelector('#video-period').append(restrictedPeriod);
+  assert('近180天的遮罩不会误拦已选中的近7天快捷项',run('video-period',{verify:true}).verified===true);
   frame.contentDocument.querySelector('#search').onclick = () => { frame.contentDocument.querySelector('#filters').textContent = `视频关键词：${frame.contentDocument.querySelector('input:not([readonly])').value}`; };
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
@@ -294,6 +296,8 @@ try {
     const doc=frame.contentDocument,root=doc.querySelector('#statistics'),start=root.querySelector('input'),end=root.querySelectorAll('input')[1];
     let clicks=0;root.onclick=()=>{clicks++;};
     assert('没有快捷按钮时直接核验真实近7天日期',run('video-period').verified===true&&clicks===0);
+    const unrelated=doc.createElement('div');unrelated.className='permission-wrapper';unrelated.innerHTML='<button>近180天</button><div class="purview-mask-layer"></div>';root.append(unrelated);
+    assert('其他时间选项的权限限制不阻止合法近7天区间',run('video-period').verified===true&&clicks===0);
     assert('无快捷按钮的 API 上下文忽略发布时间筛选日期',run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).dateRange==='2026-10-01 - 2026-10-07');
     start.value='2026-09-24';end.value='2026-09-30';
     assert('任意历史七天不冒充当前近7天',run('video-period',{verify:true}).verified===false);
