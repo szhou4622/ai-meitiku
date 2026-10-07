@@ -55,6 +55,34 @@ try {
   await mount('<h1>微信扫码登录/注册飞瓜数据</h1>');
   assert('登录页面不能视为已登录', run('auth').authenticated === false);
   assert('登录页不能采集为空榜单', run('capture', {kind:'videos'}).authRequired === true);
+  {
+    await mount(shell + '<article><h2>账号提示请重新登录怎么办？教你排查</h2><p>微信扫码登录功能说明</p></article>');
+    assert('正常榜单标题的登录文案不冒充掉线',run('auth').authenticated===true&&run('ready').ready===true);
+    const dialog=frame.contentDocument.createElement('div');dialog.setAttribute('role','dialog');
+    dialog.innerHTML='<h2>视频详情</h2><p>标题：账号提示请重新登录怎么办？</p>';frame.contentDocument.body.append(dialog);
+    assert('视频详情弹窗中的普通标题也不冒充登录弹窗',run('auth').authenticated===true);
+    dialog.innerHTML='<h2>登录提示</h2><p>登录已过期，请重新登录</p><button>重新登录</button>';
+    assert('真实过期登录弹窗仍阻止采集',run('auth').authenticated===false&&run('ready').authRequired===true);
+    dialog.style.display='none';assert('隐藏登录弹窗不使正常工作台掉线',run('auth').authenticated===true);
+    dialog.style.display='block';dialog.innerHTML='<div class="el-message-box__message">登录已过期，请重新登录</div><button>确定</button>';
+    assert('结构化的过期消息框仍被识别',run('auth').authenticated===false);
+    dialog.remove();const iframe=frame.contentDocument.createElement('iframe');iframe.src='about:blank#login';frame.contentDocument.body.append(iframe);
+    assert('工作台覆盖扫码登录框仍需重新登录',run('auth').authenticated===false);
+  }
+  {
+    await mount(shell + '<div class="tag-cascader"><span class="tag-label">视频标签</span><ul class="tag-list"><li class="tag-element"><span class="tag-text">合成一级</span></li></ul></div><div id="video-own-panel" class="el-popover" style="display:none"><label><span>合成二级</span></label></div><div class="el-popover"><label><span>合成二级</span></label></div>');
+    const doc=frame.contentDocument,root=doc.querySelector('.tag-cascader'),panel=doc.querySelector('#video-own-panel');
+    const props={value:'0',options:[{Id:'0',Name:'全部',Sub:[]},{Id:'p',Name:'合成一级',Sub:[{Id:'c',Name:'合成二级',Sub:[]}]}]};
+    root.__vue__={$props:props,popover:{$refs:{popper:panel}}};
+    root.querySelector('.tag-text').onmouseenter=()=>{panel.style.display='block';};
+    let clicked=0;panel.querySelector('label').onclick=()=>{clicked++;props.value='c';};
+    assert('视频分类从真实文字节点展开浮层',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'expand',depth:0}).changed===true&&panel.style.display==='block');
+    assert('视频二级分类使用自己的外置浮层且忽略同名干扰',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).changed===true&&clicked===1);
+    assert('视频外置浮层选择后回读完整路径',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],verify:true}).verified===true);
+    props.value='0';const mask=doc.createElement('div');mask.className='purview-mask-layer';panel.append(mask);
+    assert('视频外置浮层权限遮罩不可穿透',/权限受限/.test(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===1);mask.remove();
+    panel.style.display='none';assert('隐藏的外置浮层不能靠同名干扰选中',Boolean(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===1);
+  }
   await mount('<header><a href="https://dy.feigua.cn/synthetic/workspace">进入工作台</a><img alt="用户头像"></header>');
   assert('官网登录后首页识别工作台入口', run('auth').workspaceAvailable === true);
   assert('官网首页本身不冒充后台验证成功', run('auth').authenticated === false);

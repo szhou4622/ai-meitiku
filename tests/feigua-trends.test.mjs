@@ -124,6 +124,82 @@ function fixture({ stored, collect, auth, write } = {}) {
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
 
+const flushMicrotasks = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
+
+test('stopping automatic collection during fresh login verification prevents all later reads', async () => {
+  for (const rejectCheck of [false, true]) {
+    const {service,browser,calls}=fixture();let entered,release,reject;
+    const checking=new Promise(resolve=>{entered=resolve;});
+    browser.checkLogin=async()=>{entered();return new Promise((resolve,fail)=>{release=resolve;reject=fail;});};
+    await service.login();browser.onAuthChange({status:'authenticated',message:'已登录'});await checking;
+    assert.equal((await service.state()).busy,true);assert.equal(service.controller,null);
+    await service.cancel();
+    if(rejectCheck)reject(new Error('cancelled browser request'));else release({status:'authenticated'});
+    await service.autoStart;await service.job;
+    const state=await service.state();
+    assert.equal(state.busy,false);assert.equal(state.runs.length,0);assert.deepEqual(calls,[]);
+    assert.notEqual(state.auth.status,'error');
+  }
+});
+
+test('cancellation while the initial run is being saved never starts a controller or reads the provider', async () => {
+  let entered,release;const enteredSave=new Promise(resolve=>{entered=resolve;});const gate=new Promise(resolve=>{release=resolve;});
+  const {service,calls,disk}=fixture({write:async data=>{if(data.runs[0]?.status==='running'){entered();await gate;}}});
+  const starting=service.start();await enteredSave;await service.cancel();release();await starting;
+  assert.equal(service.controller,null);assert.deepEqual(calls,[]);
+  assert.equal(disk().runs[0].status,'cancelled');assert.ok(disk().runs[0].groups.every(group=>group.status==='cancelled'));
+});
+
+test('cancellation during keyword saving preserves settings but cannot start the queued collection', async () => {
+  let entered,release;const enteredSave=new Promise(resolve=>{entered=resolve;});const gate=new Promise(resolve=>{release=resolve;});
+  const {service,calls,disk}=fixture({write:async data=>{if(data.keywords.length&&!data.runs.length){entered();await gate;}}});
+  const saving=service.saveAndRefreshVideoQueries([{keyword:'合成新词'}],{changedOnly:true});
+  await enteredSave;await service.cancel();release();await saving;
+  assert.deepEqual(disk().keywords,['合成新词']);assert.equal(disk().runs.length,0);assert.deepEqual(calls,[]);
+});
+
+test('a keyword task takes over the login window without stale monitor callbacks closing it', async () => {
+  for (const monitorFirst of [true,false]) {
+    const entry='http://192.0.2.10:16888/',origin='http://192.0.2.10:13042';
+    const browser=new FeiguaBrowser({});let closed=false,hidden=0,collects=0;const pending=[];
+    const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>({version:1,loginEntryUrl:entry,workspaceHint:{entryUrl:entry,origin},keywords:[],runs:[]}),write:async()=>{}}});
+    await service.ready;
+    browser.window={isDestroyed:()=>closed,webContents:{getURL:()=>origin+'/app/'},hide:()=>{hidden++;},close:()=>{closed=true;browser.window=null;browser.stopLoginWatch();}};
+    browser.execute=async()=>new Promise(resolve=>pending.push(resolve));
+    browser.collect=async(kind,keyword,_signal,options)=>{collects++;return capture(kind,keyword,{...options,url:origin+'/app/#/synthetic'});};
+    service.autoCollectRequested=true;service.autoCatalogRequested=true;browser.startLoginWatch();
+    await service.saveAndRefreshVideoQueries([{keyword:'合成新词'}],{changedOnly:true});await flushMicrotasks();
+    assert.equal(pending.length,2);
+    pending[monitorFirst?0:1]({authenticated:true});await flushMicrotasks();
+    pending[monitorFirst?1:0]({authenticated:true});await service.job;await service.autoStart;await flushMicrotasks();
+    const state=await service.state();
+    assert.equal(closed,false);assert.equal(hidden,1);assert.equal(collects,1);assert.equal(state.runs[0].status,'completed');
+    assert.equal(state.auth.status,'authenticated');assert.equal(browser.loginTimer,null);browser.stopLoginWatch();
+  }
+});
+
+test('stopped or closed login checks cannot authenticate a stale window', async () => {
+  const browser=new FeiguaBrowser({});let release;let closed=false;const notifications=[];
+  browser.window={isDestroyed:()=>closed,webContents:{getURL:()=> 'https://dy.feigua.cn/app/'},close:()=>{closed=true;}};
+  browser.execute=async()=>new Promise(resolve=>{release=resolve;});browser.onAuthChange=auth=>notifications.push(auth);
+  browser.startLoginWatch();browser.stopLoginWatch();release({authenticated:true});await flushMicrotasks();
+  assert.deepEqual(notifications,[]);assert.equal(closed,false);
+  const resolving=browser.resolveAuth();browser.window=null;closed=true;release({authenticated:true});
+  await assert.rejects(resolving,error=>error.code==='FEIGUA_CANCELLED');assert.equal(browser.sourceOrigin(),null);
+});
+
+test('a still-signed-out task check restores monitoring so later user login remains automatic', async () => {
+  const browser=new FeiguaBrowser({});let authenticated=false,closed=0,notified=0;
+  browser.window={isDestroyed:()=>false,webContents:{getURL:()=> 'https://dy.feigua.cn/app/'},close:()=>{closed++;}};
+  browser.execute=async()=>({authenticated,loginVisible:!authenticated});
+  browser.onAuthChange=auth=>{if(auth.status==='authenticated')notified++;};
+  browser.startLoginWatch();
+  assert.equal((await browser.checkLogin()).status,'signed_out');await flushMicrotasks();
+  assert.ok(browser.loginTimer);assert.equal(closed,0);assert.equal(notified,0);
+  authenticated=true;browser.startLoginWatch();await flushMicrotasks();
+  assert.equal(closed,1);assert.equal(notified,1);assert.equal(browser.loginTimer,null);
+});
+
 test('new and legacy installs can choose actual bundled categories before login or collection', async () => {
   for(const videoFilterOptions of [undefined,{categoryPath:[],tagPath:[]}]) {
     const {service,calls}=fixture({stored:{version:1,keywords:[],runs:[],videoFilterOptions}});

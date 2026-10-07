@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { FEIGUA_ENDPOINTS, observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from '../electron/feigua-api.mjs';
 import { FEIGUA_SOURCES, validateCapture } from '../electron/feigua-contract.mjs';
 import { FeiguaBrowser } from '../electron/feigua-browser.mjs';
+import { FeiguaService } from '../electron/feigua-service.mjs';
 
 const contexts = Object.fromEntries(Object.keys(FEIGUA_ENDPOINTS).map(kind => [kind, {
   url:`https://dy.feigua.cn/app/#/${kind}`,period:FEIGUA_SOURCES[kind].period,filtersVerified:true,
@@ -124,6 +125,38 @@ test('provider client uses observed params and exports only the allowed response
     assert.doesNotMatch(JSON.stringify(parsed),/private-value/);
     assert.ok((await readFeiguaApi({endpoint:'/api/v1/user/info',params:{}})).error);
   }finally{globalThis.document=old;}
+});
+
+test('successful sample responses retain only a rejection flag and cannot reach capture validation', async () => {
+  const old=globalThis.document;
+  try {
+    for(const nested of [false,true])for(const marker of [true,{Token:'private-sample-data'}]) {
+      const data={Total:5,PageIndex:1,List:Array.from({length:5},(_,i)=>({...row,MusicId:`synthetic-${i}`})),...(nested?{ExampleData:marker}:{})};
+      const source={Code:200,Status:true,Data:data,...(!nested?{ExampleData:marker}:{})};
+      globalThis.document={querySelector:()=>({__vue__:{$api:{music:{list:{url:FEIGUA_ENDPOINTS.music,GET:async()=>source}}}}})};
+      const response=await readFeiguaApi({endpoint:FEIGUA_ENDPOINTS.music,params:request('music').params});
+      assert.equal(response.exampleData,true);assert.doesNotMatch(JSON.stringify(response),/private-sample-data/);
+      assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,response),/示例数据/);
+    }
+    for(const sample of [{ExampleData:true},{data:{...response().data,ExampleData:true}},{exampleData:true}]) {
+      assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,{...response(),...sample}),/示例数据/);
+    }
+  } finally { globalThis.document=old; }
+});
+
+test('sample-response rejection preserves persisted results and cannot replace the latest successful ranking', async () => {
+  const oldDocument=globalThis.document;let disk={version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[]};let sample=false;
+  globalThis.document={querySelector:()=>({__vue__:{$api:{music:{list:{url:FEIGUA_ENDPOINTS.music,GET:async()=>({Code:200,Status:true,ExampleData:sample,Data:{Total:1,PageIndex:1,List:[row]}})}}}}})};
+  const browser={checkLogin:async()=>({status:'authenticated'}),collect:async(kind)=>kind==='music'
+    ? captureFeiguaResponse(kind,request(kind),contexts[kind],await readFeiguaApi({endpoint:FEIGUA_ENDPOINTS.music,params:request('music').params}))
+    : captureFeiguaResponse(kind,request(kind),contexts[kind],response())};
+  const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>structuredClone(disk),write:async next=>{disk=structuredClone(next);}}});
+  try {
+    await service.start();await service.job;const saved=disk.latestResults.find(group=>group.kind==='music');
+    sample=true;await service.start();await service.job;
+    assert.equal(disk.runs[0].groups[0].status,'failed');assert.match(disk.runs[0].groups[0].message,/示例数据/);
+    assert.equal(disk.runs[0].groups[0].result,undefined);assert.deepEqual(disk.latestResults.find(group=>group.kind==='music'),saved);
+  } finally {globalThis.document=oldDocument;}
 });
 
 test('browser verifies the actual emitted API request and rejects a response without a new request',async()=>{

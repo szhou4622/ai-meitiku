@@ -87,7 +87,7 @@ export async function readFeiguaApi({ endpoint, params }) {
   const pick = (object, keys) => Object.fromEntries(keys.map(key => [key, scalar(object?.[key])]));
   const data = response?.Data;
   const list = Array.isArray(data?.List) ? data.List : Array.isArray(data?.AwemeList) ? data.AwemeList : null;
-  return { code: response?.Code, success: response?.Status, data: {
+  return { code: response?.Code, success: response?.Status, exampleData: Boolean(response?.ExampleData || data?.ExampleData), data: {
     ...pick(data, ['Total', 'PageIndex', 'TimeRangeStr', 'UpdateTime', 'Remainder', 'AllowCount']),
     list: list && list.length <= 100 ? list.map(row => ({
       ...pick(row, ['MusicId', 'Title', 'Author', 'UserCount', 'TodayUserCount', 'DetailUrl', 'TopicId', 'RankNum', 'ViewCountIncRatioStr', 'UserCountIncRatioStr', 'HotId', 'Rank', 'HotValueStr', 'AwemeId', 'VideoUrl', 'Desc', 'BloggerNickName', 'Fans', 'PlayCount', 'LikeCount', 'CommentCount', 'ShareCount', 'CollectCount', 'SalesGmv', 'SaleCount', 'PubTimeStr', 'IsHasProduct']),
@@ -106,6 +106,7 @@ export function captureFeiguaResponse(kind, request, context, response) {
   if (response?.code === 401) throw Object.assign(problem('飞瓜登录已失效，请重新登录'), { code: 'FEIGUA_AUTH_REQUIRED' });
   if (response?.code === 429) throw Object.assign(problem('飞瓜请求频率受限，请稍后再采集'), { code: 'FEIGUA_RATE_LIMIT' });
   if (response?.code === 403 && [0, '0'].includes(response.data?.Remainder)) throw Object.assign(problem('飞瓜接口查询额度已用完，本组未更新，保留上次结果'), { code: 'FEIGUA_QUOTA' });
+  if (response?.exampleData || response?.ExampleData || response?.data?.ExampleData) throw problem('飞瓜接口返回示例数据，本组未保存，保留上次结果');
   if ([500, 502, 503, 504].includes(response?.code)) throw Object.assign(problem('飞瓜服务暂时不可用，本组将自动重试'), { code: 'FEIGUA_NETWORK' });
   if (response?.code !== 200 || response.success !== true || !Array.isArray(response.data?.list)) throw problem(`飞瓜接口未返回有效榜单数据（返回码 ${Number.isInteger(response?.code) ? response.code : '未知'}），本组未保存`);
   const data = response.data;

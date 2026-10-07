@@ -60,12 +60,13 @@ export class FeiguaService {
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
         if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
-      }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
+      }).catch(() => { if (sequence === this.loginSequence && !this.disposed) this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
     };
     this.controller = null;
     this.writeQueue = Promise.resolve();
     this.configQueue = Promise.resolve();
     this.operation = null;
+    this.operationSequence = null;
     this.disposed = false;
     this.scheduleTimer = null;
     this.schedulePending = false;
@@ -181,10 +182,13 @@ export class FeiguaService {
   }
 
   async exclusive(action) {
+    const sequence = this.loginSequence;
     await this.ready;
     if (this.operation || this.controller) throw new Error('正在执行飞瓜操作，请稍后再试');
+    if (this.disposed || sequence !== this.loginSequence) return;
+    this.operationSequence = sequence;
     this.operation = Promise.resolve().then(action);
-    try { return await this.operation; } finally { this.operation = null; }
+    try { return await this.operation; } finally { this.operation = null; this.operationSequence = null; }
   }
 
   async saveKeywords(input) {
@@ -348,12 +352,19 @@ export class FeiguaService {
   }
 
   async start({ trigger = null } = {}) {
+    const sequence = this.loginSequence;
+    const cancelled = () => this.disposed || sequence !== this.loginSequence;
     await this.exclusive(async () => {
       await this.configQueue;
+      if (cancelled()) return;
       const musicTag = [...this.data.musicTag];
       const keywords = [...this.data.keywords];
       const videoQueries = structuredClone(this.data.videoQueries);
-      this.auth = await this.browser.checkLogin();
+      let auth;
+      try { auth = await this.browser.checkLogin(); }
+      catch (error) { if (cancelled()) return; throw error; }
+      if (cancelled()) return;
+      this.auth = auth;
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
       await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null });
     });
@@ -361,6 +372,8 @@ export class FeiguaService {
   }
 
   async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null } = {}) {
+    const sequence = this.operationSequence ?? this.loginSequence;
+    if (this.disposed || sequence !== this.loginSequence) return;
     const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
     const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'weekly-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
@@ -371,7 +384,11 @@ export class FeiguaService {
     this.data.runs = [run, ...previousRuns].slice(0, 12);
     try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; throw error; }
     this.storageMessage = null;
-    if (this.disposed) return;
+    if (this.disposed || sequence !== this.loginSequence) {
+      run.status = 'cancelled'; run.finishedAt = new Date().toISOString(); run.message = '已取消，未开始采集';
+      for (const group of groups) group.status = 'cancelled';
+      await this.persist(); return;
+    }
     this.controller = new AbortController();
     const signal = this.controller.signal;
     this.job = (async () => {

@@ -20,8 +20,14 @@ export function feiguaPage(command, argument = {}) {
     const hasProviderApi = Object.values(providerApi || {}).some(group => Object.values(group || {}).some(model => model?.url === '/api/v1/music/search/page' && typeof model.GET === 'function'));
     const personalLink = [...document.querySelectorAll('a')].some(node => node.textContent.trim() === '个人中心' && node.getAttribute('href') === '#/user-center');
     const hasShell = (compactBody.includes('个人中心') || hasProviderApi && personalLink) && compactBody.includes('收藏夹') && compactBody.includes('视频/素材');
+    const loginText = /微信扫码登录|扫码登录\/注册|登录已过期|请重新登录/;
+    const loginPrompt = node => loginText.test(text(node)) && (node.matches('.login-dialog, .login-modal')
+      || elements('.el-dialog__title, .el-message-box__title, h1, h2, h3, [role="heading"]', node).some(heading => loginText.test(text(heading)) || /^登录(?:提示)?$/.test(text(heading)))
+      || elements('.el-message-box__message', node).some(message => loginText.test(text(message)))
+      || ['登录', '重新登录', '立即登录'].some(label => exact(label, node).some(control => control.closest('button, a, [role="button"]'))));
     const loginDialog = elements('input[type="password"], iframe').some(node => node.tagName === 'INPUT' || /login|qrcode/i.test(node.getAttribute('src') || ''))
-      || /微信扫码登录|扫码登录\/注册|登录已过期|请重新登录/.test(body);
+      || elements('[role="dialog"], .el-dialog__wrapper, .el-message-box__wrapper, .login-dialog, .login-modal').some(loginPrompt)
+      || !hasShell && loginText.test(body);
     const loginVisible = loginDialog || exact('注册 / 登录').length > 0 || exact('登录').length > 0;
     const actionRequired = body.includes('数据使用限制声明') && exact('同意并继续使用').length > 0 ? 'terms' : null;
     const workspaceAvailable = !hasShell && !loginVisible && !actionRequired && exact('进入工作台').length === 1;
@@ -117,12 +123,14 @@ export function feiguaPage(command, argument = {}) {
     }
     const depth = argument.phase === 'expand' ? argument.depth : Math.max(0, path.length - 1);
     if (!Number.isInteger(depth) || depth < 0 || depth >= Math.max(1, path.length)) return failure('视频分类层级无效');
+    const popovers = [...new Set([...elements('.el-popover', data.root), ...(visible(data.popover) ? [data.popover] : [])])];
+    if (popovers.some(popover => elements('.purview-mask-layer', popover).some(mask => getComputedStyle(mask).pointerEvents !== 'none'))) return failure(`当前飞瓜账号的${argument.label}筛选权限受限，本组未采集`);
     const matches = depth === 0
       ? elements('.tag-list > .tag-element', data.root).filter(node => compact(node) === (path[0] || '全部'))
-      : elements('.el-popover', data.root).flatMap(popover => exact(path[depth], popover));
+      : popovers.flatMap(popover => exact(path[depth], popover));
     const targets = [...new Set(matches)];
     if (targets.length !== 1) return failure(`无法唯一定位${argument.label}第${depth + 1}级选项`);
-    const target = targets[0].closest('label') || targets[0];
+    const target = depth === 0 ? targets[0].querySelector('.tag-text') || targets[0] : targets[0].closest('label') || targets[0];
     if (argument.phase === 'expand') {
       target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
       target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
