@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("desktopBridge", {
   feigua: {
     state: () => ipcRenderer.invoke("feigua-state"),
+    saveLoginEntryUrl: (url) => ipcRenderer.invoke("feigua-save-login-entry", url),
     saveKeywords: (keywords) => ipcRenderer.invoke("feigua-save-keywords", keywords),
     saveAndRefreshVideoQueries: (queries, options) => ipcRenderer.invoke("feigua-save-refresh-video-queries", queries, options),
     saveMusicTag: (path) => ipcRenderer.invoke("feigua-save-music-tag", path),

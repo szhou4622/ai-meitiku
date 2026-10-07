@@ -1,6 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
+import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -8,7 +11,7 @@ const videoFilterDefaults = (cached) => ({
   categoryPath: normalizeVideoOptions(cached?.categoryPath?.length ? cached.categoryPath : builtInVideoFilters.categoryPath),
   tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
 });
-const initial = () => ({ version: 1, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, loginEntryUrl: '', keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -30,12 +33,19 @@ export function dueHotspotsDate(now = Date.now()) {
 
 export function dueVideosDate(now = Date.now()) {
   const beijing = new Date(now + 8 * 60 * 60 * 1000);
-  return beijing.getUTCHours() * 60 + beijing.getUTCMinutes() >= 390 ? beijing.toISOString().slice(0, 10) : null;
+  if (beijing.getUTCDay() === 1 && beijing.getUTCHours() * 60 + beijing.getUTCMinutes() < 390) return null;
+  return videoCollectionWeek(new Date(now).toISOString());
 }
 
 export class FeiguaService {
-  constructor({ userDataPath, browser, storage }) {
+  constructor({ userDataPath, browser, storage, retryWait = (ms, signal) => delay(ms, undefined, { signal }) }) {
     this.browser = browser;
+    this.retryWait = retryWait;
+    this.browser.onWorkspaceVerified = hint => this.saveWorkspaceHint(hint);
+    this.browser.onVideoDetailProgress = ({ index, total }) => {
+      const run = this.data.runs[0];
+      if (this.controller && run?.status === 'running') run.message = `已取得视频榜单，正在核验补充信息（${index}/${total} 条）`;
+    };
     this.data = initial();
     this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
     this.autoCollectRequested = false;
@@ -49,7 +59,7 @@ export class FeiguaService {
       this.autoCatalogRequested = false;
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
-        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start() : this.prepareCatalogs();
+        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
       }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
     };
     this.controller = null;
@@ -78,22 +88,37 @@ export class FeiguaService {
   async load() {
     const data = await this.storage.read();
     if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
-    this.data = { version: 1, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
+    this.data = { version: 1, loginEntryUrl: normalizeLoginEntryUrl(data.loginEntryUrl ?? ''), keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
       videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
-      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? data.lastVideosScheduleDate : null,
+      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? videoCollectionWeek(`${data.lastVideosScheduleDate}T04:00:00Z`) : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
-      latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
+      latestResults: recoverLatestResults(data.runs, data.latestResults),
+      videoHistory: recoverVideoHistory(data.runs, data.latestResults || [], Array.isArray(data.videoHistory) ? data.videoHistory : []), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
+    this.browser.setLoginEntryUrl?.(this.data.loginEntryUrl);
+    // Upgrade existing API results into an untrusted reload hint once. An
+    // explicit null (e.g. after editing the entry) must never resurrect it.
+    let hint = data.workspaceHint;
+    if (!Object.hasOwn(data, 'workspaceHint')) {
+      const result = this.data.latestResults.find(group => group.result?.provenance?.transport === 'provider-api' && group.result.provenance.responseCode === 200)?.result;
+      try {
+        const source = new URL(result?.sourceUrl);
+        if (source.pathname.startsWith('/app/')) hint = { entryUrl: this.data.loginEntryUrl, origin: source.origin };
+      } catch { /* No previously verified provider result. */ }
+    }
+    this.data.workspaceHint = normalizeWorkspaceHint(hint, this.data.loginEntryUrl);
+    this.browser.setWorkspaceHint?.(this.data.workspaceHint);
+    if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     let recovered = false;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
         run.status = 'interrupted';
         run.message = '上次采集被中断，已保留完成的组；请重新发起采集';
-        for (const group of run.groups) if (['pending', 'running'].includes(group.status)) group.status = 'interrupted';
+        for (const group of run.groups) if (['pending', 'running', 'retrying'].includes(group.status)) { group.status = 'interrupted'; group.retryDelay = null; }
         recovered = true;
       }
     }
@@ -106,9 +131,20 @@ export class FeiguaService {
     return write;
   }
 
+  async saveWorkspaceHint(input) {
+    const save = this.writeQueue.then(async () => {
+      const workspaceHint = normalizeWorkspaceHint(input, this.data.loginEntryUrl);
+      if (!workspaceHint) throw new Error('工作台复查地址与当前登录入口不一致');
+      await this.storage.write({ ...structuredClone(this.data), workspaceHint });
+      this.data.workspaceHint = workspaceHint;
+    });
+    this.writeQueue = save.catch(() => {});
+    await save;
+  }
+
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), credentialMessage: this.browser.credentialMessage || null, storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
   }
 
   startDailySchedule(canRun) {
@@ -194,7 +230,10 @@ export class FeiguaService {
   }
 
   async syncVideoFilters(signal) {
-    const catalog = await this.browser.getVideoFilters(signal);
+    return this.cacheVideoFilters(await this.browser.getVideoFilters(signal));
+  }
+
+  async cacheVideoFilters(catalog) {
     const videoFilterOptions = { categoryPath: normalizeVideoOptions(catalog.categoryPath), tagPath: normalizeVideoOptions(catalog.tagPath) };
     if (!videoFilterOptions.categoryPath.length || !videoFilterOptions.tagPath.length) throw new Error('视频分类目录为空');
     const save = this.writeQueue.then(async () => {
@@ -217,8 +256,33 @@ export class FeiguaService {
     return this.state();
   }
 
+  async saveLoginEntryUrl(input) {
+    const loginEntryUrl = normalizeLoginEntryUrl(input);
+    await this.exclusive(async () => {
+      await this.configQueue;
+      if (loginEntryUrl === this.data.loginEntryUrl) return;
+      const save = this.writeQueue.then(async () => {
+        await this.storage.write({ ...structuredClone(this.data), loginEntryUrl, workspaceHint: null });
+        this.data.loginEntryUrl = loginEntryUrl;
+        this.data.workspaceHint = null;
+      });
+      this.writeQueue = save.catch(() => {});
+      this.configQueue = save.catch(() => {});
+      await save;
+      this.autoCollectRequested = false;
+      this.autoCatalogRequested = false;
+      this.loginSequence++;
+      this.browser.setLoginEntryUrl?.(loginEntryUrl);
+      this.browser.setWorkspaceHint?.(null);
+      this.auth = { status: 'signed_out', message: loginEntryUrl ? '登录入口已保存，请打开入口完成登录并进入飞瓜工作台' : '请先配置并保存登录入口网址' };
+    });
+    return this.state();
+  }
+
   async login({ collectAfterLogin = true } = {}) {
     await this.exclusive(async () => {
+      await this.configQueue;
+      if (!this.data.loginEntryUrl) throw new Error('请先配置并保存登录入口网址');
       this.autoCollectRequested = collectAfterLogin === true;
       this.autoCatalogRequested = true;
       this.loginSequence++;
@@ -283,7 +347,7 @@ export class FeiguaService {
     return this.state();
   }
 
-  async start() {
+  async start({ trigger = null } = {}) {
     await this.exclusive(async () => {
       await this.configQueue;
       const musicTag = [...this.data.musicTag];
@@ -291,7 +355,7 @@ export class FeiguaService {
       const videoQueries = structuredClone(this.data.videoQueries);
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      await this.launchRun(musicTag, keywords, { videoQueries });
+      await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null });
     });
     return this.state();
   }
@@ -299,64 +363,120 @@ export class FeiguaService {
   async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null } = {}) {
     const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'daily-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'weekly-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
     const previousRuns = this.data.runs;
     const scheduleKey = onlyVideos ? 'lastVideosScheduleDate' : 'lastHotspotsScheduleDate';
     const previousScheduleDate = this.data[scheduleKey];
     if (scheduledDate) this.data[scheduleKey] = scheduledDate;
     this.data.runs = [run, ...previousRuns].slice(0, 12);
     try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; throw error; }
+    this.storageMessage = null;
     if (this.disposed) return;
     this.controller = new AbortController();
     const signal = this.controller.signal;
     this.job = (async () => {
       if (verifyLogin) {
         try {
+          this.auth = { status: 'checking', message: '正在检查飞瓜登录状态…' };
+          run.message = '正在检查飞瓜登录状态…';
+          await this.persist();
           this.auth = await this.browser.checkLogin();
           if (this.auth.status !== 'authenticated') throw new Error(onlyHotspots ? '请登录飞瓜后刷新日榜' : '设置已保存，请登录飞瓜后刷新榜单');
         } catch (error) {
+          if (this.auth.status === 'checking') this.auth = { status: 'error', message: error.publicMessage || '飞瓜登录状态检查失败，请重试' };
           run.status = signal.aborted ? 'cancelled' : 'failed';
           run.finishedAt = new Date().toISOString();
           run.message = scheduledDate ? '每日定时采集未完成，请登录飞瓜后手动重试' : '分类榜单刷新未完成';
-          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : error.publicMessage || (onlyHotspots ? '飞瓜登录状态未确认，请登录后重试日榜采集' : '设置已保存，飞瓜登录状态未确认，请登录后重试'); }
+          for (const group of groups) { group.status = run.status; group.message = signal.aborted ? '已取消' : `设置已保存；${error.publicMessage || this.auth.message || '请点击“打开登录入口”重新登录'}`; }
           await this.persist(); return;
         }
       }
-      if (!onlyHotspots) {
-        const errors = [];
-        if (!onlyVideos && this.browser.getMusicTags && !signal.aborted) {
-          try { await this.syncMusicTags(signal); } catch { errors.push('榜单分类自动加载失败'); }
-        }
-        if (!onlyMusic && !onlyRankings && this.browser.getVideoFilters && !signal.aborted) {
-          try { await this.syncVideoFilters(signal); } catch { errors.push('带货视频分类自动加载失败'); }
-        }
-        this.catalogMessage = errors.length ? `${errors.join('；')}，保留已有目录，请重新登录后重试。` : null;
-      }
+      this.catalogMessage = null;
       await this.execute(run, signal);
     })().catch(() => {
       run.status = 'failed'; run.message = '本机保存失败，已停止采集，请检查存储后重试';
+      run.finishedAt = new Date().toISOString();
+      this.storageMessage = run.message;
+      for (const group of run.groups) {
+        if (group.status === 'running') { group.status = 'failed'; group.message = run.message; }
+        else if (group.status === 'pending') group.status = 'skipped';
+      }
     }).finally(() => { this.controller = null; });
+  }
+
+  async saveCapturedGroup(run, group, result) {
+    const save = this.writeQueue.then(async () => {
+      const snapshot = structuredClone(this.data);
+      const savedRun = snapshot.runs.find(item => item.id === run.id);
+      const savedGroup = savedRun.groups[run.groups.indexOf(group)];
+      Object.assign(savedGroup, { result, status: 'completed' });
+      snapshot.latestResults = recoverLatestResults([{ id: run.id, groups: [savedGroup] }], snapshot.latestResults);
+      if (group.kind === 'videos') snapshot.videoHistory = recoverVideoHistory([{ groups: [savedGroup] }], [], snapshot.videoHistory);
+      await this.storage.write(snapshot);
+      // Publishing follows the durable write. Polling must never see a result
+      // that would disappear on restart after a failed save.
+      Object.assign(group, { result, status: 'completed' });
+      this.data.latestResults = snapshot.latestResults;
+      this.data.videoHistory = snapshot.videoHistory;
+    });
+    this.writeQueue = save.catch(() => {});
+    try { await save; }
+    catch (error) {
+      throw Object.assign(new Error('本机结果保存失败，已保留上次结果并停止采集'), {
+        code: 'FEIGUA_STORAGE', publicMessage: '本机结果保存失败，已保留上次结果并停止采集', cause: error,
+      });
+    }
+  }
+
+  async collectWithRetry(run, group, signal, options, index) {
+    const waits = [10_000, 30_000];
+    for (let attempt = 0; ; attempt++) {
+      if (signal.aborted) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' });
+      try { return await this.browser.collect(group.kind, group.keyword, signal, structuredClone(options)); }
+      catch (error) {
+        if (signal.aborted || error.code !== 'FEIGUA_NETWORK') throw error;
+        if (attempt >= waits.length) throw Object.assign(new Error('自动重试后仍未完成，请稍后重新采集'), { code: 'FEIGUA_NETWORK', publicMessage: '已自动重试 2 次，仍未完成；保留上次结果，请稍后重新采集' });
+        const ms = waits[attempt];
+        group.status = 'retrying'; group.retryDelay = ms;
+        group.message = `网络暂时不可用，${ms / 1000} 秒后自动重试（${attempt + 1}/${waits.length}）`;
+        run.message = `${FEIGUA_SOURCES[group.kind].label}：${group.message}`;
+        const persistRetry = async () => {
+          try { await this.persist(); }
+          catch { throw Object.assign(new Error('自动重试状态保存失败，已停止采集'), { code: 'FEIGUA_STORAGE', publicMessage: '自动重试状态保存失败，已保留上次结果并停止采集' }); }
+        };
+        await persistRetry();
+        await this.retryWait(ms, signal);
+        if (signal.aborted || this.disposed) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' });
+        group.status = 'running'; group.attempts = attempt + 2; group.retryDelay = null; delete group.message;
+        run.message = `正在重试${FEIGUA_SOURCES[group.kind].label}（第 ${group.attempts}/3 次，${index + 1}/${run.groups.length} 组）`;
+        await persistRetry();
+      }
+    }
   }
 
   async execute(run, signal) {
     let stop = false;
-    for (const group of run.groups) {
+    for (const [index, group] of run.groups.entries()) {
       if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; continue; }
-      group.status = 'running';
-      run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}`;
+      group.status = 'running'; group.attempts = 1;
+      run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}（${index + 1}/${run.groups.length}）`;
       await this.persist();
       try {
         const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
-        const capture = await this.browser.collect(group.kind, group.keyword, signal, options);
+        const capture = await this.collectWithRetry(run, group, signal, options, index);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
-        group.result = validateCapture(group.kind, group.keyword, capture, options);
-        group.status = 'completed';
-        this.data.latestResults = recoverLatestResults([{ id: run.id, groups: [group] }], this.data.latestResults);
+        if (group.kind === 'videos' && capture.videoFilterOptions) await this.cacheVideoFilters(capture.videoFilterOptions);
+        if (capture.catalogWarning) this.catalogMessage = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验';
+        const result = validateCapture(group.kind, group.keyword, capture, { ...options, sourceOrigin: this.browser.sourceOrigin?.() });
+        await this.saveCapturedGroup(run, group, result);
+        continue;
       } catch (error) {
-        group.status = signal.aborted ? 'cancelled' : 'failed';
+        group.status = signal.aborted ? 'cancelled' : 'failed'; group.retryDelay = null;
         // Only adapter-owned messages are exposed, never raw browser/network errors.
         group.message = signal.aborted ? '已取消' : error.publicMessage || '本组采集未通过校验，请打开飞瓜核对页面后重试';
+        if (error.code === 'FEIGUA_STORAGE') throw error;
+        if (['FEIGUA_QUOTA', 'FEIGUA_RATE_LIMIT'].includes(error.code)) stop = true;
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }

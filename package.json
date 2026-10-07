@@ -43,7 +43,7 @@
     "diagnostic:mac:x64": "npm run diagnostic:prepare && electron-builder --config scripts/license-diagnostic-app/electron-builder.json --mac dmg --x64 --publish never",
     "diagnostic:mac:notarized": "zsh scripts/license-diagnostic-app/build-macos-notarized.sh all",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "test:feigua": "node --test tests/feigua-trends.test.mjs tests/feature-registry.test.mjs tests/electron-runtime-imports.test.mjs",
+    "test:feigua": "node --test tests/feigua-video-details.test.mjs tests/feigua-retry.test.mjs tests/feigua-login-credentials.test.mjs tests/feigua-login-entry.test.mjs tests/feigua-trends.test.mjs tests/feigua-api.test.mjs tests/feature-registry.test.mjs tests/electron-runtime-imports.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },

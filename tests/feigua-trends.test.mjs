@@ -1,21 +1,114 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
+import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, validateCaptureDates, isRankingMetric, isFeiguaDataUrl, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from '../electron/feigua-contract.mjs';
 import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigua-service.mjs';
-import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
+import { FeiguaBrowser, isFeiguaNavigation, isCollectionLoadingRequest } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
+import { recoverVideoHistory, videoRankingPeriod, videoCollectionWeek, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
+
+const historyVideo = (keyword, collectedAt, rows = [{ id: collectedAt }], dateRange = '2026-09-25 - 2026-10-01') => ({ kind: 'videos', keyword, status: 'completed', result: { collectedAt, rows, dateRange, filters: { categoryPath: ['历史分类'], tagPath: [] } } });
+
+test('video week key uses the verified seven-day source period instead of a collection date', () => {
+  assert.equal(videoRankingPeriod('2026-09-25 - 2026-10-01'), '2026-09-25 - 2026-10-01');
+  assert.equal(videoRankingPeriod('2026-10-01T16:00:00Z'), null);
+  assert.equal(videoRankingPeriod('2026-10-01'), null);
+  assert.equal(videoRankingPeriod('2026-10-01 - 2026-10-02'), null);
+  assert.equal(videoRankingPeriod('2026-02-30 - 2026-03-08'), null);
+  assert.equal(videoRankingPeriod('invalid'), null);
+  assert.equal(videoCollectionWeek('2026-10-04T15:59:59Z'), '2026-09-28');
+  assert.equal(videoCollectionWeek('2026-10-04T16:00:00Z'), '2026-10-05');
+});
+
+test('weekly video history takes the newest successful result per keyword and period, including empty rankings', () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const newest = historyVideo('甲', '2026-10-01T03:00:00Z', []);
+  const another = historyVideo('乙', '2026-10-01T02:00:00Z');
+  const failed = { ...historyVideo('甲', '2026-10-01T04:00:00Z'), status: 'failed' };
+  const result = recoverVideoHistory([{ groups: [old, failed, newest, another, { kind: 'music', result: newest.result }] }]);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.find(group => group.keyword === '甲').result.rows, []);
+  assert.equal(old.result.rows.length, 1);
+});
+
+test('refreshes on different days of one week share one tab while source seven-day dates stay intact', () => {
+  const monday = historyVideo('甲', '2026-10-05T02:00:00Z', undefined, '2026-09-29 - 2026-10-05');
+  const friday = historyVideo('甲', '2026-10-09T02:00:00Z', undefined, '2026-10-03 - 2026-10-09');
+  const history = recoverVideoHistory([{ groups: [monday, friday] }]);
+  assert.deepEqual(videoHistoryPeriods(history, ['甲']), ['2026-10-05']);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].result.dateRange, '2026-10-03 - 2026-10-09');
+});
+
+test('historical week never borrows another period or its pending refresh and excludes removed keywords', () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const next = historyVideo('乙', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08');
+  const history = recoverVideoHistory([{ groups: [old, next] }]);
+  assert.deepEqual(videoHistoryPeriods(history, ['甲']), ['2026-09-28']);
+  const latest = [{ ...next, refreshStatus: 'retrying' }];
+  assert.deepEqual(videoGroupsForPeriod(history, '', latest, ['乙']), latest);
+  const selected = videoGroupsForPeriod(history, '2026-09-28', latest, ['甲', '乙']);
+  assert.equal(selected.length, 1);
+  assert.deepEqual(selected[0].result.filters.categoryPath, ['历史分类']);
+  assert.equal(selected[0].refreshStatus, undefined);
+  assert.deepEqual(videoGroupsForPeriod(history, '2026-09-18 - 2026-09-24', latest, ['甲']), []);
+});
+
+test('video archive retains fifty-two statistical periods rather than individual keyword groups', () => {
+  const history = Array.from({ length: 55 }, (_, index) => {
+    const collectedAt = new Date(Date.UTC(2026, 5, 1 + index * 7)).toISOString();
+    const end = new Date(Date.parse(collectedAt) + 6 * 86400000).toISOString().slice(0, 10);
+    return ['甲', '乙'].map(keyword => historyVideo(keyword, collectedAt, undefined, `${collectedAt.slice(0, 10)} - ${end}`));
+  }).flat();
+  const saved = recoverVideoHistory([], [], history);
+  assert.equal(saved.length, 104);
+  assert.equal(videoHistoryPeriods(saved, ['甲', '乙']).length, 52);
+});
+
+test('legacy video periods survive more than twelve unrelated refreshes and a service restart', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service, disk } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [{ id: 'old', status: 'completed', groups: [old] }] } });
+  for (let index = 0; index < 13; index++) { await service.saveAndRefreshMusicTag([]); await service.job; }
+  assert.equal(disk().runs.length, 12);
+  assert.deepEqual(disk().videoHistory, [old]);
+  const reloaded = fixture({ stored: disk() }).service;
+  assert.deepEqual((await reloaded.state()).videoHistory.map(group => group.result), [old.result]);
+});
+
+test('weekly archive is published only after durable save; disk failure leaves prior history intact', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [], videoHistory: [old] }, write: async () => { throw new Error('disk full'); } });
+  await service.state();
+  const group = { kind: 'videos', keyword: '甲', status: 'running' };
+  const run = { id: 'new', groups: [group] };
+  service.data.runs = [run];
+  await assert.rejects(service.saveCapturedGroup(run, group, historyVideo('甲', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08').result), /保存失败/);
+  assert.deepEqual((await service.state()).videoHistory, [old]);
+  assert.equal(group.result, undefined);
+});
+
+test('successful video save archives the new week without losing the prior week', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service, disk } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [], videoHistory: [old] } });
+  await service.state();
+  const group = { kind: 'videos', keyword: '甲', status: 'running' };
+  const run = { id: 'new', groups: [group] };
+  service.data.runs = [run];
+  await service.saveCapturedGroup(run, group, historyVideo('甲', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08').result);
+  assert.deepEqual(videoHistoryPeriods(disk().videoHistory, ['甲']), ['2026-10-05', '2026-09-28']);
+  assert.equal(disk().videoHistory[0].status, 'completed');
+});
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: '2026-09-25 - 2026-10-01',
+  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
 
 function fixture({ stored, collect, auth, write } = {}) {
-  let disk = stored || { version: 1, keywords: [], runs: [] };
+  let disk = stored || { version: 1, loginEntryUrl: 'https://dy.feigua.cn/', keywords: [], runs: [] };
   const calls = [];
   const browser = {
     async openLogin() {}, async checkLogin() { return auth || { status: 'authenticated', message: '已登录' }; },
@@ -166,24 +259,62 @@ test('busy keyword refresh cannot replace saved groups, and login failure preser
   assert.equal(state.runs[0].status,'failed');
 });
 
-test('catalogs update automatically even with no keywords; refresh errors preserve cached selections', async () => {
+test('catalogs update on their visited source pages and failed rereads preserve cached selections', async () => {
   const {service,browser}=fixture();
-  browser.getVideoFilters=async()=>videoCatalog;
-  browser.getMusicTags=async()=>({options:[{label:'榜单分类',children:[]}]});
+  const original=browser.collect;
+  browser.getVideoFilters=async()=>{throw new Error('separate catalog navigation must not run');};
+  browser.getMusicTags=async()=>{throw new Error('separate catalog navigation must not run');};
+  browser.collect=async(kind,...args)=>({...await original(kind,...args),...(kind==='music'?{musicTagOptions:[{label:'榜单分类',children:[]}]}:kind==='videos'?{videoFilterOptions:videoCatalog}:{})});
+  await service.start(); await service.job;
+  assert.deepEqual((await service.state()).musicTagOptions,[{label:'榜单分类',children:[]}]);
+  assert.equal((await service.state()).videoFilterOptions.categoryPath.length,22);
+  await service.saveKeywords(['目录测试词']);
   await service.start(); await service.job;
   assert.deepEqual((await service.state()).videoFilterOptions,videoCatalog);
   await service.saveVideoQueries(videoQueries);
-  browser.getVideoFilters=async()=>{throw new Error('private payload');};
+  browser.collect=async(kind,...args)=>({...await original(kind,...args),...(kind==='videos'?{catalogWarning:'分类目录更新暂未完成'}:{})});
   await service.start(); await service.job;
   const state=await service.state();
   assert.deepEqual(state.videoQueries,videoQueries);
   assert.deepEqual(state.videoFilterOptions,videoCatalog);
-  assert.match(state.catalogMessage,/自动加载失败/);
-  assert.doesNotMatch(JSON.stringify(state),/private payload/);
+  assert.match(state.catalogMessage,/目录更新暂未完成/);
+});
+
+test('login confirmation starts collection before any separate catalog work',async()=>{
+  const {service,browser}=fixture();
+  let started,release;
+  const first=new Promise(resolve=>{started=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  browser.getMusicTags=()=>new Promise(()=>{});
+  browser.getVideoFilters=()=>new Promise(()=>{});
+  const original=browser.collect;
+  browser.collect=async(...args)=>{if(args[0]==='music'){started();await gate;}return original(...args);};
+  browser.openLogin=async()=>{browser.onAuthChange({status:'authenticated',message:'已登录'});};
+  await service.login();await service.autoStart;
+  let timer;
+  try {
+    await Promise.race([first,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('catalog work delayed first collection')),1000);})]);
+    const state=await service.state();
+    assert.equal(state.runs[0].trigger,'login');
+    assert.equal(state.runs[0].groups[0].status,'running');
+    assert.match(state.runs[0].message,/正在采集/);
+  }finally{clearTimeout(timer);release();}
+  await service.job;
+  assert.equal((await service.state()).runs[0].status,'completed');
+});
+
+test('page settling tracks only the current provider ranking loads, excluding analytics and other windows',()=>{
+  const origin='http://192.0.2.10:13042';
+  const details={webContentsId:123,url:`${origin}/api/v1/music/search/page`,resourceType:'xhr'};
+  assert.equal(isCollectionLoadingRequest(details,123,origin),true);
+  assert.equal(isCollectionLoadingRequest({...details,url:`${origin}/app/`,resourceType:'mainFrame'},123,origin),true);
+  for(const changed of [{webContentsId:456},{url:'https://log.example/collect'},{url:`${origin}/api/v1/other/getUserNotice`},{resourceType:'image'}])assert.equal(isCollectionLoadingRequest({...details,...changed},123,origin),false);
+  assert.equal(isCollectionLoadingRequest(details,123,'http://192.0.2.10:13045'),false);
 });
 
 test('browser applies both video paths, then keyword, period and sales sort for each group', async () => {
   const browser=new FeiguaBrowser({}); const calls=[];
+  browser.readRanking=async()=>({});
   browser.openSource=async()=>{};browser.settle=async()=>{};
   browser.execute=async(command,args)=>{calls.push([command,args]);return {verified:true};};
   await browser.collect('videos','拌饭',undefined,videoQueries[0]);
@@ -210,33 +341,41 @@ test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
   assert.equal(dueHotspotsDate(Date.parse('2026-10-02T16:00:00Z')), null);
 });
 
-test('daily keyword videos start at exactly 06:30 Beijing time and reset at midnight',()=>{
-  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:29:59Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:30:00Z')),'2026-10-02');
-  assert.equal(dueHotspotsDate(Date.parse('2026-10-01T22:30:00Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-02T15:59:59Z')),'2026-10-02');
-  assert.equal(dueVideosDate(Date.parse('2026-10-02T16:00:00Z')),null);
+test('weekly videos become due Monday at 06:30 Beijing time and remain catch-up eligible until Sunday',()=>{
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:29:59Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:30:00Z')),'2026-10-05');
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-04T22:30:00Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-06T16:00:00Z')),'2026-10-05');
+  assert.equal(dueVideosDate(Date.parse('2026-10-11T15:59:59Z')),'2026-10-05');
+  assert.equal(dueVideosDate(Date.parse('2026-10-11T16:00:00Z')),null);
 });
 
 test('06:30 collects every saved video group once and preserves independent 07:00 schedule across restart',async()=>{
   const {service,calls,disk}=fixture({stored:{version:1,keywords:videoQueries.map(q=>q.keyword),videoQueries,videoFilterOptions:videoCatalog,runs:[]}});
-  const now=Date.parse('2026-10-01T22:30:00Z');
+  const now=Date.parse('2026-09-27T22:30:00Z');
   await service.checkDailySchedule(now-1,()=>true);
   await service.checkDailySchedule(now,()=>false);
   assert.equal(calls.length,0);
   await Promise.all([service.checkDailySchedule(now,()=>true),service.checkDailySchedule(now,()=>true)]);await service.job;
   assert.deepEqual(calls,[['videos','拌饭'],['videos','收纳']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,null);
-  assert.equal(disk().runs[0].trigger,'daily-videos');
+  assert.equal(disk().runs[0].trigger,'weekly-videos');
   assert.deepEqual(disk().runs[0].groups[0].result.filters,{...videoQueries[0],publishedAt:'不限'});
   const restored=fixture({stored:disk()});
   await restored.service.checkDailySchedule(now+1000,()=>true);
   assert.equal(restored.calls.length,0);
   await restored.service.checkDailySchedule(now+1800000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls,[['hotspots',null]]);
-  await restored.service.checkDailySchedule(now+86400000,()=>true);await restored.service.job;
+  await restored.service.checkDailySchedule(now+7*86400000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls.slice(1),[['videos','拌饭'],['videos','收纳']]);
+});
+
+test('existing daily video marker migrates into its week and does not collect again on later days', async () => {
+  const { service, calls } = fixture({ stored: { version: 1, keywords: ['词'], runs: [], lastVideosScheduleDate: '2026-10-07', lastHotspotsScheduleDate: '2026-10-08' } });
+  assert.equal((await service.state()).lastVideosScheduleDate, '2026-10-05');
+  await service.checkDailySchedule(Date.parse('2026-10-08T02:00:00Z'), () => true);
+  assert.deepEqual(calls, []);
 });
 
 test('late startup catches up videos first, waits while busy, then independently catches up hotspots',async()=>{
@@ -253,11 +392,11 @@ test('late startup catches up videos first, waits while busy, then independently
   await service.checkDailySchedule(now,()=>true);
   assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null]]);
   assert.equal(disk().runs.length,2);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
 
-test('video schedule failure and cancellation do not retry that day or consume hotspot schedule',async()=>{
+test('video schedule failure and cancellation do not retry that week or consume hotspot schedule',async()=>{
   for(const cancel of [false,true]) {
     const {service,browser,calls,disk}=fixture();await service.saveKeywords(['词']);
     let release;
@@ -269,7 +408,7 @@ test('video schedule failure and cancellation do not retry that day or consume h
     await service.checkDailySchedule(now+60000,()=>true);
     assert.equal(disk().runs[0].status,cancel?'cancelled':'failed');
     assert.equal(calls.length,0);assert.equal(disk().runs.length,1);
-    assert.equal(disk().lastVideosScheduleDate,'2026-10-02');assert.equal(disk().lastHotspotsScheduleDate,null);
+    assert.equal(disk().lastVideosScheduleDate,'2026-09-28');assert.equal(disk().lastHotspotsScheduleDate,null);
   }
 });
 
@@ -301,13 +440,13 @@ test('adding or editing a keyword immediately collects only changed groups; dele
   assert.deepEqual(calls,[['videos','拌饭']]);
 });
 
-test('new groups still collect immediately after the daily quota is used, without resetting it',async()=>{
+test('new groups still collect immediately after the weekly schedule is used, without resetting it',async()=>{
   const {service,calls,disk}=fixture();await service.saveKeywords(['旧关键词']);
   const now=Date.parse('2026-10-01T22:30:00Z');
   await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
   await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
   assert.deepEqual(calls,[['videos','新关键词']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   await service.checkDailySchedule(now+1000,()=>true);assert.equal(calls.length,1);
 });
 
@@ -423,8 +562,10 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
   assert.equal(result.rows.length, 5);
   assert.equal(result.rows[0].sales, '10w~25w');
   assert.equal(result.rows[0].products[0].commission, '5.00%');
-  assert.equal(result.rows[0].plays, null);
-  assert.ok(result.rows[0].missingFields.includes('plays'));
+  assert.equal(result.rows[0].salesCount, null);
+  assert.ok(result.rows[0].missingFields.includes('salesCount'));
+  assert.equal(result.rows[0].missingFields.includes('plays'),false);
+  assert.equal(validateCapture('videos','测试',capture('videos','测试',{rows:[{...capture('videos','测试').rows[0],salesCount:'2500-5000'}]})).rows[0].salesCount,'2500-5000');
   assert.equal(result.filters.publishedAt, '不限');
   for (const invalid of [{ sort: '视频销量' }, { direction: 'asc' }, { period: '本周' }, { keyword: '其他词' }, { filtersVerified: false }, { dateRange: null }, { rows: [] }, { url: 'https://evil.example/' }]) {
     assert.throws(() => validateCapture('videos', '测试', capture('videos', '测试', invalid)));
@@ -432,14 +573,107 @@ test('only verified provider ranking is accepted; sales ranges remain unchanged'
   assert.equal(validateCapture('videos', '测试', capture('videos', '测试', { rows: [], emptyVerified: true })).rows.length, 0);
 });
 
+test('statistics dates validate calendar days and period length without relabelling stale provider data', () => {
+  const now = Date.parse('2026-10-02T00:00:00Z');
+  assert.deepEqual(validateCaptureDates('hotspots', '2026/10/1', now), { dateRange: '2026-10-01', dateWarning: null });
+  assert.equal(validateCaptureDates('hotspots', '2026-10-01 - 2026-10-01', now).dateRange, '2026-10-01');
+  assert.equal(validateCaptureDates('topics', '2026-09-21 - 2026-09-27', now).dateWarning, null);
+  assert.equal(validateCaptureDates('videos', '2026-09-26 - 2026-10-02', now).dateWarning, null);
+  assert.match(validateCaptureDates('hotspots', '2020-01-01', now).dateWarning, /较旧/);
+  assert.equal(validateCaptureDates('hotspots', '2020-01-01', now).dateRange, '2020-01-01');
+  assert.match(validateCaptureDates('topics', '2026-09-14 - 2026-09-20', now).dateWarning, /较旧/);
+  for (const raw of [null, '', '2026-02-30', '2026-10-03', '2026-09-25 - 2026-10-01', '日期：2026-10-01']) {
+    assert.throws(() => validateCaptureDates('hotspots', raw, now));
+  }
+  for (const kind of ['topics', 'videos']) for (const raw of ['2026-10-01', '2020-01-01 - 2020-12-31', '2026-10-01 - 2026-09-25', '2026-02-24 - 2026-02-30']) {
+    assert.throws(() => validateCaptureDates(kind, raw, now));
+  }
+});
+
+test('ranking metrics reject permission placeholders and retain actual provider units and ranges', () => {
+  const examples = { music: ['0', '88.2w', '1,234', '1.5万'], topics: ['97.2w%', '-12.5%', '+10%', '0%'], hotspots: ['1249.1w', '0'], videos: ['25w-50w', '10w~25w', '1,000-2,500', '<100', '0'] };
+  for (const [kind, values] of Object.entries(examples)) {
+    for (const raw of values) assert.equal(isRankingMetric(kind, raw), true, `${kind}: ${raw}`);
+    for (const raw of ['开通会员查看', '--', '暂无', '升级至123会员', '', null]) assert.equal(isRankingMetric(kind, raw), false, `${kind}: ${raw}`);
+  }
+  const invalid = capture('hotspots'); invalid.rows[0].peakHeat = '开通会员查看';
+  assert.throws(() => validateCapture('hotspots', null, invalid), /权限提示/);
+  const actual = capture('topics'); actual.rows[0].participantGrowth = '97.2w%';
+  assert.equal(validateCapture('topics', null, actual).rows[0].participantGrowth, '97.2w%');
+});
+
+test('a ranking placeholder fails its group while independent sources still collect', async () => {
+  const {service, browser} = fixture();
+  await service.start(); await service.job;
+  const before = await service.state();
+  browser.collect = async (kind, keyword) => {
+    const next = capture(kind, keyword);
+    if (kind === 'music') next.rows[0].yesterdayUsers = '开通会员查看';
+    return next;
+  };
+  await service.start(); await service.job;
+  const after = await service.state();
+  assert.equal(after.runs[0].status, 'partial');
+  assert.equal(after.runs[0].groups[0].status, 'failed');
+  assert.equal(after.runs[0].groups[0].result, undefined);
+  const latest = after.latestResults.find(group => group.kind === 'music');
+  assert.equal(latest.sourceRunId, before.runs[0].id);
+});
+
+test('result persistence failure never publishes unsaved rows and preserves durable results after restart', async () => {
+  let fail = false;
+  const {service, calls, disk} = fixture({write: async data => {
+    if (fail && data.runs[0]?.groups[0]?.result) throw new Error('private disk detail');
+  }});
+  await service.start(); await service.job;
+  const oldRun = (await service.state()).runs[0].id;
+  fail = true; calls.length = 0;
+  await service.start(); await service.job;
+  const state = await service.state();
+  assert.equal(state.runs[0].status, 'failed');
+  assert.equal(state.runs[0].groups[0].status, 'failed');
+  assert.equal(state.runs[0].groups[0].result, undefined);
+  assert.ok(state.runs[0].groups.slice(1).every(group => group.status === 'skipped'));
+  assert.equal(calls.length, 1);
+  assert.match(state.storageMessage, /保存失败/);
+  assert.doesNotMatch(JSON.stringify(state), /private disk detail/);
+  assert.equal(state.latestResults.find(group => group.kind === 'music').sourceRunId, oldRun);
+  assert.equal(disk().runs[0].groups[0].result, undefined);
+  const shown = displayedFeiguaGroups(state.runs, '', state.latestResults)[0];
+  assert.equal(shown.showingPrevious, true);
+  assert.equal(shown.refreshStatus, 'failed');
+  const reloaded = fixture({stored: disk()}).service;
+  assert.equal((await reloaded.state()).latestResults.find(group => group.kind === 'music').sourceRunId, oldRun);
+  fail = false;
+  await service.start(); await service.job;
+  assert.equal((await service.state()).storageMessage, null);
+});
+
+test('state polling cannot observe captured rows before the durable write resolves', async () => {
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { entered = resolve; });
+  const {service} = fixture({write: async data => {
+    if (data.runs[0]?.groups[0]?.result) { entered(); await gate; }
+  }});
+  await service.start(); await waiting;
+  const pending = await service.state();
+  assert.equal(pending.runs[0].groups[0].status, 'running');
+  assert.equal(pending.runs[0].groups[0].result, undefined);
+  assert.equal(pending.latestResults.length, 0);
+  release(); await service.job;
+  assert.equal((await service.state()).runs[0].status, 'completed');
+});
+
 test('hotspots select the daily hot ranking and verify descending peak heat before capture', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking = async () => capture('hotspots');
   const calls = [];
   browser.openSource = async kind => { calls.push(['source', FEIGUA_SOURCES[kind].navigation]); };
   browser.settle = async () => {};
   browser.execute = async (command, args) => {
     calls.push([command, args]);
-    return command === 'capture' ? capture('hotspots', null, args) : { verified: true };
+    return { verified: true };
   };
   const result = await browser.collect('hotspots');
   assert.deepEqual(calls, [
@@ -447,8 +681,8 @@ test('hotspots select the daily hot ranking and verify descending peak heat befo
     ['choice', { label: '热点榜' }],
     ['choice', { label: '日榜' }],
     ['optional-filters', undefined],
-    ['sort', { label: '峰值热度', verify: false }],
-    ['capture', { kind: 'hotspots', keyword: undefined, sort: '峰值热度', period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
+    ['capture-context', { kind: 'hotspots', keyword: undefined, period: '日榜' }],
   ]);
   assert.equal(validateCapture('hotspots', null, result).period, '日榜');
   for (const invalid of [{ period: '近7天' }, { period: '实时榜' }, { period: '周榜' }, { direction: 'asc' }]) {
@@ -505,6 +739,21 @@ test('session expiry halts remaining groups and preserves successful groups', as
   assert.doesNotMatch(JSON.stringify(state), /private network detail/);
 });
 
+test('exhausted provider quota stops remaining keyword requests while keeping completed rankings', async () => {
+  const {service,calls}=fixture({collect:async(kind,keyword)=>{
+    if(kind==='videos')throw Object.assign(new Error('quota'),{code:'FEIGUA_QUOTA',publicMessage:'飞瓜接口查询额度已用完'});
+    return capture(kind,keyword);
+  }});
+  await service.saveKeywords(['合成甲','合成乙']);
+  await service.start();await service.job;
+  const state=await service.state();
+  assert.equal(calls.length,4);
+  assert.equal(state.runs[0].status,'partial');
+  assert.equal(state.runs[0].groups[3].status,'failed');
+  assert.equal(state.runs[0].groups[4].status,'skipped');
+  assert.equal(state.runs[0].groups.filter(group=>group.result).length,3);
+});
+
 test('failed refresh does not overwrite older successful results', async () => {
   const { service, browser } = fixture();
   await service.start(); await service.job;
@@ -558,7 +807,7 @@ test('provider window is sandboxed and reuses its own persistent session without
   const partition = new EventEmitter();
   Object.assign(partition, { setPermissionRequestHandler: handler => { permissions = handler; }, setPermissionCheckHandler() {}, webRequest: { onBeforeRequest() {}, onCompleted() {}, onErrorOccurred() {} } });
   class Window extends EventEmitter {
-    constructor(opts) { super(); options = opts; this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler: handler => { popup = handler; } }); }
+    constructor(opts) { super(); options = opts; this.webContents = new EventEmitter(); Object.assign(this.webContents, { getURL: () => '', setWindowOpenHandler: handler => { popup = handler; } }); }
     isDestroyed() { return false; } show() {} focus() {} loadURL() { return Promise.resolve(); }
   }
   const browser = new FeiguaBrowser({ BrowserWindow: Window, session: { fromPartition: name => { assert.equal(name, 'persist:feigua-trends'); return partition; } } });
@@ -742,6 +991,7 @@ test('topic results must confirm the complete shared path including the second l
 
 test('topic browser applies shared first/second levels without changing weekly ranking rules', async () => {
   const browser = new FeiguaBrowser({});
+  browser.readRanking=async()=>({});
   const calls=[];
   browser.openSource=async kind=>assert.equal(kind,'topics');
   browser.settle=async()=>{};
@@ -841,6 +1091,28 @@ test('save and refresh keeps selection and records a visible failure when login 
   const state=await service.state();
   assert.deepEqual(state.musicTag,['测试一级甲']);assert.equal(calls.length,0);
   assert.equal(state.runs[0].status,'failed');assert.match(state.runs[0].groups[0].message,/已保存/);
+});
+
+test('saving a category checks the current session once, collects if valid, and prompts relogin if expired', async () => {
+  for (const status of ['authenticated','expired']) {
+    const {service,browser,calls}=fixture();
+    await service.ready;
+    await service.cacheMusicTags({options:tagOptions});
+    let checks=0;
+    browser.checkLogin=async()=>{checks++;return {status,message:status==='expired'?'飞瓜登录已失效，请点击“打开登录入口”重新登录':'已登录飞瓜'};};
+    await service.saveAndRefreshMusicTag(['测试一级甲','测试二级甲']);
+    await service.job;
+    const state=await service.state();
+    assert.equal(checks,1);
+    assert.deepEqual(state.musicTag,['测试一级甲','测试二级甲']);
+    if(status==='authenticated') assert.deepEqual(calls.map(([kind])=>kind),['music','topics']);
+    else {
+      assert.equal(calls.length,0);
+      assert.equal(state.auth.status,'expired');
+      assert.equal(state.runs[0].status,'failed');
+      assert.ok(state.runs[0].groups.every(group=>/重新登录/.test(group.message)));
+    }
+  }
 });
 
 test('busy refresh refuses to overwrite settings or start a second BGM job', async () => {

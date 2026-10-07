@@ -11,6 +11,9 @@
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .heading p { margin-top: 5px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.loginEntry { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; color: #34595c; font-size: 12px; }
+.loginEntry input { flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #d5e1e2; border-radius: 7px; background: white; color: #29494c; font: inherit; }
+.loginEntry small { flex-basis: 100%; color: #728489; font-size: 11px; }
 .connection { display: flex; align-items: center; gap: 8px; color: #718185; font-size: 12px; margin: 22px 0; }
 .connection > span:last-child { margin-left: auto; }
 .dot,.online { width: 7px; height: 7px; border-radius: 50%; background: #a3afb0; }
@@ -60,6 +63,9 @@
 .rank { font-size: 12px; color: #8aa3a5; font-variant-numeric: tabular-nums; padding-top: 2px; }
 .rowContent { flex: 1; min-width: 0; }
 .rowContent h4 { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.contentLink { color: inherit; text-decoration: underline; text-decoration-color: #b7d5d1; text-underline-offset: 3px; }
+.contentLink:hover { color: #168c82; text-decoration-color: currentColor; }
+.contentLink:focus-visible { outline: 2px solid #229d93; outline-offset: 3px; border-radius: 2px; }
 .rowContent p { font-size: 11px; margin-top: 4px; }
 .rowContent dl { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
 .rowContent dt { color: #8a9b9e; font-size: 10px; }
@@ -72,6 +78,11 @@
 .videoSection { margin-top: 20px; }
 .videoSection > header { padding: 20px; }
 .videoSection > header p { margin-top: 6px; }
+.videoPeriods { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 14px 2px 6px; }
+.videoPeriods > span { font-size: 12px; color: #73868b; white-space: nowrap; }
+.videoPeriods button { flex: 0 0 auto; border-radius: 18px; padding: 7px 13px; font-variant-numeric: tabular-nums; }
+.videoPeriods button[aria-pressed="true"] { color: white; background: #238e86; border-color: #238e86; }
+.videoSection .videoPeriodNotice { padding: 0 20px 16px; }
 .videoGroup { padding: 0 20px 15px; }
 .videoGroup h3 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 0; color: #238e86; }
 .videoGroup h3 small { font-size: 11px; color: #8a9b9e; font-weight: normal; }
