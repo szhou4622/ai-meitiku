@@ -13,7 +13,7 @@ type Run = { id: string; startedAt: string; finishedAt: string | null; status: s
 type MusicTagOption = { label: string; children: { label: string }[] };
 type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
 type CategoryOption = { label: string; children: CategoryOption[] };
-type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
+type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; credentialMessage?: string | null; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveLoginEntryUrl: (url: string) => Promise<State>;
@@ -214,6 +214,7 @@ export function FeiguaTrends() {
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
+    {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
     <p>本周品类新发布每天北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后当天打开或恢复运行会补采一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>

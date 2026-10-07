@@ -65,6 +65,7 @@ import { createStableMachineIdentity, publicMachineIdentity } from "./machine-co
 import { QianchuanService, qianchuanInternals } from "./qianchuan-service.mjs";
 import { FeiguaService } from "./feigua-service.mjs";
 import { FeiguaBrowser } from "./feigua-browser.mjs";
+import { FeiguaLoginCredentialStore } from "./feigua-login-credentials.mjs";
 import { buildFolderRelinkPlan } from "./media-folder-relink.mjs";
 import { extractProductInfoFiles, extractScannedProductInfoFiles, PRODUCT_INFO_SUPPORTED_EXTENSIONS } from "./product-info-files.mjs";
 import { StorageManagementService } from "./storage-management.mjs";
@@ -167,7 +168,7 @@ let feiguaService = null;
 function getFeiguaService() {
   if (!feiguaService) feiguaService = new FeiguaService({
     userDataPath: app.getPath("userData"),
-    browser: new FeiguaBrowser({ BrowserWindow, session }),
+    browser: new FeiguaBrowser({ BrowserWindow, session, ipcMain, credentialStore: new FeiguaLoginCredentialStore({ secureStore: apiSettingsSecureStore }) }),
   });
   return feiguaService;
 }

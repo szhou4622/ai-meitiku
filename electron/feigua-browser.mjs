@@ -3,6 +3,8 @@ import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normal
 import { feiguaPage } from './feigua-page.mjs';
 import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
+import { normalizeLoginCredentials, loginFormMemory } from './feigua-login-credentials.mjs';
+import { fileURLToPath } from 'node:url';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
@@ -16,7 +18,7 @@ export function isFeiguaNavigation(value, loginEntryUrl = '') {
 }
 
 export class FeiguaBrowser {
-  constructor({ BrowserWindow, session }) {
+  constructor({ BrowserWindow, session, credentialStore, ipcMain }) {
     this.BrowserWindow = BrowserWindow; this.session = session;
     this.window = null; this.pending = new Set(); this.lastNetwork = 0;
     this.wasAuthenticated = false;
@@ -28,6 +30,19 @@ export class FeiguaBrowser {
     this.rankingRequests = [];
     this.verifiedSourceOrigin = null;
     this.workspaceHint = null;
+    this.credentialStore = credentialStore;
+    this.credentialTimer = null;
+    this.credentialContext = null;
+    this.credentialPending = false;
+    this.credentialMessage = null;
+    this.ipcMain = ipcMain;
+    this.credentialListener = (event, payload) => {
+      event.returnValue = false;
+      const window = this.window;
+      if (!window || window.isDestroyed() || !event.senderFrame || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isLoginEntryNavigation(event.senderFrame.url, this.loginEntryUrl)) return;
+      event.returnValue = this.rememberLoginCredentials(payload);
+    };
+    if (credentialStore && ipcMain) ipcMain.on('feigua-private-login-memory', this.credentialListener);
   }
 
   setLoginEntryUrl(value) {
@@ -43,6 +58,65 @@ export class FeiguaBrowser {
   }
 
   sourceOrigin() { return this.verifiedSourceOrigin; }
+
+  stopCredentialMemory() {
+    clearInterval(this.credentialTimer);
+    this.credentialTimer = null;
+    this.credentialContext = null;
+  }
+
+  async runLoginMemory(window, command, credentials) {
+    const entryUrl = this.loginEntryUrl;
+    if (this.window !== window || window.isDestroyed() || !isLoginEntryNavigation(window.webContents.getURL(), entryUrl)) return { installed: false };
+    const argument = { command, origin: new URL(entryUrl).origin, credentials };
+    const result = await window.webContents.executeJavaScriptInIsolatedWorld(47, [{ code: `(() => { try { return (${loginFormMemory.toString()})(${JSON.stringify(argument)}); } catch { return { installed: false, failed: true }; } })()` }]);
+    if (this.window !== window || window.isDestroyed() || this.loginEntryUrl !== entryUrl || !isLoginEntryNavigation(window.webContents.getURL(), entryUrl)) return { installed: false };
+    return result;
+  }
+
+  async installCredentialMemory(window) {
+    this.stopCredentialMemory();
+    if (!this.credentialStore || !isLoginEntryNavigation(window.webContents.getURL(), this.loginEntryUrl)) return;
+    const entryUrl = this.loginEntryUrl;
+    try {
+      let credentials;
+      try { credentials = await this.credentialStore.read(entryUrl); }
+      catch { this.credentialMessage = '已保存的登录信息暂时无法读取，请手动输入'; }
+      if (this.loginEntryUrl !== entryUrl || this.window !== window || window.isDestroyed()) return;
+      const result = await this.runLoginMemory(window, 'install', credentials);
+      if (!result?.installed) return;
+      this.credentialContext = { entryUrl, windowId: window.webContents.id, lastSequence: 0 };
+      const tick = () => void this.captureCredentialChanges(window).catch(() => {
+        this.credentialMessage = '登录信息未能加密保存，请手动输入；当前登录仍可继续';
+      });
+      this.credentialTimer = setInterval(tick, 300);
+      this.credentialTimer.unref?.();
+      tick();
+    } catch { this.credentialMessage = '登录信息自动回填未完成，请手动输入'; }
+  }
+
+  async captureCredentialChanges(window) {
+    if (this.credentialPending || !this.credentialContext) return;
+    this.credentialPending = true;
+    const entryUrl = this.credentialContext.entryUrl;
+    try {
+      const state = await this.runLoginMemory(window, 'take');
+      if (!state?.installed || !state.credentials) return;
+      if (this.credentialContext?.entryUrl === entryUrl) this.rememberLoginCredentials(state);
+    } finally { this.credentialPending = false; }
+  }
+
+  rememberLoginCredentials(payload) {
+    const context = this.credentialContext;
+    if (!context || !this.credentialStore || this.loginEntryUrl !== context.entryUrl || !Number.isSafeInteger(payload?.sequence) || payload.sequence <= context.lastSequence || ![true, false].includes(payload.remember)) return false;
+    const credentials = payload.remember ? normalizeLoginCredentials(payload.credentials) : null;
+    if (payload.remember && !credentials) return false;
+    context.lastSequence = payload.sequence;
+    void this.credentialStore.write(context.entryUrl, credentials).then(() => {
+      if (this.loginEntryUrl === context.entryUrl) this.credentialMessage = null;
+    }).catch(() => { this.credentialMessage = '登录信息未能加密保存，请手动输入；当前登录仍可继续'; });
+    return true;
+  }
 
   setWorkspaceHint(value) {
     this.workspaceHint = normalizeWorkspaceHint(value, this.loginEntryUrl);
@@ -85,8 +159,13 @@ export class FeiguaBrowser {
       this.partition.webRequest.onErrorOccurred(done);
     }
     const window = new this.BrowserWindow({ width: 1320, height: 900, show, title: '飞瓜 · 热点采集',
-      webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
+      webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
+        ...(this.credentialStore ? { preload: fileURLToPath(new URL('./feigua-login-preload.cjs', import.meta.url)) } : {}) } });
     this.window = window;
+    window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+      if (isMainFrame && !isInPlace) this.stopCredentialMemory();
+    });
+    window.webContents.on('did-finish-load', () => { void this.installCredentialMemory(window); });
     const allowedNavigation = url => isFeiguaNavigation(url, this.loginEntryUrl) || [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin));
     const guard = (event, url) => { if (!allowedNavigation(url)) event.preventDefault(); };
     window.webContents.on('will-navigate', guard);
@@ -101,7 +180,7 @@ export class FeiguaBrowser {
       else this.onAuthChange?.({ status: 'signed_out', message: '入口跳转地址尚不支持，请返回入口重试或核对网址' });
       return { action: 'deny' };
     });
-    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); this.rankingRequests = []; });
+    window.on('closed', () => { this.stopCredentialMemory(); this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); this.rankingRequests = []; });
     return window;
   }
 
@@ -380,5 +459,5 @@ export class FeiguaBrowser {
   }
 
   stop() { this.window?.webContents.stop(); }
-  dispose() { this.stopLoginWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
+  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
 }

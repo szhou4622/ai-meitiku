@@ -1,5 +1,6 @@
 
 import { feiguaPage } from '/electron/feigua-page.mjs';
+import { loginFormMemory } from '/electron/feigua-login-credentials.mjs';
 const frame = document.querySelector('iframe');
 const outputs = [];
 async function mount(html) {
@@ -9,6 +10,34 @@ const run = (command, args = {}) => frame.contentWindow.eval(`(${feiguaPage.toSt
 const assert = (name, passed) => { outputs.push(`${passed ? 'PASS' : 'FAIL'} ${name}`); if (!passed) throw new Error(name); };
 const shell = '<aside>个人中心 收藏夹 视频/素材</aside>';
 try {
+  {
+    const loginHtml='<form><input id="username" name="username"><input id="password" name="password" type="password"><input id="save_pass" type="checkbox" checked><button type="button">登录</button></form>';
+    await mount(loginHtml);
+    const doc=frame.contentDocument, origin=frame.contentWindow.location.origin;
+    const saved={username:'synthetic-user',password:'synthetic-password'};
+    const memory=args=>frame.contentWindow.eval(`(${loginFormMemory.toString()})(${JSON.stringify({origin,...args})})`);
+    let clicked=0;doc.querySelector('button').onclick=()=>{clicked++;};
+    assert('登录信息回填到正确表单',memory({command:'install',credentials:saved}).filled===true&&doc.querySelector('#username').value===saved.username&&doc.querySelector('#password').value===saved.password);
+    assert('自动回填不点击登录',clicked===0);
+    assert('输入只交给主进程私有采集通道',memory({command:'take'}).credentials.password===saved.password);
+    doc.querySelector('#password').value='synthetic-new-password';
+    doc.querySelector('#password').dispatchEvent(new frame.contentWindow.Event('input',{bubbles:true}));
+    assert('新输入覆盖旧密码',memory({command:'take'}).credentials.password==='synthetic-new-password');
+    doc.querySelector('#password').value='';
+    assert('临时清空字段不删除已记忆信息',memory({command:'take'}).credentials===null);
+    doc.querySelector('#save_pass').checked=false;
+    assert('取消记住密码请求撤销保存',memory({command:'take'}).credentials.remember===false);
+    await mount(loginHtml);
+    const freshOrigin=frame.contentWindow.location.origin;
+    const fresh=args=>frame.contentWindow.eval(`(${loginFormMemory.toString()})(${JSON.stringify({origin:freshOrigin,...args})})`);
+    assert('其他来源不能回填',fresh({command:'install',origin:'https://other.example',credentials:saved}).installed===false&&frame.contentDocument.querySelector('#password').value==='');
+    frame.contentDocument.querySelector('#username').value='different-synthetic-user';
+    assert('更换账号不填入旧账号密码',fresh({command:'install',credentials:saved}).filled===false&&frame.contentDocument.querySelector('#password').value==='');
+    await mount(loginHtml);
+    frame.contentDocument.querySelector('#password').value='synthetic-current-input';
+    fresh({command:'install',credentials:saved});
+    assert('已有用户输入不会被旧密码覆盖',frame.contentDocument.querySelector('#password').value==='synthetic-current-input');
+  }
   {
     await mount(shell + `<div class="tag-cascader"><span class="tag-label">视频标签</span><ul class="tag-list"><li class="tag-element"><span class="tag-text">时尚</span></li></ul></div>
       <div class="el-popover" id="own-panel" style="display:none"><label><span>护肤</span></label></div>

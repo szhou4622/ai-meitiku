@@ -135,7 +135,7 @@ export class FeiguaService {
 
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), credentialMessage: this.browser.credentialMessage || null, storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
   }
 
   startDailySchedule(canRun) {
