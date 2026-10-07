@@ -124,13 +124,13 @@ export function feiguaPage(command, argument = {}) {
     const depth = argument.phase === 'expand' ? argument.depth : Math.max(0, path.length - 1);
     if (!Number.isInteger(depth) || depth < 0 || depth >= Math.max(1, path.length)) return failure('视频分类层级无效');
     const popovers = [...new Set([...elements('.el-popover', data.root), ...(visible(data.popover) ? [data.popover] : [])])];
-    if (popovers.some(popover => elements('.purview-mask-layer', popover).some(mask => getComputedStyle(mask).pointerEvents !== 'none'))) return failure(`当前飞瓜账号的${argument.label}筛选权限受限，本组未采集`);
     const matches = depth === 0
       ? elements('.tag-list > .tag-element', data.root).filter(node => compact(node) === (path[0] || '全部'))
       : popovers.flatMap(popover => exact(path[depth], popover));
     const targets = [...new Set(matches)];
     if (targets.length !== 1) return failure(`无法唯一定位${argument.label}第${depth + 1}级选项`);
     const target = depth === 0 ? targets[0].querySelector('.tag-text') || targets[0] : targets[0].closest('label') || targets[0];
+    if (popovers.some(popover => elements('.purview-mask-layer', popover).some(mask => getComputedStyle(mask).pointerEvents !== 'none' && mask.parentElement.contains(target)))) return failure(`当前飞瓜账号的${argument.label}筛选权限受限，本组未采集`);
     if (argument.phase === 'expand') {
       target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
       target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));

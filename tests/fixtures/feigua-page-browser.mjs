@@ -81,7 +81,9 @@ try {
     assert('视频外置浮层选择后回读完整路径',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],verify:true}).verified===true);
     props.value='0';const mask=doc.createElement('div');mask.className='purview-mask-layer';panel.append(mask);
     assert('视频外置浮层权限遮罩不可穿透',/权限受限/.test(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===1);mask.remove();
-    panel.style.display='none';assert('隐藏的外置浮层不能靠同名干扰选中',Boolean(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===1);
+    const peer=doc.createElement('div');peer.innerHTML='<label>其他受限分类</label><div class="purview-mask-layer"></div>';panel.append(peer);
+    assert('外置浮层内其他选项受限不妨碍合法选项',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).changed===true&&clicked===2);
+    props.value='0';panel.style.display='none';assert('隐藏的外置浮层不能靠同名干扰选中',Boolean(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===2);
   }
   await mount('<header><a href="https://dy.feigua.cn/synthetic/workspace">进入工作台</a><img alt="用户头像"></header>');
   assert('官网登录后首页识别工作台入口', run('auth').workspaceAvailable === true);
