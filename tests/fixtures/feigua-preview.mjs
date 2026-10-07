@@ -2,9 +2,9 @@
 // Never imported by the production entrypoint. Reload the tab to remove it.
 /**
  * @typedef {{ label: string, children: CatalogNode[] }} CatalogNode
- * @param {{ musicRefreshFails?: boolean, videoCatalog?: { categoryPath: CatalogNode[], tagPath: CatalogNode[] } | null, signedOut?: boolean }} [options]
+ * @param {{ musicRefreshFails?: boolean, videoCatalog?: { categoryPath: CatalogNode[], tagPath: CatalogNode[] } | null, signedOut?: boolean, weeklyHistory?: boolean }} [options]
  */
-export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog = null, signedOut = false } = {}) {
+export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog = null, signedOut = false, weeklyHistory = false } = {}) {
   let state = { keywords: [], musicTag: [], musicTagOptions: [{ label: '合成一级甲', children: [{label:'合成二级甲'}, {label:'合成二级乙'}] }, { label:'合成一级乙', children:[{label:'合成二级丙'}] }], musicTagOptionsLoadedAt: '2026-10-02T00:00:00Z', musicTagRestricted: false, runs: [], busy: false, auth: { status: 'authenticated', message: '合成测试：已登录' } };
   state.videoQueries = [];
   state.videoFilterOptions = { categoryPath: [{label:'合成食品',children:[{label:'合成调味品',children:[{label:'合成酱料',children:[]}]}]}, {label:'合成家居',children:[]}], tagPath: [{label:'合成美食',children:[{label:'合成教程',children:[]}]}, {label:'合成生活',children:[]}] };
@@ -17,6 +17,20 @@ export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog =
     collectedAt: '2026-10-01T11:00:00Z', dateRange: '2026-09-25 - 2026-10-01', period: '近7天',
     rows: Array.from({ length: 5 }, (_, index) => ({ id: `${kind}-${index}`, rank: index + 1, title: `合成测试${kind === 'videos' ? '视频' : '条目'} ${index + 1}`, author: '合成测试达人', totalUsers: '100w', yesterdayUsers: '3.2w', followers: '10w', participantGrowth: '24.5%', playGrowth: '32.1%', peakHeat: '1000w', plays: index ? '20w' : null, likes: '5000', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }], missingFields: index ? [] : ['plays'] })),
   } });
+  if (weeklyHistory) {
+    state.videoQueries = ['合成甲', '合成乙'].map(keyword => ({ keyword, categoryPath: [], tagPath: [] }));
+    state.keywords = state.videoQueries.map(query => query.keyword);
+    const old = group('videos', '合成甲');
+    old.result.collectedAt = '2026-09-28T02:00:00Z'; old.result.dateRange = '2026-09-22 - 2026-09-28';
+    old.result.filters.categoryPath = ['历史分类']; old.result.rows[0].sales = '旧周 10w~25w';
+    const latest = state.keywords.map(keyword => {
+      const current = group('videos', keyword);
+      current.result.collectedAt = '2026-10-05T02:00:00Z'; current.result.dateRange = '2026-09-29 - 2026-10-05';
+      current.result.rows.forEach(row => { row.salesCount = '5000-1w'; });
+      return current;
+    });
+    state.runs = [{ id:'weekly-latest', status:'completed', groups:[group('music'), group('topics'), group('hotspots'), ...latest] }, { id:'weekly-old', status:'completed', groups:[old] }];
+  }
   window.desktopBridge = { ...window.desktopBridge, feigua: {
     state: async () => snapshot(),
     saveKeywords: async keywords => { state.keywords = [...keywords]; return snapshot(); },

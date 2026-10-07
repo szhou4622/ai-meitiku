@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
+import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -32,7 +33,8 @@ export function dueHotspotsDate(now = Date.now()) {
 
 export function dueVideosDate(now = Date.now()) {
   const beijing = new Date(now + 8 * 60 * 60 * 1000);
-  return beijing.getUTCHours() * 60 + beijing.getUTCMinutes() >= 390 ? beijing.toISOString().slice(0, 10) : null;
+  if (beijing.getUTCDay() === 1 && beijing.getUTCHours() * 60 + beijing.getUTCMinutes() < 390) return null;
+  return videoCollectionWeek(new Date(now).toISOString());
 }
 
 export class FeiguaService {
@@ -92,9 +94,10 @@ export class FeiguaService {
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
-      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? data.lastVideosScheduleDate : null,
+      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? videoCollectionWeek(`${data.lastVideosScheduleDate}T04:00:00Z`) : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
-      latestResults: recoverLatestResults(data.runs, data.latestResults), runs: data.runs.slice(0, 12) };
+      latestResults: recoverLatestResults(data.runs, data.latestResults),
+      videoHistory: recoverVideoHistory(data.runs, data.latestResults || [], Array.isArray(data.videoHistory) ? data.videoHistory : []), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
     this.browser.setLoginEntryUrl?.(this.data.loginEntryUrl);
     // Upgrade existing API results into an untrusted reload hint once. An
@@ -360,7 +363,7 @@ export class FeiguaService {
   async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null } = {}) {
     const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'daily-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'weekly-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
     const previousRuns = this.data.runs;
     const scheduleKey = onlyVideos ? 'lastVideosScheduleDate' : 'lastHotspotsScheduleDate';
     const previousScheduleDate = this.data[scheduleKey];
@@ -408,11 +411,13 @@ export class FeiguaService {
       const savedGroup = savedRun.groups[run.groups.indexOf(group)];
       Object.assign(savedGroup, { result, status: 'completed' });
       snapshot.latestResults = recoverLatestResults([{ id: run.id, groups: [savedGroup] }], snapshot.latestResults);
+      if (group.kind === 'videos') snapshot.videoHistory = recoverVideoHistory([{ groups: [savedGroup] }], [], snapshot.videoHistory);
       await this.storage.write(snapshot);
       // Publishing follows the durable write. Polling must never see a result
       // that would disappear on restart after a failed save.
       Object.assign(group, { result, status: 'completed' });
       this.data.latestResults = snapshot.latestResults;
+      this.data.videoHistory = snapshot.videoHistory;
     });
     this.writeQueue = save.catch(() => {});
     try { await save; }

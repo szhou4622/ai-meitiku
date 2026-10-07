@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Globe2, Music2, TrendingUp, Plus, X, RefreshCw, LogIn, Square, Search } from 'lucide-react';
 import styles from './feigua-trends.module.css';
 import { displayedFeiguaGroups } from './feigua-results.mjs';
+import { recoverVideoHistory, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; salesCount?: string; publishedAt?: string; products?: { title: string; commission: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
@@ -13,7 +14,7 @@ type Run = { id: string; startedAt: string; finishedAt: string | null; status: s
 type MusicTagOption = { label: string; children: { label: string }[] };
 type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
 type CategoryOption = { label: string; children: CategoryOption[] };
-type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; credentialMessage?: string | null; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
+type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoHistory?: Group[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; credentialMessage?: string | null; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveLoginEntryUrl: (url: string) => Promise<State>;
@@ -115,6 +116,7 @@ export function FeiguaTrends() {
   const [state, setState] = useState<State>(emptyState);
   const [loginEntryUrl, setLoginEntryUrl] = useState('');
   const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
+  const [videoPeriod, setVideoPeriod] = useState('');
   const keywords = videoQueries.map(query => query.keyword);
   const [musicTag, setMusicTag] = useState<string[]>([]);
   const [input, setInput] = useState('');
@@ -135,7 +137,10 @@ export function FeiguaTrends() {
   const secondTags = firstTag?.children || [];
   const run = state.runs[0];
   const displayedGroups = (displayedFeiguaGroups(state.runs, '', state.latestResults) as Group[]).filter(group => group.kind !== 'videos' || state.keywords.includes(group.keyword || ''));
-  const displayedCount = displayedGroups.reduce((sum, group) => sum + (group.result?.rows.length || 0), 0);
+  const videoHistory = recoverVideoHistory(state.runs, state.latestResults, state.videoHistory || []) as Group[];
+  const videoPeriods = videoHistoryPeriods(videoHistory, state.keywords) as string[];
+  const videoGroups = videoGroupsForPeriod(videoHistory, videoPeriod, displayedGroups, state.keywords) as Group[];
+  const displayedCount = [...displayedGroups.filter(group => group.kind !== 'videos'), ...videoGroups].reduce((sum, group) => sum + (group.result?.rows.length || 0), 0);
 
   useEffect(() => {
     let alive = true, pending = false;
@@ -165,6 +170,7 @@ export function FeiguaTrends() {
       const next = await operation(api); setState({ ...emptyState, ...next });
       if (name === 'entry-save') setLoginEntryUrl(next.loginEntryUrl || '');
       if (name === 'video-save' || name === 'video-change') {
+        setVideoPeriod('');
         setVideoQueries(savedVideoQueries(next));
         if (name === 'video-save' && settingsPanel.current) settingsPanel.current.open = false;
       }
@@ -218,7 +224,7 @@ export function FeiguaTrends() {
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
-    <p>本周品类新发布每天北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后当天打开或恢复运行会补采一次。</p>
+    <p>本周品类新发布每周一北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采当前周榜和当天热点各一次。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
@@ -241,7 +247,7 @@ export function FeiguaTrends() {
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
-      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组 · 每天 06:30 更新近7天销售额前 5 · 新增或修改分类后立即采集该组</p></div>
+      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组 · 每周一 06:30 更新近7天销售额前 5 · 新增或修改分类后立即采集该组</p></div>
       <form className={styles.queryEditor} onSubmit={event => { event.preventDefault(); void addKeyword(); }}>
         <label className={styles.queryField}>关键词<input aria-label="视频关键词" placeholder="输入关键词" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} /></label>
         <CategorySelect label="带货品类" options={state.videoFilterOptions.categoryPath} path={inputCategoryPath} disabled={disabled} onChange={setInputCategoryPath} />
@@ -258,7 +264,7 @@ export function FeiguaTrends() {
         <button disabled={disabled || editorDirty} aria-label={`修改关键词${query.keyword}`} onClick={() => editQuery(query, index)}>修改</button>
         <button disabled={disabled || state.busy || editorDirty} aria-label={`删除关键词${query.keyword}`} onClick={() => void perform('video-change', api => api.saveAndRefreshVideoQueries(videoQueries.filter((_, current) => current !== index), { changedOnly: true }))}><X size={13} />删除</button>
       </section>)}
-      <small>{editing !== null ? '确认后自动保存，并立即采集有变化的这一组。' : editorDirty ? '选择带货品类和视频标签后点击“添加并采集”，自动保存并立即采集这一组。' : keywords.length ? `已保存 ${keywords.length} 组，每天 06:30 自动采集；也可手动刷新。` : '输入关键词，选择带货品类和视频标签，再点击“添加并采集”。'}</small>
+      <small>{editing !== null ? '确认后自动保存，并立即采集有变化的这一组。' : editorDirty ? '选择带货品类和视频标签后点击“添加并采集”，自动保存并立即采集这一组。' : keywords.length ? `已保存 ${keywords.length} 组，每周一 06:30 自动采集；也可手动刷新。` : '输入关键词，选择带货品类和视频标签，再点击“添加并采集”。'}</small>
     </section>
     </details>
 
@@ -273,11 +279,17 @@ export function FeiguaTrends() {
         return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{(kind === 'music' || kind === 'topics') ? <MusicCaption kind={kind} group={group} selection={musicTag} dirty={musicDirty} /> : <p>{rules[kind]}</p>}{kind === 'hotspots' && group?.result && group.result.period !== '日榜' && <p>当前显示：{group.result.period} · 之前采集结果</p>}{kind === 'hotspots' && (group?.refreshStatus || group?.status) === 'retrying' && <p role="status">{group?.refreshMessage || group?.message || '正在自动重试'}</p>}{kind === 'hotspots' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <ResultFooter result={group.result} />}</section>;
       })}
     </div>
-    <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
-      {displayedGroups.filter(group => group.kind === 'videos').map(group => {
+    <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p>
+      <div className={styles.videoPeriods} role="group" aria-label="带货榜单周日期">
+        <span>周榜日期</span><button type="button" aria-pressed={!videoPeriod} onClick={() => setVideoPeriod('')}>最新</button>
+        {videoPeriods.map(period => <button type="button" key={period} aria-pressed={videoPeriod === period} onClick={() => setVideoPeriod(period)}>{period}</button>)}
+      </div>
+      <p>{videoPeriod ? `查看 ${videoPeriod} 这一周保存的榜单` : '显示最新结果'} · 按周保存；实际近7天统计周期见各组底部</p>
+    </header>
+      {videoGroups.map(group => {
         const configured = savedVideoQueries(state).find(query => query.keyword === group.keyword);
         const actual = group.result ? group.result.filters : group;
-        const changed = configured && (JSON.stringify(configured.categoryPath) !== JSON.stringify(actual?.categoryPath || []) || JSON.stringify(configured.tagPath) !== JSON.stringify(actual?.tagPath || []));
+        const changed = !videoPeriod && configured && (JSON.stringify(configured.categoryPath) !== JSON.stringify(actual?.categoryPath || []) || JSON.stringify(configured.tagPath) !== JSON.stringify(actual?.tagPath || []));
         const status = group.refreshStatus || group.status;
         return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : group.result?.rows.some(row=>videoMissingFields(row).length) ? '榜单已采集 · 部分信息不可用' : names[group.status]}</small></h3>
           <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
@@ -285,7 +297,8 @@ export function FeiguaTrends() {
           {['pending', 'running', 'retrying', 'failed', 'cancelled', 'interrupted'].includes(status) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
           <ResultBody group={group} kind="videos" />{group.result && <ResultFooter result={group.result} />}</section>;
       })}
-      {!displayedGroups.some(group => group.kind === 'videos') && <div className={styles.empty}>{state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
+      {!!videoPeriod && state.keywords.some(keyword => !videoGroups.some(group => group.keyword === keyword)) && <p className={styles.videoPeriodNotice}>这一周未保存以下关键词的榜单：{state.keywords.filter(keyword => !videoGroups.some(group => group.keyword === keyword)).join('、')}</p>}
+      {!videoGroups.length && <div className={styles.empty}>{videoPeriod ? '这一周没有已保存的带货榜单，请选择其他周或最新结果。' : state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>
   </section>;
 }

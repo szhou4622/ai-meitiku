@@ -6,6 +6,99 @@ import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigu
 import { FeiguaBrowser, isFeiguaNavigation, isCollectionLoadingRequest } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
+import { recoverVideoHistory, videoRankingPeriod, videoCollectionWeek, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
+
+const historyVideo = (keyword, collectedAt, rows = [{ id: collectedAt }], dateRange = '2026-09-25 - 2026-10-01') => ({ kind: 'videos', keyword, status: 'completed', result: { collectedAt, rows, dateRange, filters: { categoryPath: ['历史分类'], tagPath: [] } } });
+
+test('video week key uses the verified seven-day source period instead of a collection date', () => {
+  assert.equal(videoRankingPeriod('2026-09-25 - 2026-10-01'), '2026-09-25 - 2026-10-01');
+  assert.equal(videoRankingPeriod('2026-10-01T16:00:00Z'), null);
+  assert.equal(videoRankingPeriod('2026-10-01'), null);
+  assert.equal(videoRankingPeriod('2026-10-01 - 2026-10-02'), null);
+  assert.equal(videoRankingPeriod('2026-02-30 - 2026-03-08'), null);
+  assert.equal(videoRankingPeriod('invalid'), null);
+  assert.equal(videoCollectionWeek('2026-10-04T15:59:59Z'), '2026-09-28');
+  assert.equal(videoCollectionWeek('2026-10-04T16:00:00Z'), '2026-10-05');
+});
+
+test('weekly video history takes the newest successful result per keyword and period, including empty rankings', () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const newest = historyVideo('甲', '2026-10-01T03:00:00Z', []);
+  const another = historyVideo('乙', '2026-10-01T02:00:00Z');
+  const failed = { ...historyVideo('甲', '2026-10-01T04:00:00Z'), status: 'failed' };
+  const result = recoverVideoHistory([{ groups: [old, failed, newest, another, { kind: 'music', result: newest.result }] }]);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.find(group => group.keyword === '甲').result.rows, []);
+  assert.equal(old.result.rows.length, 1);
+});
+
+test('refreshes on different days of one week share one tab while source seven-day dates stay intact', () => {
+  const monday = historyVideo('甲', '2026-10-05T02:00:00Z', undefined, '2026-09-29 - 2026-10-05');
+  const friday = historyVideo('甲', '2026-10-09T02:00:00Z', undefined, '2026-10-03 - 2026-10-09');
+  const history = recoverVideoHistory([{ groups: [monday, friday] }]);
+  assert.deepEqual(videoHistoryPeriods(history, ['甲']), ['2026-10-05']);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].result.dateRange, '2026-10-03 - 2026-10-09');
+});
+
+test('historical week never borrows another period or its pending refresh and excludes removed keywords', () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const next = historyVideo('乙', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08');
+  const history = recoverVideoHistory([{ groups: [old, next] }]);
+  assert.deepEqual(videoHistoryPeriods(history, ['甲']), ['2026-09-28']);
+  const latest = [{ ...next, refreshStatus: 'retrying' }];
+  assert.deepEqual(videoGroupsForPeriod(history, '', latest, ['乙']), latest);
+  const selected = videoGroupsForPeriod(history, '2026-09-28', latest, ['甲', '乙']);
+  assert.equal(selected.length, 1);
+  assert.deepEqual(selected[0].result.filters.categoryPath, ['历史分类']);
+  assert.equal(selected[0].refreshStatus, undefined);
+  assert.deepEqual(videoGroupsForPeriod(history, '2026-09-18 - 2026-09-24', latest, ['甲']), []);
+});
+
+test('video archive retains fifty-two statistical periods rather than individual keyword groups', () => {
+  const history = Array.from({ length: 55 }, (_, index) => {
+    const collectedAt = new Date(Date.UTC(2026, 5, 1 + index * 7)).toISOString();
+    const end = new Date(Date.parse(collectedAt) + 6 * 86400000).toISOString().slice(0, 10);
+    return ['甲', '乙'].map(keyword => historyVideo(keyword, collectedAt, undefined, `${collectedAt.slice(0, 10)} - ${end}`));
+  }).flat();
+  const saved = recoverVideoHistory([], [], history);
+  assert.equal(saved.length, 104);
+  assert.equal(videoHistoryPeriods(saved, ['甲', '乙']).length, 52);
+});
+
+test('legacy video periods survive more than twelve unrelated refreshes and a service restart', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service, disk } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [{ id: 'old', status: 'completed', groups: [old] }] } });
+  for (let index = 0; index < 13; index++) { await service.saveAndRefreshMusicTag([]); await service.job; }
+  assert.equal(disk().runs.length, 12);
+  assert.deepEqual(disk().videoHistory, [old]);
+  const reloaded = fixture({ stored: disk() }).service;
+  assert.deepEqual((await reloaded.state()).videoHistory.map(group => group.result), [old.result]);
+});
+
+test('weekly archive is published only after durable save; disk failure leaves prior history intact', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [], videoHistory: [old] }, write: async () => { throw new Error('disk full'); } });
+  await service.state();
+  const group = { kind: 'videos', keyword: '甲', status: 'running' };
+  const run = { id: 'new', groups: [group] };
+  service.data.runs = [run];
+  await assert.rejects(service.saveCapturedGroup(run, group, historyVideo('甲', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08').result), /保存失败/);
+  assert.deepEqual((await service.state()).videoHistory, [old]);
+  assert.equal(group.result, undefined);
+});
+
+test('successful video save archives the new week without losing the prior week', async () => {
+  const old = historyVideo('甲', '2026-10-01T02:00:00Z');
+  const { service, disk } = fixture({ stored: { version: 1, keywords: ['甲'], runs: [], videoHistory: [old] } });
+  await service.state();
+  const group = { kind: 'videos', keyword: '甲', status: 'running' };
+  const run = { id: 'new', groups: [group] };
+  service.data.runs = [run];
+  await service.saveCapturedGroup(run, group, historyVideo('甲', '2026-10-08T02:00:00Z', undefined, '2026-10-02 - 2026-10-08').result);
+  assert.deepEqual(videoHistoryPeriods(disk().videoHistory, ['甲']), ['2026-10-05', '2026-09-28']);
+  assert.equal(disk().videoHistory[0].status, 'completed');
+});
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
@@ -248,33 +341,41 @@ test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
   assert.equal(dueHotspotsDate(Date.parse('2026-10-02T16:00:00Z')), null);
 });
 
-test('daily keyword videos start at exactly 06:30 Beijing time and reset at midnight',()=>{
-  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:29:59Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-01T22:30:00Z')),'2026-10-02');
-  assert.equal(dueHotspotsDate(Date.parse('2026-10-01T22:30:00Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-02T15:59:59Z')),'2026-10-02');
-  assert.equal(dueVideosDate(Date.parse('2026-10-02T16:00:00Z')),null);
+test('weekly videos become due Monday at 06:30 Beijing time and remain catch-up eligible until Sunday',()=>{
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:29:59Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:30:00Z')),'2026-10-05');
+  assert.equal(dueHotspotsDate(Date.parse('2026-10-04T22:30:00Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-06T16:00:00Z')),'2026-10-05');
+  assert.equal(dueVideosDate(Date.parse('2026-10-11T15:59:59Z')),'2026-10-05');
+  assert.equal(dueVideosDate(Date.parse('2026-10-11T16:00:00Z')),null);
 });
 
 test('06:30 collects every saved video group once and preserves independent 07:00 schedule across restart',async()=>{
   const {service,calls,disk}=fixture({stored:{version:1,keywords:videoQueries.map(q=>q.keyword),videoQueries,videoFilterOptions:videoCatalog,runs:[]}});
-  const now=Date.parse('2026-10-01T22:30:00Z');
+  const now=Date.parse('2026-09-27T22:30:00Z');
   await service.checkDailySchedule(now-1,()=>true);
   await service.checkDailySchedule(now,()=>false);
   assert.equal(calls.length,0);
   await Promise.all([service.checkDailySchedule(now,()=>true),service.checkDailySchedule(now,()=>true)]);await service.job;
   assert.deepEqual(calls,[['videos','拌饭'],['videos','收纳']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,null);
-  assert.equal(disk().runs[0].trigger,'daily-videos');
+  assert.equal(disk().runs[0].trigger,'weekly-videos');
   assert.deepEqual(disk().runs[0].groups[0].result.filters,{...videoQueries[0],publishedAt:'不限'});
   const restored=fixture({stored:disk()});
   await restored.service.checkDailySchedule(now+1000,()=>true);
   assert.equal(restored.calls.length,0);
   await restored.service.checkDailySchedule(now+1800000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls,[['hotspots',null]]);
-  await restored.service.checkDailySchedule(now+86400000,()=>true);await restored.service.job;
+  await restored.service.checkDailySchedule(now+7*86400000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls.slice(1),[['videos','拌饭'],['videos','收纳']]);
+});
+
+test('existing daily video marker migrates into its week and does not collect again on later days', async () => {
+  const { service, calls } = fixture({ stored: { version: 1, keywords: ['词'], runs: [], lastVideosScheduleDate: '2026-10-07', lastHotspotsScheduleDate: '2026-10-08' } });
+  assert.equal((await service.state()).lastVideosScheduleDate, '2026-10-05');
+  await service.checkDailySchedule(Date.parse('2026-10-08T02:00:00Z'), () => true);
+  assert.deepEqual(calls, []);
 });
 
 test('late startup catches up videos first, waits while busy, then independently catches up hotspots',async()=>{
@@ -291,11 +392,11 @@ test('late startup catches up videos first, waits while busy, then independently
   await service.checkDailySchedule(now,()=>true);
   assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null]]);
   assert.equal(disk().runs.length,2);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
 
-test('video schedule failure and cancellation do not retry that day or consume hotspot schedule',async()=>{
+test('video schedule failure and cancellation do not retry that week or consume hotspot schedule',async()=>{
   for(const cancel of [false,true]) {
     const {service,browser,calls,disk}=fixture();await service.saveKeywords(['词']);
     let release;
@@ -307,7 +408,7 @@ test('video schedule failure and cancellation do not retry that day or consume h
     await service.checkDailySchedule(now+60000,()=>true);
     assert.equal(disk().runs[0].status,cancel?'cancelled':'failed');
     assert.equal(calls.length,0);assert.equal(disk().runs.length,1);
-    assert.equal(disk().lastVideosScheduleDate,'2026-10-02');assert.equal(disk().lastHotspotsScheduleDate,null);
+    assert.equal(disk().lastVideosScheduleDate,'2026-09-28');assert.equal(disk().lastHotspotsScheduleDate,null);
   }
 });
 
@@ -339,13 +440,13 @@ test('adding or editing a keyword immediately collects only changed groups; dele
   assert.deepEqual(calls,[['videos','拌饭']]);
 });
 
-test('new groups still collect immediately after the daily quota is used, without resetting it',async()=>{
+test('new groups still collect immediately after the weekly schedule is used, without resetting it',async()=>{
   const {service,calls,disk}=fixture();await service.saveKeywords(['旧关键词']);
   const now=Date.parse('2026-10-01T22:30:00Z');
   await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
   await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
   assert.deepEqual(calls,[['videos','新关键词']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   await service.checkDailySchedule(now+1000,()=>true);assert.equal(calls.length,1);
 });
 

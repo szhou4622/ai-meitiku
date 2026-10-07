@@ -75,6 +75,11 @@
 .videoSection { margin-top: 20px; }
 .videoSection > header { padding: 20px; }
 .videoSection > header p { margin-top: 6px; }
+.videoPeriods { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 14px 2px 6px; }
+.videoPeriods > span { font-size: 12px; color: #73868b; white-space: nowrap; }
+.videoPeriods button { flex: 0 0 auto; border-radius: 18px; padding: 7px 13px; font-variant-numeric: tabular-nums; }
+.videoPeriods button[aria-pressed="true"] { color: white; background: #238e86; border-color: #238e86; }
+.videoSection .videoPeriodNotice { padding: 0 20px 16px; }
 .videoGroup { padding: 0 20px 15px; }
 .videoGroup h3 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 0; color: #238e86; }
 .videoGroup h3 small { font-size: 11px; color: #8a9b9e; font-weight: normal; }
