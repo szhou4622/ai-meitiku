@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
 import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff } from './feigua-login-entry.mjs';
+import { observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
   return Object.assign(new Error(message), { code, publicMessage: message });
@@ -23,6 +24,9 @@ export class FeiguaBrowser {
     this.onAuthChange = null;
     this.loginEntryUrl = '';
     this.loginRelayOrigins = new Set();
+    this.requestSequence = 0;
+    this.rankingRequests = [];
+    this.verifiedSourceOrigin = null;
   }
 
   setLoginEntryUrl(value) {
@@ -31,8 +35,18 @@ export class FeiguaBrowser {
     this.stopLoginWatch();
     this.wasAuthenticated = false;
     this.loginRelayOrigins.clear();
+    this.verifiedSourceOrigin = null;
     if (this.window && !this.window.isDestroyed()) this.window.close();
     this.loginEntryUrl = next;
+  }
+
+  sourceOrigin() { return this.verifiedSourceOrigin; }
+
+  isProviderUrl(url) { return isFeiguaDataUrl(url, this.verifiedSourceOrigin); }
+
+  isRelayWorkspace(url) {
+    try { return new URL(url).pathname.startsWith('/app/') && [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin)); }
+    catch { return false; }
   }
 
   ensureWindow(show = false) {
@@ -44,6 +58,10 @@ export class FeiguaBrowser {
       this.partition.on('will-download', event => event.preventDefault());
       this.partition.webRequest.onBeforeRequest((details, callback) => {
         if (['xhr', 'mainFrame'].includes(details.resourceType)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
+        if (this.window && details.webContentsId === this.window.webContents.id) {
+          const request = observeFeiguaRequest(details, this.verifiedSourceOrigin);
+          if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
+        }
         callback({});
       });
       const done = details => { this.pending.delete(details.id); this.lastNetwork = Date.now(); };
@@ -67,12 +85,12 @@ export class FeiguaBrowser {
       else this.onAuthChange?.({ status: 'signed_out', message: '入口跳转地址尚不支持，请返回入口重试或核对网址' });
       return { action: 'deny' };
     });
-    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); });
+    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); this.rankingRequests = []; });
     return window;
   }
 
   async navigate(url) {
-    if (!isFeiguaDataUrl(url)) throw issue('飞瓜来源地址不受支持');
+    if (!this.isProviderUrl(url)) throw issue('飞瓜来源地址不受支持');
     const window = this.ensureWindow();
     try { await window.loadURL(url); }
     catch { throw issue('飞瓜页面加载失败，请检查网络后重试', 'FEIGUA_NETWORK'); }
@@ -80,7 +98,9 @@ export class FeiguaBrowser {
 
   async execute(command, argument = {}, retryNotice = true) {
     if (!this.window || this.window.isDestroyed()) throw issue('飞瓜窗口已关闭，请重新打开');
-    if (!isFeiguaDataUrl(this.window.webContents.getURL())) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
+    const currentUrl = this.window.webContents.getURL();
+    if (!this.isProviderUrl(currentUrl) && !this.isRelayWorkspace(currentUrl)) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
+    if (!this.isProviderUrl(currentUrl) && !['auth', 'accept-terms'].includes(command)) throw issue('请先核验代理工作台登录', 'FEIGUA_AUTH_REQUIRED');
     let result;
     try { result = await this.window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
     catch { throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
@@ -95,13 +115,24 @@ export class FeiguaBrowser {
 
   async resolveAuth(signal) {
     let auth = await this.execute('auth');
+    const deadline = Date.now() + 15000;
+    while (auth.loading && Date.now() < deadline) {
+      if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+      await delay(300, undefined, { signal });
+      auth = await this.execute('auth');
+    }
+    if (auth.loading) throw issue('飞瓜工作台尚未加载完成，请稍后重试', 'FEIGUA_NETWORK');
+    if (auth.authenticated && this.isRelayWorkspace(this.window.webContents.getURL())) this.verifiedSourceOrigin = new URL(this.window.webContents.getURL()).origin;
     if (auth.actionRequired !== 'terms') return auth;
     this.onAuthChange?.({ status: 'checking', message: '正在自动处理飞瓜声明…' });
     await this.execute('accept-terms');
     for (let attempt = 0; attempt < 25; attempt++) {
       await delay(300, undefined, { signal });
       auth = await this.execute('auth');
-      if (!auth.actionRequired) return auth;
+      if (!auth.actionRequired) {
+        if (auth.authenticated && this.isRelayWorkspace(this.window.webContents.getURL())) this.verifiedSourceOrigin = new URL(this.window.webContents.getURL()).origin;
+        return auth;
+      }
     }
     throw issue('飞瓜声明确认未生效，请稍后重试', 'FEIGUA_NOTICE_FAILED');
   }
@@ -146,7 +177,7 @@ export class FeiguaBrowser {
       this.loginCheckPending = true;
       const loginWindow = this.window;
       try {
-        if (!isFeiguaDataUrl(loginWindow.webContents.getURL())) return;
+        if (!this.isProviderUrl(loginWindow.webContents.getURL()) && !this.isRelayWorkspace(loginWindow.webContents.getURL())) return;
         const auth = await this.resolveAuth();
         if (this.window !== loginWindow || loginWindow.isDestroyed()) return;
         if (!auth.authenticated && auth.workspaceAvailable) {
@@ -180,10 +211,10 @@ export class FeiguaBrowser {
     this.ensureWindow();
     if (!this.window.webContents.getURL()) {
       if (!this.loginEntryUrl) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-      try { await this.window.loadURL(this.loginEntryUrl); }
+      try { await this.window.loadURL(this.verifiedSourceOrigin ? `${this.verifiedSourceOrigin}/app/` : this.loginEntryUrl); }
       catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
     }
-    if (!isFeiguaDataUrl(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台；代理页面的采集登录状态尚未核验' };
+    if (!this.isProviderUrl(this.window.webContents.getURL()) && !this.isRelayWorkspace(this.window.webContents.getURL())) return { status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台；代理页面的采集登录状态尚未核验' };
     let auth = await this.resolveAuth();
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();
@@ -222,7 +253,7 @@ export class FeiguaBrowser {
     if (!source) throw issue('未知飞瓜来源');
     if (signal?.aborted) throw issue('已取消采集');
     // Discover routes from the signed-in application's menu; never guess API paths.
-    await this.navigate(FEIGUA_HOME);
+    await this.navigate(this.verifiedSourceOrigin ? `${this.verifiedSourceOrigin}/app/` : FEIGUA_HOME);
     const auth = await this.resolveAuth(signal);
     if (auth.workspaceAvailable) {
       await this.enterWorkspace();
@@ -252,6 +283,7 @@ export class FeiguaBrowser {
 
   async collect(kind, keyword, signal, options = {}) {
     const source = FEIGUA_SOURCES[kind];
+    const since = this.requestSequence;
     await this.openSource(kind, signal);
     const musicTag = ['music', 'topics'].includes(kind) ? normalizeMusicTag(options.musicTag) : [];
     if (kind === 'videos') {
@@ -285,16 +317,48 @@ export class FeiguaBrowser {
     }
     await this.execute('optional-filters');
     // At most two clicks to cycle ascending -> descending; unknown direction blocks capture.
-    let sorted = false;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // The fixed hotspot ranking is verified from the API's Rank/HotValueStr.
+    let sorted = kind === 'hotspots';
+    for (let attempt = 0; !sorted && attempt < 3; attempt++) {
       const result = await this.execute('sort', { label: source.sort, verify: attempt === 2 });
       if (result.verified) { sorted = true; break; }
       await this.settle(signal);
     }
     if (!sorted) throw issue('无法确认降序排列');
-    return this.execute('capture', { kind, keyword, sort: source.sort, period: source.period });
+    const args = { kind, keyword, period: source.period };
+    const context = await this.execute('capture-context', args);
+    const capture = await this.readRanking(kind, context, since, signal);
+    await this.settle(signal);
+    const after = await this.execute('capture-context', args);
+    if (JSON.stringify(after) !== JSON.stringify(context)) throw issue('接口返回期间页面筛选发生变化，本组未保存');
+    return capture;
+  }
+
+  async readRanking(kind, context, since, signal) {
+    const observed = this.rankingRequests.filter(request => request.kind === kind && request.sequence > since).at(-1);
+    if (!observed || observed.invalid) throw issue('未监听到本组榜单请求，请重新采集', 'FEIGUA_API_INVALID');
+    const request = structuredClone(observed);
+    // Replay exactly the observed query. Adding a date parameter to a default
+    // week would turn it into a different (historical) provider operation.
+    validateFeiguaRequest(kind, request, context);
+    if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+    const beforeApi = this.requestSequence;
+    const result = this.window.webContents.executeJavaScript(`(${readFeiguaApi.toString()})(${JSON.stringify({ endpoint: request.endpoint, params: request.params })})`);
+    const response = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { cleanup(); reject(issue('飞瓜接口响应超时', 'FEIGUA_NETWORK')); }, 25000);
+      const abort = () => { cleanup(); reject(issue('已取消采集', 'FEIGUA_CANCELLED')); };
+      const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+      signal?.addEventListener('abort', abort, { once: true });
+      Promise.resolve(result).then(value => { cleanup(); resolve(value); }, () => { cleanup(); reject(issue('飞瓜接口请求失败，请检查网络或登录状态', 'FEIGUA_NETWORK')); });
+      if (signal?.aborted) abort();
+    });
+    if (response?.error) throw issue(response.error, 'FEIGUA_API_INVALID');
+    const sent = this.rankingRequests.filter(record => record.kind === kind && record.sequence > beforeApi).at(-1);
+    validateFeiguaRequest(kind, sent, context);
+    if (JSON.stringify(Object.entries(sent.params).sort()) !== JSON.stringify(Object.entries(request.params).sort())) throw issue('实际发出的接口参数与任务不一致，本组未保存');
+    return captureFeiguaResponse(kind, sent, context, response);
   }
 
   stop() { this.window?.webContents.stop(); }
-  dispose() { this.stopLoginWatch(); this.window?.destroy(); this.window = null; }
+  dispose() { this.stopLoginWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
 }

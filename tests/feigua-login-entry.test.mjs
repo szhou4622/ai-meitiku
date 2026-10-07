@@ -83,6 +83,24 @@ test('a portal may open its same-server gateway on another port without trusting
   browser.stopLoginWatch();
 });
 
+test('only a selected gateway workspace passing auth may become the collection source', async () => {
+  const { browser, loaded, handlers } = browserFixture();
+  browser.setLoginEntryUrl(entry);
+  await browser.openLogin();
+  assert.equal(browser.sourceOrigin(), null);
+  const gateway = 'http://192.0.2.10:13042/app/#/brand-compare/index';
+  handlers.get('popup')({ url: gateway });
+  await assert.rejects(browser.execute('capture-context'), /先核验/);
+  assert.equal((await browser.checkLogin()).status, 'authenticated');
+  assert.equal(browser.sourceOrigin(), 'http://192.0.2.10:13042');
+  await browser.navigate('http://192.0.2.10:13042/app/#/music/index');
+  assert.equal(loaded.at(-1), 'http://192.0.2.10:13042/app/#/music/index');
+  await assert.rejects(browser.navigate('http://192.0.2.10:13045/app/'), /来源地址/);
+  browser.setLoginEntryUrl('https://new-portal.example/');
+  assert.equal(browser.sourceOrigin(), null);
+  browser.stopLoginWatch();
+});
+
 function browserFixture() {
   const loaded = [], executed = [], handlers = new Map();
   const partition = new EventEmitter();
@@ -101,6 +119,16 @@ function browserFixture() {
   }
   return { browser: new FeiguaBrowser({ BrowserWindow: Window, session: { fromPartition: () => partition } }), loaded, executed, handlers };
 }
+
+test('a mounting workspace is awaited rather than misreported as an expired login', async () => {
+  const { browser } = browserFixture();
+  let calls = 0;
+  browser.ensureWindow();
+  browser.window.url = 'https://dy.feigua.cn/app/';
+  browser.execute = async () => ++calls === 1 ? {loading:true,authenticated:false} : {loading:false,authenticated:true};
+  assert.equal((await browser.resolveAuth()).authenticated, true);
+  assert.equal(calls, 2);
+});
 
 test('login always opens the saved portal, never runs provider scripts on it, and follows its allowed popup', async () => {
   const { browser, loaded, executed, handlers } = browserFixture();

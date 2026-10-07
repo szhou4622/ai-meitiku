@@ -7,13 +7,13 @@ import { displayedFeiguaGroups } from './feigua-results.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
 type Row = { id: string; rank: number; title: string; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; likes?: string; sales?: string; publishedAt?: string; products?: { title: string; commission: string | null }[]; missingFields: string[] };
-type Result = { collectedAt: string; dateRange: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
+type Result = { collectedAt: string; dateRange: string | null; dateWarning?: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
 type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; categoryPath?: string[]; tagPath?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
 type MusicTagOption = { label: string; children: { label: string }[] };
 type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
 type CategoryOption = { label: string; children: CategoryOption[] };
-type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; scheduleMessage?: string | null; catalogMessage?: string | null };
+type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
   saveLoginEntryUrl: (url: string) => Promise<State>;
@@ -35,6 +35,10 @@ const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本�
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
 const date = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false });
+
+function ResultFooter({ result }: { result: Result }) {
+  return <footer>{result.dateRange || result.period} · 采集于 {date(result.collectedAt)}{result.dateWarning && <p className={styles.missing} role="status">{result.dateWarning}</p>}</footer>;
+}
 
 function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
   if (!group?.result) return <div className={styles.empty}><span>{group ? names[group.status] : '尚未采集'}</span><p>{group?.message || '采集完成后，飞瓜的前 5 条结果会显示在这里。'}</p></div>;
@@ -207,6 +211,7 @@ export function FeiguaTrends() {
     </form>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
+    {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     <p>本周品类新发布每天北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后当天打开或恢复运行会补采一次。</p>
@@ -262,7 +267,7 @@ export function FeiguaTrends() {
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {
         const group = displayedGroups.find(item => item.kind === kind);
         const Icon = kind === 'music' ? Music2 : kind === 'topics' ? TrendingUp : Globe2;
-        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{(kind === 'music' || kind === 'topics') ? <MusicCaption kind={kind} group={group} selection={musicTag} dirty={musicDirty} history={!!effectiveRunId} /> : <p>{rules[kind]}</p>}{kind === 'hotspots' && group?.result && group.result.period !== '日榜' && <p>当前显示：{group.result.period} · 之前采集结果</p>}{kind === 'hotspots' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+        return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{(kind === 'music' || kind === 'topics') ? <MusicCaption kind={kind} group={group} selection={musicTag} dirty={musicDirty} history={!!effectiveRunId} /> : <p>{rules[kind]}</p>}{kind === 'hotspots' && group?.result && group.result.period !== '日榜' && <p>当前显示：{group.result.period} · 之前采集结果</p>}{kind === 'hotspots' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <ResultFooter result={group.result} />}</section>;
       })}
     </div>
     <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p></header>
@@ -275,7 +280,7 @@ export function FeiguaTrends() {
           <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
           {changed && <p>已保存设置 · 带货品类：{pathLabel(configured.categoryPath)} · 视频标签：{pathLabel(configured.tagPath)}（当前结果尚未更新）</p>}
           {!effectiveRunId && ['pending', 'running', 'failed', 'cancelled', 'interrupted'].includes(status) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
-          <ResultBody group={group} kind="videos" />{group.result && <footer>{group.result.dateRange || group.result.period} · 采集于 {date(group.result.collectedAt)}</footer>}</section>;
+          <ResultBody group={group} kind="videos" />{group.result && <ResultFooter result={group.result} />}</section>;
       })}
       {!displayedGroups.some(group => group.kind === 'videos') && <div className={styles.empty}>{state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>

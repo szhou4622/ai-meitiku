@@ -6,10 +6,15 @@ export const FEIGUA_SOURCES = Object.freeze({
   videos: { label: '关键词带货视频 Top5', navigation: ['带货视频库'], sort: '视频销售额', period: '近7天', fields: ['title', 'products', 'author', 'followers', 'plays', 'likes', 'sales', 'publishedAt'] },
 });
 
-export function isFeiguaDataUrl(value) {
+export function isFeiguaDataUrl(value, sourceOrigin = null) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password && !url.port && /^dy\d*\.feigua\.cn$/.test(url.hostname);
+    if (url.username || url.password) return false;
+    if (sourceOrigin) {
+      const source = new URL(sourceOrigin);
+      if (['http:', 'https:'].includes(source.protocol) && !source.username && !source.password && url.origin === source.origin) return true;
+    }
+    return url.protocol === 'https:' && !url.port && /^dy\d*\.feigua\.cn$/.test(url.hostname);
   } catch { return false; }
 }
 
@@ -97,10 +102,52 @@ function value(input, max = 1000) {
   return typeof input === 'string' ? input.trim().slice(0, max) || null : null;
 }
 
+function captureError(message) {
+  return Object.assign(new Error(message), { publicMessage: message });
+}
+
+export function validateCaptureDates(kind, input, now = Date.now()) {
+  const raw = value(input, 100);
+  if (kind === 'music') return { dateRange: raw, dateWarning: null };
+  const match = raw?.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2})(?:\s*[-~～至]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}))?$/);
+  if (!match) throw captureError('未取得可核验的实际统计日期，本组未保存');
+  const parse = text => {
+    const [year, month, day] = text.split(/[-/]/).map(Number);
+    const timestamp = Date.UTC(year, month - 1, day);
+    const date = new Date(timestamp);
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) throw captureError('统计日期无效，本组未保存');
+    return timestamp;
+  };
+  const start = parse(match[1]), end = parse(match[2] || match[1]);
+  const day = 86_400_000;
+  const expectedDays = kind === 'hotspots' ? 1 : 7;
+  if ((end - start) / day + 1 !== expectedDays) throw captureError(`实际统计日期与${FEIGUA_SOURCES[kind].period}不一致，本组未保存`);
+  const today = Math.floor((now + 8 * 60 * 60 * 1000) / day) * day;
+  if (end > today) throw captureError('实际统计日期晚于北京时间当天，本组未保存');
+  // The provider may only publish a settled week. Preserve its actual dates,
+  // and label old data instead of relabelling it as the current week/day.
+  const lastSunday = today - (new Date(today).getUTCDay() || 7) * day;
+  const stale = end < (kind === 'topics' ? lastSunday : today - day);
+  return {
+    dateRange: kind === 'hotspots' ? new Date(start).toISOString().slice(0, 10) : `${new Date(start).toISOString().slice(0, 10)} - ${new Date(end).toISOString().slice(0, 10)}`,
+    dateWarning: stale ? '来源统计日期较旧，请按所示日期使用数据' : null,
+  };
+}
+
+export function isRankingMetric(kind, input) {
+  const raw = value(input)?.replace(/\s+/g, '');
+  if (!raw) return false;
+  const number = '(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?';
+  const amount = `${number}(?:万|亿|[wWkKmM])?`;
+  if (kind === 'topics') return new RegExp(`^[<>≤≥]?[+-]?${amount}%$`).test(raw);
+  if (kind === 'videos') return new RegExp(`^[¥￥]?[<>≤≥]?${amount}(?:[-~～—–至]${amount})?(?:元|以上|以下)?$`).test(raw);
+  return new RegExp(`^[<>≤≥]?${amount}(?:人|次|以上|以下)?$`).test(raw);
+}
+
 // Whitelist provider data before it crosses IPC or reaches the local store.
 export function validateCapture(kind, keyword, capture, options = {}) {
   const source = FEIGUA_SOURCES[kind];
-  if (!source || !capture || !isFeiguaDataUrl(capture.url)) throw new Error('飞瓜来源校验失败');
+  if (!source || !capture || !isFeiguaDataUrl(capture.url, options.sourceOrigin)) throw new Error('飞瓜来源校验失败');
   if (capture.sort !== source.sort || capture.direction !== 'desc' || capture.period !== source.period || capture.filtersVerified !== true) {
     throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
   }
@@ -112,15 +159,15 @@ export function validateCapture(kind, keyword, capture, options = {}) {
   const hasCategory = ['music', 'topics'].includes(kind);
   const musicTag = hasCategory ? normalizeMusicTag(options.musicTag) : [];
   if (hasCategory && (!Array.isArray(capture.musicTag) || JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag))) throw new Error('榜单实际分类与任务选择不一致，本组未保存');
-  if (['topics', 'videos'].includes(kind) && !value(capture.dateRange, 100)) throw new Error('未取得实际统计日期，本组未保存');
+  const dates = validateCaptureDates(kind, capture.dateRange, options.now);
   if (!Array.isArray(capture.rows) || (!capture.rows.length && capture.emptyVerified !== true)) throw new Error('未读到榜单，不能将未加载页面保存为空榜单');
   const seen = new Set();
   const rows = [];
   for (const row of capture.rows) {
     if (!row || !value(row.title)) throw new Error('榜单缺少标题，页面结构可能已变化');
     const metric = { music: 'yesterdayUsers', topics: 'participantGrowth', hotspots: 'peakHeat', videos: 'sales' }[kind];
-    if (!value(row[metric])) throw new Error('榜单缺少排名指标，本组未保存');
-    const url = isFeiguaDataUrl(row.url) ? row.url : null;
+    if (!isRankingMetric(kind, row[metric])) throw captureError('榜单排名指标缺失、无效或被权限提示替代，本组未保存');
+    const url = isFeiguaDataUrl(row.url, options.sourceOrigin) ? row.url : null;
     const id = value(row.id, 200) || url;
     // Do not collapse unrelated videos solely because they share a title.
     if (!id) throw new Error('榜单缺少可核验的来源标识，已停止本组采集');
@@ -132,7 +179,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
         ? (Array.isArray(row.products) ? row.products.slice(0, 30).map(product => ({ title: value(product?.title), commission: value(product?.commission, 60) })).filter(product => product.title) : [])
         : value(row[field]);
     }
-    clean.missingFields = source.fields.filter(field => field === 'products' ? !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
+    clean.missingFields = source.fields.filter(field => field === 'products' ? row.productsIncomplete === true || !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
     rows.push(clean);
     if (rows.length === 5) break;
   }
@@ -140,7 +187,10 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     kind, keyword: kind === 'videos' ? keyword : null,
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
     sort: source.sort, direction: 'desc', period: source.period,
-    dateRange: value(capture.dateRange, 100),
+    ...dates,
+    ...(capture.provenance?.transport === 'provider-api' ? { provenance: {
+      transport: 'provider-api', endpoint: value(capture.provenance.endpoint, 200), method: 'GET', responseCode: 200, dateCode: value(capture.provenance.dateCode, 30),
+    } } : {}),
     filters: kind === 'videos' ? { keyword, publishedAt: '不限', ...videoFilters } : hasCategory ? { category: musicTag.join(' > ') || '全部', categoryPath: musicTag } : { category: '全部' },
     rows,
   };

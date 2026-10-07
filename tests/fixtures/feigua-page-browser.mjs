@@ -49,7 +49,7 @@ try {
   assert('新版自定义列表降序核验', run('sort', {label:'昨日使用人数',verify:true}).verified === true);
   const customMusic = run('capture', {kind:'music',sort:'昨日使用人数',period:'昨日使用人数'});
   assert('新版列表表头与数据行分离仍正确提取', customMusic.rows.length === 1 && customMusic.rows[0].yesterdayUsers === '5w');
-  await mount(shell + `<div><input readonly value="视频关键词"><input placeholder="请输入视频标题关键词或链接搜索"><button id="search">模糊搜索</button></div><p id="filters"></p>
+  await mount(shell + `<div><input readonly value="视频关键词"><input placeholder="请输入视频标题关键词或链接搜索"><button id="search">模糊搜索</button></div><span id="filters"></span>
     <div class="permission-wrapper active"><button><span>近7天</span></button></div>
     <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01">
     <table><thead><tr><th>带货视频/发布时间</th><th>关联商品</th><th>达人</th><th aria-sort="descending">视频销售额</th><th>点赞</th></tr></thead><tbody>
@@ -60,6 +60,9 @@ try {
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
   assert('其他关键词无法混入', run('keyword', {keyword:'其他词',verify:true}).verified === false);
+  frame.contentDocument.querySelector('#filters').textContent = '视频关键词：合成词后缀';
+  assert('关键词前缀相同不能冒充完整匹配', run('keyword', {keyword:'合成词',verify:true}).verified === false);
+  frame.contentDocument.querySelector('#filters').textContent = '视频关键词：合成词';
   for (const label of ['带货品类', '视频标签']) {
     const root = frame.contentDocument.createElement('div');
     root.className = 'tag-cascader';
@@ -98,6 +101,15 @@ try {
   assert('完整标题、佣金率、粉丝和区间保真', videos.rows[0].title === '合成完整标题' && videos.rows[0].products[0].commission === '5.00%' && videos.rows[0].followers === '10w' && videos.rows[0].sales === '10w~25w');
   assert('缺少播放列不填零', !videos.rows[0].plays);
   assert('统计日期提取', videos.dateRange === '2026-09-25 - 2026-10-01');
+  const videoArgs = {kind:'videos',sort:'视频销售额',period:'近7天',keyword:'合成词'};
+  frame.contentDocument.querySelector('.permission-wrapper.active').classList.remove('active');
+  assert('最终采集重新核验周期而非复述请求参数', /周期/.test(run('capture',videoArgs).error));
+  frame.contentDocument.querySelector('.permission-wrapper').classList.add('active');
+  frame.contentDocument.querySelector('#filters').textContent = '视频关键词：其他词';
+  assert('最终采集重新核验关键词', /关键词/.test(run('capture',videoArgs).error));
+  frame.contentDocument.querySelector('#filters').textContent = '视频关键词：合成词';
+  const loading = frame.contentDocument.createElement('div'); loading.className = 'el-loading-mask'; loading.textContent = '加载中'; frame.contentDocument.body.append(loading);
+  assert('仍在加载时不能保存旧列表', /加载/.test(run('capture',videoArgs).error)); loading.remove();
   run('video-filter',{label:'带货品类',path:[],phase:'select'});
   assert('切换关键词前允许回到全部，另一套筛选保持独立',run('video-filter',{label:'带货品类',path:[],verify:true}).verified===true && run('video-filter',{label:'视频标签',path:tagPath,verify:true}).verified===true);
   const videoRoot=frame.contentDocument.querySelector('.tag-cascader');
@@ -128,7 +140,7 @@ try {
   mask.remove();
   tagRoot.querySelector('.tag-label').textContent = '话题分类';
   const table = frame.contentDocument.createElement('div');
-  table.innerHTML = `<input value="2026-09-21 - 2026-09-27"><table><thead><tr><th>话题</th><th aria-sort="descending">参与人数增长率</th></tr></thead><tbody><tr><td><a href="https://dy.feigua.cn/synthetic/topic/1">合成话题</a></td><td>20%</td></tr></tbody></table>`;
+  table.innerHTML = `<button class="active">话题总榜</button><button class="active">周榜</button><div><span>话题类型</span><button class="active">全部</button></div><input value="2026-09-21 - 2026-09-27"><table><thead><tr><th>话题</th><th aria-sort="descending">参与人数增长率</th></tr></thead><tbody><tr><td><a href="https://dy.feigua.cn/synthetic/topic/1">合成话题</a></td><td>20%</td></tr></tbody></table>`;
   frame.contentDocument.body.append(table);
   const topicArgs = {kind:'topics',sort:'参与人数增长率',period:'周榜'};
   assert('话题从自身控件读取二级目录',run('music-tag-options',{kind:'topics'}).options[0].children[0].label==='合成二级');
@@ -151,5 +163,55 @@ try {
   widgetProps.value=['0'];
   widgetProps.options[1].Sub[0].Sub=[{Id:'111',Name:'新增三级',Sub:[]}];
   assert('未来出现三级目录时不得静默截断',/三级/.test(run('music-tag-options',{kind:'topics'}).error)&&/三级/.test(run('capture',topicArgs).error));
+  await mount(shell + `<div role="tab" aria-selected="true" class="el-tabs__item is-active"><div><span>热点榜</span></div></div><button class="active"><span>日榜</span></button><input value="2026-10-01"><table><thead><tr><th>热点</th><th aria-sort="descending">峰值热度</th></tr></thead><tbody><tr><td><a href="https://dy.feigua.cn/synthetic/hotspot/1">合成热点</a></td><td>1249.1w</td></tr></tbody></table>`);
+  const hotspotArgs = {kind:'hotspots',sort:'峰值热度',period:'日榜'};
+  assert('真实嵌套 tab 的选中状态从 role=tab 回读',run('choice',{label:'热点榜',verify:true}).verified===true);
+  assert('日榜保存具体单日统计日期',run('capture',hotspotArgs).dateRange==='2026-10-01');
+  frame.contentDocument.querySelector('[role="tab"]').setAttribute('aria-selected','false');
+  frame.contentDocument.querySelector('[role="tab"]').classList.remove('is-active');
+  assert('最终采集不接受已变化的热点榜类型',/周期或榜单类型/.test(run('capture',hotspotArgs).error));
+  frame.contentDocument.querySelector('[role="tab"]').setAttribute('aria-selected','true');
+  frame.contentDocument.querySelector('button').classList.remove('active');
+  assert('实时或未选中周期不能被标为日榜',/周期/.test(run('capture',hotspotArgs).error));
+  frame.contentDocument.querySelector('button').classList.add('active');
+  frame.contentDocument.querySelector('input').remove();
+  const unrelatedDate = frame.contentDocument.createElement('p'); unrelatedDate.textContent='其他内容发布于 2026-10-01'; frame.contentDocument.body.append(unrelatedDate);
+  assert('不能拿表格正文日期冒充所选统计日期',/统计日期/.test(run('capture',hotspotArgs).error));
+  await mount(shell + `<div role="tab" aria-selected="true"><div><span>热点榜</span></div></div><button class="active">日榜</button><input value="2026-10-01"><table><thead><tr><th>排名</th><th>热点</th><th>峰值热度</th></tr></thead><tbody><tr><td>01</td><td><a href="https://dy.feigua.cn/synthetic/hotspot/1">合成热点1</a></td><td>0.2亿</td></tr><tr><td>02</td><td><a href="https://dy.feigua.cn/synthetic/hotspot/2">合成热点2</a></td><td>1000w</td></tr></tbody></table>`);
+  assert('固定日榜无排序箭头时核验来源排名和峰值热度降序',run('sort',{label:'峰值热度',verify:true}).verified===true);
+  assert('固定日榜可以按真实日期及顺序采集',run('capture',hotspotArgs).rows.length===2);
+  const fixedRows = frame.contentDocument.querySelectorAll('tbody tr');
+  fixedRows[1].children[2].textContent='0.3亿';
+  assert('实际热度升序的固定榜单被拒绝',Boolean(run('sort',{label:'峰值热度',verify:true}).error));
+  fixedRows[1].children[2].textContent='1000w';
+  fixedRows[0].children[0].textContent='06';
+  assert('不是从第一名开始的页面不能冒充 Top5',Boolean(run('capture',hotspotArgs).error));
+  fixedRows[0].children[0].textContent='01';
+  fixedRows[1].children[0].textContent='03';
+  assert('来源排名缺行不能静默跳过',Boolean(run('capture',hotspotArgs).error));
+  fixedRows[1].children[0].textContent='02';
+  fixedRows[1].children[2].textContent='开通会员查看';
+  assert('固定排名指标为权限提示时拒绝采集',Boolean(run('capture',hotspotArgs).error));
+  fixedRows[1].children[2].textContent='1000w';
+  frame.contentDocument.querySelector('th:last-child').setAttribute('aria-sort','ascending');
+  assert('显式升序不能被固定排名规则覆盖',Boolean(run('capture',hotspotArgs).error));
+  frame.contentDocument.querySelector('th:last-child').removeAttribute('aria-sort');
+  fixedRows[0].children[1].innerHTML='<div class="cursor-pointer-color">合成热点1</div>';
+  fixedRows[0].__vue__={$props:{source:{HotId:'synthetic-hotspot-id',Title:'合成热点1',privateIgnored:'must-not-leak'}}};
+  const eventTitle=run('capture',hotspotArgs);
+  assert('非链接热点标题使用实际行 HotId 而非标题或行号造 ID',eventTitle.rows[0].id==='hotspot:synthetic-hotspot-id' && eventTitle.rows[0].title==='合成热点1' && eventTitle.rows[0].url===null);
+  assert('行组件仅返回白名单身份字段',!JSON.stringify(eventTitle).includes('must-not-leak'));
+  fixedRows[0].__vue__.$props.source.Title='不匹配标题';
+  assert('行绑定数据与可见标题不一致时拒绝保存',/稳定来源标识/.test(run('capture',hotspotArgs).error));
+  fixedRows[0].__vue__.$props.source.Title='合成热点1';
+  delete fixedRows[0].__vue__.$props.source.HotId;
+  assert('非链接热点缺少真实标识时拒绝保存',/稳定来源标识/.test(run('capture',hotspotArgs).error));
+  await mount(shell + `<div role="tab" aria-selected="true"><div><span>热点榜</span></div></div><button class="active">日榜</button><input value="2026-10-01"><section><div class="list-hd"><div class="col-item">排名</div><div class="col-item">热点</div><div class="col-item">峰值热度</div></div><div class="item-border-bottom"><div class="row-cells"><div class="col-item">01</div><div class="col-item">合成热点</div><div class="col-item">1000w</div></div></div></section>`);
+  frame.contentDocument.querySelector('.item-border-bottom').__vue__={$props:{source:{HotId:'nested-row-id',Title:'合成热点'}}};
+  assert('真实自定义列表从外层行组件回读身份',run('capture',hotspotArgs).rows[0].id==='hotspot:nested-row-id');
+  const context=run('capture-context',hotspotArgs);
+  assert('接口采集上下文只回读控件，不携带表格数据',context.dateRange==='2026-10-01'&&!Object.hasOwn(context,'rows'));
+  frame.contentDocument.querySelector('section').remove();
+  assert('表格不存在也能完成接口请求的筛选上下文核验',run('capture-context',hotspotArgs).filtersVerified===true);
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');
