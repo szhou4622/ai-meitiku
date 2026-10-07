@@ -72,7 +72,16 @@ export async function readFeiguaApi({ endpoint, params }) {
   if (!api) return { error: '未找到飞瓜当前页面的接口客户端' };
   const models = Object.values(api).flatMap(group => Object.values(group || {})).filter(model => model?.url === endpoint && typeof model.GET === 'function');
   if (models.length !== 1) return { error: '无法唯一定位飞瓜榜单接口客户端' };
-  const response = await models[0].GET({ params });
+  let response;
+  try { response = await models[0].GET({ params }); }
+  catch (error) {
+    const status = Number(error?.response?.status || error?.status);
+    if (status === 401) return { error: '飞瓜登录已失效，请重新登录', errorCode: 'FEIGUA_AUTH_REQUIRED' };
+    if (status === 403) return { error: '当前账号访问权限不足，请核对登录及权限', errorCode: 'FEIGUA_PERMISSION' };
+    if (status === 429) return { error: '飞瓜请求频率受限，请稍后再采集', errorCode: 'FEIGUA_RATE_LIMIT' };
+    if ([500, 502, 503, 504].includes(status) || ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', 'ERR_INTERNET_DISCONNECTED', 'ERR_CONNECTION_RESET'].includes(error?.code) || /^(Failed to fetch|Network Error)$/i.test(error?.message || '')) return { error: '飞瓜网络或服务暂时不可用', errorCode: 'FEIGUA_NETWORK' };
+    return { error: '飞瓜接口请求未完成，请核对页面后重试', errorCode: 'FEIGUA_API_INVALID' };
+  }
   const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) || value === null ? value : null;
   const pick = (object, keys) => Object.fromEntries(keys.map(key => [key, scalar(object?.[key])]));
   const data = response?.Data;
@@ -93,7 +102,10 @@ const link = (value, base) => { try { const url = new URL(value, base).href; ret
 
 export function captureFeiguaResponse(kind, request, context, response) {
   validateFeiguaRequest(kind, request, context);
+  if (response?.code === 401) throw Object.assign(problem('飞瓜登录已失效，请重新登录'), { code: 'FEIGUA_AUTH_REQUIRED' });
+  if (response?.code === 429) throw Object.assign(problem('飞瓜请求频率受限，请稍后再采集'), { code: 'FEIGUA_RATE_LIMIT' });
   if (response?.code === 403 && [0, '0'].includes(response.data?.Remainder)) throw Object.assign(problem('飞瓜接口查询额度已用完，本组未更新，保留上次结果'), { code: 'FEIGUA_QUOTA' });
+  if ([500, 502, 503, 504].includes(response?.code)) throw Object.assign(problem('飞瓜服务暂时不可用，本组将自动重试'), { code: 'FEIGUA_NETWORK' });
   if (response?.code !== 200 || response.success !== true || !Array.isArray(response.data?.list)) throw problem(`飞瓜接口未返回有效榜单数据（返回码 ${Number.isInteger(response?.code) ? response.code : '未知'}），本组未保存`);
   const data = response.data;
   if (data.list.length > Number(request.params.pageSize)) throw problem('接口返回条数超出本次分页范围');

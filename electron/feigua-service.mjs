@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
@@ -35,8 +36,9 @@ export function dueVideosDate(now = Date.now()) {
 }
 
 export class FeiguaService {
-  constructor({ userDataPath, browser, storage }) {
+  constructor({ userDataPath, browser, storage, retryWait = (ms, signal) => delay(ms, undefined, { signal }) }) {
     this.browser = browser;
+    this.retryWait = retryWait;
     this.browser.onWorkspaceVerified = hint => this.saveWorkspaceHint(hint);
     this.data = initial();
     this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
@@ -109,7 +111,7 @@ export class FeiguaService {
       if (run.status === 'running') {
         run.status = 'interrupted';
         run.message = '上次采集被中断，已保留完成的组；请重新发起采集';
-        for (const group of run.groups) if (['pending', 'running'].includes(group.status)) group.status = 'interrupted';
+        for (const group of run.groups) if (['pending', 'running', 'retrying'].includes(group.status)) { group.status = 'interrupted'; group.retryDelay = null; }
         recovered = true;
       }
     }
@@ -417,16 +419,42 @@ export class FeiguaService {
     }
   }
 
+  async collectWithRetry(run, group, signal, options, index) {
+    const waits = [10_000, 30_000];
+    for (let attempt = 0; ; attempt++) {
+      if (signal.aborted) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' });
+      try { return await this.browser.collect(group.kind, group.keyword, signal, structuredClone(options)); }
+      catch (error) {
+        if (signal.aborted || error.code !== 'FEIGUA_NETWORK') throw error;
+        if (attempt >= waits.length) throw Object.assign(new Error('自动重试后仍未完成，请稍后重新采集'), { code: 'FEIGUA_NETWORK', publicMessage: '已自动重试 2 次，仍未完成；保留上次结果，请稍后重新采集' });
+        const ms = waits[attempt];
+        group.status = 'retrying'; group.retryDelay = ms;
+        group.message = `网络暂时不可用，${ms / 1000} 秒后自动重试（${attempt + 1}/${waits.length}）`;
+        run.message = `${FEIGUA_SOURCES[group.kind].label}：${group.message}`;
+        const persistRetry = async () => {
+          try { await this.persist(); }
+          catch { throw Object.assign(new Error('自动重试状态保存失败，已停止采集'), { code: 'FEIGUA_STORAGE', publicMessage: '自动重试状态保存失败，已保留上次结果并停止采集' }); }
+        };
+        await persistRetry();
+        await this.retryWait(ms, signal);
+        if (signal.aborted || this.disposed) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' });
+        group.status = 'running'; group.attempts = attempt + 2; group.retryDelay = null; delete group.message;
+        run.message = `正在重试${FEIGUA_SOURCES[group.kind].label}（第 ${group.attempts}/3 次，${index + 1}/${run.groups.length} 组）`;
+        await persistRetry();
+      }
+    }
+  }
+
   async execute(run, signal) {
     let stop = false;
     for (const [index, group] of run.groups.entries()) {
       if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; continue; }
-      group.status = 'running';
+      group.status = 'running'; group.attempts = 1;
       run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}（${index + 1}/${run.groups.length}）`;
       await this.persist();
       try {
         const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
-        const capture = await this.browser.collect(group.kind, group.keyword, signal, options);
+        const capture = await this.collectWithRetry(run, group, signal, options, index);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
         if (group.kind === 'videos' && capture.videoFilterOptions) await this.cacheVideoFilters(capture.videoFilterOptions);
@@ -435,11 +463,11 @@ export class FeiguaService {
         await this.saveCapturedGroup(run, group, result);
         continue;
       } catch (error) {
-        group.status = signal.aborted ? 'cancelled' : 'failed';
+        group.status = signal.aborted ? 'cancelled' : 'failed'; group.retryDelay = null;
         // Only adapter-owned messages are exposed, never raw browser/network errors.
         group.message = signal.aborted ? '已取消' : error.publicMessage || '本组采集未通过校验，请打开飞瓜核对页面后重试';
         if (error.code === 'FEIGUA_STORAGE') throw error;
-        if (error.code === 'FEIGUA_QUOTA') stop = true;
+        if (['FEIGUA_QUOTA', 'FEIGUA_RATE_LIMIT'].includes(error.code)) stop = true;
         if (error.code === 'FEIGUA_AUTH_REQUIRED') {
           this.auth = { status: 'expired', message: '飞瓜登录已失效，请重新登录' }; stop = true;
         }

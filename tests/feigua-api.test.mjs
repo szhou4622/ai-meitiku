@@ -135,3 +135,21 @@ test('production collection has no DOM-row or screenshot fallback',async()=>{
   assert.doesNotMatch(source,/execute\(['"]capture['"]|capturePage|screenshot|OCR/);
   assert.match(source,/readFeiguaApi\.toString/);
 });
+
+test('temporary service responses are retryable but authentication and rate-limit responses are terminal',()=>{
+  for(const code of [500,502,503,504])assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,{code}),error=>error.code==='FEIGUA_NETWORK');
+  assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,{code:401}),error=>error.code==='FEIGUA_AUTH_REQUIRED');
+  assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,{code:429}),error=>error.code==='FEIGUA_RATE_LIMIT');
+});
+
+test('transport failures preserve error class without exporting raw request or credential details',async()=>{
+  const old=globalThis.document;
+  try{
+    for(const [failure,expected] of [[{response:{status:401}},'FEIGUA_AUTH_REQUIRED'],[{response:{status:403}},'FEIGUA_PERMISSION'],[{response:{status:429}},'FEIGUA_RATE_LIMIT'],[{response:{status:503}},'FEIGUA_NETWORK'],[{code:'ERR_NETWORK'},'FEIGUA_NETWORK'],[{message:'Failed to fetch'},'FEIGUA_NETWORK'],[{},'FEIGUA_API_INVALID']]){
+      const model={url:FEIGUA_ENDPOINTS.music,GET:async()=>{throw {message:'private-transport-detail',...failure,config:{authorization:'private-token'}};}};
+      globalThis.document={querySelector:()=>({__vue__:{$api:{music:{list:model}}}})};
+      const result=await readFeiguaApi({endpoint:FEIGUA_ENDPOINTS.music,params:request('music').params});
+      assert.equal(result.errorCode,expected);assert.doesNotMatch(JSON.stringify(result),/private-transport-detail|private-token/);
+    }
+  }finally{globalThis.document=old;}
+});

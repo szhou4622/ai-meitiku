@@ -467,7 +467,7 @@ export class FeiguaBrowser {
       Promise.resolve(result).then(value => { cleanup(); resolve(value); }, () => { cleanup(); reject(issue('飞瓜接口请求失败，请检查网络或登录状态', 'FEIGUA_NETWORK')); });
       if (signal?.aborted) abort();
     });
-    if (response?.error) throw issue(response.error, 'FEIGUA_API_INVALID');
+    if (response?.error) throw issue(response.error, ['FEIGUA_NETWORK', 'FEIGUA_AUTH_REQUIRED', 'FEIGUA_PERMISSION', 'FEIGUA_RATE_LIMIT'].includes(response.errorCode) ? response.errorCode : 'FEIGUA_API_INVALID');
     const sent = this.rankingRequests.filter(record => record.kind === kind && record.sequence > beforeApi).at(-1);
     validateFeiguaRequest(kind, sent, context);
     if (JSON.stringify(Object.entries(sent.params).sort()) !== JSON.stringify(Object.entries(request.params).sort())) throw issue('实际发出的接口参数与任务不一致，本组未保存');
