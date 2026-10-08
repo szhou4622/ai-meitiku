@@ -49,6 +49,18 @@ test('430 without an observed dialog does not prematurely mark verification comp
   f.page.auth={authenticated:true};t.mock.timers.tick(1000);await flush();assert.equal((await f.service.state()).auth.status,'authenticated');
 });
 
+test('automatic login flows keep verification state instead of masking it as a generic startup error',async t=>{
+  const f=verificationFixture(t);await f.service.ready;f.browser.openLogin=async()=>{};
+  for(const collectAfterLogin of [false,true]){
+    f.page.auth=collectAfterLogin?{authenticated:false,actionRequired:'verification'}:{authenticated:true};
+    f.browser.getMusicTags=async()=>f.browser.requireVerification();
+    f.browser.getVideoFilters=async()=>assert.fail('must not leave a verification prompt');
+    await f.service.login({collectAfterLogin});f.browser.onAuthChange({status:'authenticated'});await f.service.autoStart;await flush();
+    assert.equal((await f.service.state()).auth.status,'verification_required');assert.ok(f.browser.verificationTimer);
+    assert.ok(!f.calls.some(call=>call.startsWith('collect:')));f.browser.stopVerificationWatch();
+  }
+});
+
 test('cancelling a pending verification observation prevents late readiness or auto-restart',async t=>{
   const f=verificationFixture(t);await f.service.ready;const gate=deferred();
   f.browser.window.webContents.executeJavaScript=()=>gate.promise;

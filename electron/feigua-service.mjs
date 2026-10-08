@@ -69,7 +69,12 @@ export class FeiguaService {
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
         if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
-      }).catch(() => { if (sequence === this.loginSequence && !this.disposed) this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
+      }).catch(error => {
+        if (sequence !== this.loginSequence || this.disposed || error.code === 'FEIGUA_CANCELLED') return;
+        this.auth = error.code === 'FEIGUA_VERIFICATION_REQUIRED'
+          ? { status: 'verification_required', message: error.publicMessage || '飞瓜需要图形验证，完成后请重新采集' }
+          : { status: 'error', message: '自动采集未能启动，请重试采集' };
+      });
     };
     this.controller = null;
     this.writeQueue = Promise.resolve();
