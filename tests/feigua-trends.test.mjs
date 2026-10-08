@@ -102,7 +102,7 @@ test('successful video save archives the new week without losing the prior week'
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : '2026-09-25 - 2026-10-01',
+  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : kind === 'topics' ? '2026-09-21 - 2026-09-27' : '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
@@ -123,6 +123,8 @@ function fixture({ stored, collect, auth, write } = {}) {
 
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
+// Isolate daily/video scheduler tests from a separate overdue topic check.
+const topicReadyState = () => ({version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[],latestResults:[{kind:'topics',keyword:null,status:'completed',musicTag:[],result:validateCapture('topics',null,capture('topics'))}]});
 
 const flushMicrotasks = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
@@ -356,8 +358,9 @@ test('catalogs update on their visited source pages and failed rereads preserve 
   assert.match(state.catalogMessage,/目录更新暂未完成/);
 });
 
-test('login confirmation starts collection before any separate catalog work',async()=>{
-  const {service,browser}=fixture();
+test('login confirmation starts collection before any separate catalog work',async t=>{
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
+  const {service,browser}=fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
   let started,release;
   const first=new Promise(resolve=>{started=resolve;});
   const gate=new Promise(resolve=>{release=resolve;});
@@ -485,7 +488,7 @@ test('existing daily video marker migrates into its week and does not collect ag
   assert.deepEqual(calls, []);
 });
 
-test('late startup catches up videos first, waits while busy, then independently catches up hotspots',async()=>{
+test('late startup serializes videos, daily hotspots and the independent topic week check',async()=>{
   let release;
   const gate=new Promise(resolve=>{release=resolve;});
   const {service,calls,disk}=fixture({collect:async(kind,keyword,_signal,options)=>{if(kind==='videos')await gate;return capture(kind,keyword,options);}});
@@ -496,16 +499,17 @@ test('late startup catches up videos first, waits while busy, then independently
   assert.equal(disk().runs.length,1);
   release();await service.job;
   await service.checkDailySchedule(now,()=>true);await service.job;
+  await service.checkDailySchedule(now,()=>true);await service.job;
   await service.checkDailySchedule(now,()=>true);
-  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null]]);
-  assert.equal(disk().runs.length,2);
+  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null],['topics',null]]);
+  assert.equal(disk().runs.length,3);
   assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
 
 test('video schedule failure and cancellation do not retry that week or consume hotspot schedule',async()=>{
   for(const cancel of [false,true]) {
-    const {service,browser,calls,disk}=fixture();await service.saveKeywords(['词']);
+    const {service,browser,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['词']);
     let release;
     browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
     const now=Date.parse('2026-10-01T22:30:00Z');
@@ -548,7 +552,7 @@ test('adding or editing a keyword immediately collects only changed groups; dele
 });
 
 test('new groups still collect immediately after the weekly schedule is used, without resetting it',async()=>{
-  const {service,calls,disk}=fixture();await service.saveKeywords(['旧关键词']);
+  const {service,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['旧关键词']);
   const now=Date.parse('2026-10-01T22:30:00Z');
   await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
   await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
@@ -558,7 +562,7 @@ test('new groups still collect immediately after the weekly schedule is used, wi
 });
 
 test('without keywords the daily collection catches up only hotspots once per day, including after restart', async () => {
-  const { service, calls, disk } = fixture();
+  const { service, calls, disk } = fixture({stored:topicReadyState()});
   const now = Date.parse('2026-10-02T01:00:00Z');
   await Promise.all([service.checkDailySchedule(now, () => true), service.checkDailySchedule(now, () => true)]);
   await service.job;
@@ -575,7 +579,7 @@ test('without keywords the daily collection catches up only hotspots once per da
 });
 
 test('daily collection waits for 07:00, authorization and idle state', async () => {
-  const { service, calls, disk } = fixture();
+  const { service, calls, disk } = fixture({stored:topicReadyState()});
   const now = Date.parse('2026-10-01T23:00:00Z');
   await service.checkDailySchedule(now - 1, () => true);
   await service.checkDailySchedule(now, () => false);
@@ -627,7 +631,7 @@ test('disposing stops the daily timer and prevents subsequent collection', async
 });
 
 test('cancelling scheduled login prevents collection and does not requeue that day', async () => {
-  const { service, browser, calls, disk } = fixture();
+  const { service, browser, calls, disk } = fixture({stored:topicReadyState()});
   let release;
   browser.checkLogin = () => new Promise(resolve => { release = resolve; });
   const now = Date.parse('2026-10-01T23:00:00Z');
@@ -655,7 +659,7 @@ test('daily-only history rotation preserves cached BGM, topics and keyword video
   const restored = fixture({ stored: disk() });
   const state = await restored.service.state();
   assert.equal(state.runs.length, 12);
-  assert.ok(state.runs.every(run => run.groups.length === 1 && ['hotspots','videos'].includes(run.groups[0].kind)));
+  assert.ok(state.runs.every(run => run.groups.length === 1 && ['hotspots','videos','topics'].includes(run.groups[0].kind)));
   assert.deepEqual(new Set(state.latestResults.map(group => group.kind)), new Set(['music', 'topics', 'hotspots', 'videos']));
 });
 
@@ -1003,8 +1007,9 @@ test('known provider notice is confirmed once and login then closes automaticall
   browser.stopLoginWatch();
 });
 
-test('login success starts a single collection automatically using saved keywords', async () => {
-  const {service,browser,calls} = fixture();
+test('login success starts a single collection automatically using saved keywords', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
+  const {service,browser,calls} = fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
   await service.saveKeywords(['测试词']);
   browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); };
   await service.login(); await service.autoStart; await service.job;

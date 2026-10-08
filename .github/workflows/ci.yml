@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Test Feigua contracts, task lifecycle and feature registration
-        run: node --test tests/feigua-video-details.test.mjs tests/feigua-retry.test.mjs tests/feigua-login-credentials.test.mjs tests/feigua-login-entry.test.mjs tests/feigua-trends.test.mjs tests/feigua-api.test.mjs tests/feature-registry.test.mjs tests/electron-runtime-imports.test.mjs
+        run: node --test tests/feigua-topic-schedule.test.mjs tests/feigua-video-details.test.mjs tests/feigua-retry.test.mjs tests/feigua-login-credentials.test.mjs tests/feigua-login-entry.test.mjs tests/feigua-trends.test.mjs tests/feigua-api.test.mjs tests/feature-registry.test.mjs tests/electron-runtime-imports.test.mjs
 
   repository-checks:
     name: repository-checks
