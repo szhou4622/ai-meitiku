@@ -10,7 +10,7 @@ const saved=(period=expected,musicTag=[])=>({kind:'topics',keyword:null,status:'
 const makeCapture=(range,options)=>({url:'https://dy.feigua.cn/app/#/synthetic-topics',period:'周榜',dateRange:range,musicTag:options.musicTag,sort:'参与人数增长率',direction:'desc',filtersVerified:true,rows:[{id:'synthetic-topic',title:'合成话题',author:'合成作者',followers:'10',participantGrowth:'20%',playGrowth:'30%'}]});
 
 function fixture({stored={},range=expected,auth='authenticated',write}={}) {
-  let disk={version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],musicTag:[],runs:[],lastHotspotsScheduleDate:'2026-10-31',...stored};
+  let disk={version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],musicTag:[],runs:[],lastHotspotsScheduleDate:'2026-10-31',lastMusicCheck:{date:'2026-10-31',musicTag:[]},...stored};
   const calls=[];const browser={checkLogin:async()=>({status:auth,message:auth==='authenticated'?'已登录':'请重新登录'}),collect:async(kind,keyword,signal,options)=>{calls.push(kind);return kind==='topics'?makeCapture(typeof range==='function'?range():range,options):{url:'https://dy.feigua.cn/synthetic',period:FEIGUA_SOURCES[kind].period,sort:FEIGUA_SOURCES[kind].sort,direction:'desc',filtersVerified:true,musicTag:options.musicTag||[],dateRange:kind==='hotspots'?'2026-10-01':null,rows:[{id:'synthetic-'+kind,title:'合成标题',author:'合成作者',totalUsers:'1',yesterdayUsers:'1',peakHeat:'1'}]};},stop(){}};
   const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>structuredClone(disk),write:async data=>{await write?.(data);disk=structuredClone(data);}}});
   return {service,browser,calls,disk:()=>disk};

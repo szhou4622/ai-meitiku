@@ -123,8 +123,8 @@ function fixture({ stored, collect, auth, write } = {}) {
 
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
-// Isolate daily/video scheduler tests from a separate overdue topic check.
-const topicReadyState = () => ({version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[],latestResults:[{kind:'topics',keyword:null,status:'completed',musicTag:[],result:validateCapture('topics',null,capture('topics'))}]});
+// Isolate hotspot/video scheduler tests from other overdue modules.
+const topicReadyState = () => ({version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[],lastMusicCheck:{date:'2026-10-31',musicTag:[]},latestResults:[{kind:'topics',keyword:null,status:'completed',musicTag:[],result:validateCapture('topics',null,capture('topics'))}]});
 
 const flushMicrotasks = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
@@ -488,7 +488,7 @@ test('existing daily video marker migrates into its week and does not collect ag
   assert.deepEqual(calls, []);
 });
 
-test('late startup serializes videos, daily hotspots and the independent topic week check',async()=>{
+test('late startup serializes videos, hotspots, BGM and the topic week check',async()=>{
   let release;
   const gate=new Promise(resolve=>{release=resolve;});
   const {service,calls,disk}=fixture({collect:async(kind,keyword,_signal,options)=>{if(kind==='videos')await gate;return capture(kind,keyword,options);}});
@@ -500,9 +500,9 @@ test('late startup serializes videos, daily hotspots and the independent topic w
   release();await service.job;
   await service.checkDailySchedule(now,()=>true);await service.job;
   await service.checkDailySchedule(now,()=>true);await service.job;
-  await service.checkDailySchedule(now,()=>true);
-  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null],['topics',null]]);
-  assert.equal(disk().runs.length,3);
+  await service.checkDailySchedule(now,()=>true);await service.job;
+  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null],['music',null],['topics',null]]);
+  assert.equal(disk().runs.length,4);
   assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
