@@ -11,6 +11,21 @@ const assert = (name, passed) => { outputs.push(`${passed ? 'PASS' : 'FAIL'} ${n
 const shell = '<aside>个人中心 收藏夹 视频/素材</aside>';
 try {
   {
+    await mount(shell + '<section class="notice-list-wrap"><div class="el-loading-mask">加载公告</div></section>');
+    assert('首页无关组件加载不阻止已认证导航', run('ready',{navigationOnly:true}).ready===true);
+    assert('榜单和详情仍需等待加载完成', run('ready').ready===false);
+    const dialog=frame.contentDocument.createElement('div');dialog.setAttribute('role','dialog');
+    dialog.innerHTML=`<h2>风险提示</h2><img width="116" height="28" src="${location.origin}/Login/GetPTDogValidateCode"><input placeholder="请输入正确的图形验证码后继续使用"><button>继续使用</button>`;
+    frame.contentDocument.body.append(dialog);let clicked=0;dialog.querySelector('button').onclick=()=>clicked++;
+    assert('验证码弹窗不能视为登录就绪', run('auth').authenticated===false&&run('auth').actionRequired==='verification');
+    assert('首页导航也不能忽略验证码', run('ready',{navigationOnly:true}).actionRequired==='verification');
+    assert('验证码出现时不能继续采集',run('capture-context',{kind:'videos'}).actionRequired==='verification');
+    assert('普通声明确认不能提交验证码',run('accept-terms').accepted===false&&clicked===0);
+    dialog.style.display='none';assert('隐藏验证码不误报正在验证',run('auth').authenticated===true);
+    dialog.remove();await mount('<h1>微信扫码登录</h1>');
+    assert('首页导航仍然要求登录',run('ready',{navigationOnly:true}).authRequired===true);
+  }
+  {
     const loginHtml='<form><input id="username" name="username"><input id="password" name="password" type="password"><input id="save_pass" type="checkbox" checked><button type="button">登录</button></form>';
     await mount(loginHtml);
     const doc=frame.contentDocument, origin=frame.contentWindow.location.origin;

@@ -133,6 +133,14 @@ test('missing observed requests and permission masks prevent guessed or unauthor
 test('quota, login and sample responses stop subsequent detail calls without publishing data',async()=>{
   for(const main of [{Code:401},{Code:403,Data:{Remainder:0}},{Code:200,Status:true,ExampleData:true,Data:{AwemeId:id}}])await withPage({main},async calls=>{assert.notEqual((await readVideoDetailsApi({videoId:id,dateCode})).state,'verified');assert.deepEqual(calls,['main']);});
 });
+
+test('detail verification halts before product lookup and cannot publish a partial capture',async()=>{
+  await withPage({main:{Code:430}},async calls=>{assert.equal((await readVideoDetailsApi({videoId:id,dateCode})).state,'verification_required');assert.deepEqual(calls,['main']);});
+  const browser=new FeiguaBrowser({});let navigations=0;
+  browser.navigate=async()=>{navigations++;throw Object.assign(new Error('verification'),{code:'FEIGUA_VERIFICATION_REQUIRED'});};
+  await assert.rejects(browser.enrichVideoFields({url:origin+'/app/',rows:[structuredClone(row),structuredClone(row)]}),{code:'FEIGUA_VERIFICATION_REQUIRED'});
+  assert.equal(navigations,1);
+});
 test('saved video rows retain availability, supplemental engagement, zero commission and safe provenance',()=>{
   const enriched=enrichVideoRow(row,detail);
   const clean=validateCapture('videos','合成词',{url:`${origin}/app/#/synthetic/list`,keyword:'合成词',period:'近7天',sort:FEIGUA_SOURCES.videos.sort,direction:'desc',filtersVerified:true,categoryPath:[],tagPath:[],dateRange:'2026-10-01 - 2026-10-07',rows:[enriched]});

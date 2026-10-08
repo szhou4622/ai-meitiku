@@ -214,6 +214,7 @@ export class FeiguaBrowser {
     let result;
     try { result = await this.window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
     catch { throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
+    if (result?.actionRequired === 'verification') this.requireVerification();
     if (result?.authRequired) throw issue('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
     if (command !== 'auth' && result?.actionRequired) {
       if (retryNotice) { await this.resolveAuth(); return this.execute(command, argument, false); }
@@ -221,6 +222,13 @@ export class FeiguaBrowser {
     }
     if (result?.error) throw issue(result.error);
     return result;
+  }
+
+  requireVerification() {
+    const message = '飞瓜需要图形验证，请在已打开的飞瓜窗口完成验证后重新采集';
+    this.ensureWindow(true);
+    this.onAuthChange?.({ status: 'verification_required', message });
+    throw issue(message, 'FEIGUA_VERIFICATION_REQUIRED');
   }
 
   async resolveAuth(signal, isCurrent = () => true) {
@@ -260,13 +268,13 @@ export class FeiguaBrowser {
     throw issue('飞瓜声明确认未生效，请稍后重试', 'FEIGUA_NOTICE_FAILED');
   }
 
-  async settle(signal) {
+  async settle(signal, { navigationOnly = false } = {}) {
     const deadline = Date.now() + 25000;
     let stable = 0;
     while (Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
       await delay(300, undefined, { signal });
-      const ready = await this.execute('ready');
+      const ready = await this.execute('ready', { navigationOnly });
       if (ready.ready && !this.pending.size && Date.now() - this.lastNetwork > 600) stable++; else stable = 0;
       if (stable >= 2) return;
     }
@@ -438,10 +446,10 @@ export class FeiguaBrowser {
       await this.enterWorkspace();
       await this.waitForWorkspace(signal);
     }
-    await this.settle(signal);
+    await this.settle(signal, { navigationOnly: true });
     const previousUrl = this.window.webContents.getURL();
     let destination = await this.execute('navigate', { labels: source.navigation });
-    if (destination.expanded) { await this.settle(signal); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
+    if (destination.expanded) { await this.settle(signal, { navigationOnly: true }); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
     if (destination.url) await this.navigate(destination.url);
     if (destination.clicked) {
       for (let attempt = 0; attempt < 40 && this.window.webContents.getURL() === previousUrl; attempt++) await delay(250, undefined, { signal });
@@ -518,7 +526,10 @@ export class FeiguaBrowser {
         capture.musicTagOptions = catalog.options;
         capture.musicTagRestricted = catalog.restricted;
       } else if (kind === 'videos') capture.videoFilterOptions = await this.execute('video-filter-options');
-    } catch { capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验'; }
+    } catch (error) {
+      if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error;
+      capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验';
+    }
     if (kind === 'videos' && Array.isArray(capture.rows)) await this.enrichVideoFields(capture, signal);
     return capture;
   }
@@ -554,9 +565,11 @@ export class FeiguaBrowser {
           }
         } catch (error) {
           if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+          if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error;
           detail = { state: error.code === 'FEIGUA_AUTH_REQUIRED' ? 'auth_required' : 'lookup_failed' };
         }
       }
+      if (detail?.state === 'verification_required') this.requireVerification();
       if (['auth_required', 'quota_exhausted', 'rate_limited'].includes(detail?.state)) blocked = detail.state;
       if (detail?.state === 'auth_required') this.onAuthChange?.({ status: 'expired', message: '飞瓜登录已失效，列表已保留，请重新登录后补充详情' });
       capture.rows[index] = enrichVideoRow(row, detail);
@@ -581,6 +594,7 @@ export class FeiguaBrowser {
       Promise.resolve(result).then(value => { cleanup(); resolve(value); }, () => { cleanup(); reject(issue('飞瓜接口请求失败，请检查网络或登录状态', 'FEIGUA_NETWORK')); });
       if (signal?.aborted) abort();
     });
+    if (response?.code === 430) this.requireVerification();
     if (response?.error) throw issue(response.error, ['FEIGUA_NETWORK', 'FEIGUA_AUTH_REQUIRED', 'FEIGUA_PERMISSION', 'FEIGUA_RATE_LIMIT'].includes(response.errorCode) ? response.errorCode : 'FEIGUA_API_INVALID');
     const sent = this.rankingRequests.filter(record => record.kind === kind && record.sequence > beforeApi).at(-1);
     validateFeiguaRequest(kind, sent, context);

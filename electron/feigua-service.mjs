@@ -265,8 +265,8 @@ export class FeiguaService {
       this.auth = await this.browser.checkLogin();
       if (this.auth.status !== 'authenticated') throw new Error('请先登录飞瓜');
       const errors = [];
-      try { await this.syncMusicTags(); } catch { errors.push('榜单分类'); }
-      try { await this.syncVideoFilters(); } catch { errors.push('视频分类'); }
+      try { await this.syncMusicTags(); } catch (error) { if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error; errors.push('榜单分类'); }
+      try { await this.syncVideoFilters(); } catch (error) { if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error; errors.push('视频分类'); }
       this.catalogMessage = errors.length ? `${errors.join('、')}更新暂未完成，仍可使用已有分类；采集时将核验实际筛选。` : null;
     });
     return this.state();
@@ -526,6 +526,9 @@ export class FeiguaService {
         }
         if (error.code === 'FEIGUA_NOTICE_FAILED') {
           this.auth = { status: 'error', message: error.publicMessage }; stop = true;
+        }
+        if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') {
+          this.auth = { status: 'verification_required', message: error.publicMessage }; stop = true;
         }
       }
       await this.persist();

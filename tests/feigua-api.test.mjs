@@ -185,6 +185,16 @@ test('browser verifies the actual emitted API request and rejects a response wit
   const aborted=new AbortController();aborted.abort();await assert.rejects(browser.readRanking('music',contexts.music,0,aborted.signal),/取消/);
 });
 
+test('verification response opens the owned provider window without accepting a ranking', async()=>{
+  assert.throws(()=>captureFeiguaResponse('music',request('music'),contexts.music,{code:430}),{code:'FEIGUA_VERIFICATION_REQUIRED'});
+  const browser=new FeiguaBrowser({});let shown=0,focused=0,auth;
+  browser.rankingRequests=[{...request('music'),sequence:1}];browser.requestSequence=1;
+  browser.window={isDestroyed:()=>false,show:()=>shown++,focus:()=>focused++,webContents:{executeJavaScript:async()=>({code:430})}};
+  browser.onAuthChange=value=>{auth=value;};
+  await assert.rejects(browser.readRanking('music',contexts.music,0),{code:'FEIGUA_VERIFICATION_REQUIRED'});
+  assert.equal(shown,1);assert.equal(focused,1);assert.equal(auth.status,'verification_required');
+});
+
 test('cancelling a pending API response prevents publication even when it later resolves',async()=>{
   const browser=new FeiguaBrowser({});browser.rankingRequests=[{...request('music'),sequence:1}];browser.requestSequence=1;
   let release;browser.window={webContents:{executeJavaScript:()=>new Promise(resolve=>{release=resolve;})}};

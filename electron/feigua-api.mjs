@@ -105,6 +105,7 @@ const link = (value, base) => { try { const url = new URL(value, base).href; ret
 export function captureFeiguaResponse(kind, request, context, response) {
   validateFeiguaRequest(kind, request, context);
   if (response?.code === 401) throw Object.assign(problem('飞瓜登录已失效，请重新登录'), { code: 'FEIGUA_AUTH_REQUIRED' });
+  if (response?.code === 430) throw Object.assign(problem('飞瓜需要图形验证，请在飞瓜窗口完成验证后重新采集'), { code: 'FEIGUA_VERIFICATION_REQUIRED' });
   if (response?.code === 429) throw Object.assign(problem('飞瓜请求频率受限，请稍后再采集'), { code: 'FEIGUA_RATE_LIMIT' });
   if (response?.code === 403 && [0, '0'].includes(response.data?.Remainder)) throw Object.assign(problem('飞瓜接口查询额度已用完，本组未更新，保留上次结果'), { code: 'FEIGUA_QUOTA' });
   if (response?.exampleData || response?.ExampleData || response?.data?.ExampleData) throw problem('飞瓜接口返回示例数据，本组未保存，保留上次结果');

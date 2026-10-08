@@ -29,7 +29,10 @@ export function feiguaPage(command, argument = {}) {
       || elements('[role="dialog"], .el-dialog__wrapper, .el-message-box__wrapper, .login-dialog, .login-modal').some(loginPrompt)
       || !hasShell && loginText.test(body);
     const loginVisible = loginDialog || exact('注册 / 登录').length > 0 || exact('登录').length > 0;
-    const actionRequired = body.includes('数据使用限制声明') && exact('同意并继续使用').length > 0 ? 'terms' : null;
+    const verification = elements('[role="dialog"], .el-dialog, .el-message-box').some(dialog =>
+      elements('img', dialog).some(image => { try { return new URL(image.getAttribute('src'), location.href).pathname === '/Login/GetPTDogValidateCode'; } catch { return false; } })
+      && elements('input', dialog).some(input => /图形验证码/.test(input.getAttribute('placeholder') || '')));
+    const actionRequired = verification ? 'verification' : body.includes('数据使用限制声明') && exact('同意并继续使用').length > 0 ? 'terms' : null;
     const workspaceAvailable = !hasShell && !loginVisible && !actionRequired && exact('进入工作台').length === 1;
     return { authenticated: hasShell && !loginDialog && !actionRequired, loginVisible, actionRequired, workspaceAvailable,
       loading: Boolean(document.querySelector('#app')) && !hasShell && !loginVisible && !actionRequired && !workspaceAvailable };
@@ -86,7 +89,7 @@ export function feiguaPage(command, argument = {}) {
     buttons[0].click();
     return { accepted: true };
   }
-  if (authState().actionRequired) return { actionRequired: 'terms' };
+  if (authState().actionRequired) return { actionRequired: authState().actionRequired };
   if (command === 'enter-workspace') {
     if (!authState().workspaceAvailable) return failure('尚未发现登录后的工作台入口');
     const entry = exact('进入工作台')[0];
@@ -486,6 +489,8 @@ export function feiguaPage(command, argument = {}) {
       dateRange,
       emptyVerified: /暂无数据|暂无相关|没有找到/.test(text(table.root)) };
   }
-  if (command === 'ready') return { ready: document.readyState === 'complete' && !elements('[aria-busy="true"], .el-loading-mask, .loading-mask').length };
+  // The authenticated home shell is sufficient for opening its navigation.
+  // Rankings and details still wait for their loading masks to disappear.
+  if (command === 'ready') return { ready: document.readyState === 'complete' && (argument.navigationOnly === true || !elements('[aria-busy="true"], .el-loading-mask, .loading-mask').length) };
   return failure('未知采集指令');
 }

@@ -10,6 +10,15 @@ import { recoverVideoHistory, videoRankingPeriod, videoCollectionWeek, videoHist
 
 const historyVideo = (keyword, collectedAt, rows = [{ id: collectedAt }], dateRange = '2026-09-25 - 2026-10-01') => ({ kind: 'videos', keyword, status: 'completed', result: { collectedAt, rows, dateRange, filters: { categoryPath: ['历史分类'], tagPath: [] } } });
 
+test('opening a ranking ignores home widget loading only until its menu navigation completes',async()=>{
+  const browser=new FeiguaBrowser({});const waits=[];let navigations=0;
+  browser.navigate=async()=>{};browser.resolveAuth=async()=>({authenticated:true});
+  browser.window={webContents:{getURL:()=> 'https://dy.feigua.cn/app/'}};
+  browser.settle=async(_signal,options)=>{waits.push(options?.navigationOnly===true);};
+  browser.execute=async(command)=>{assert.equal(command,'navigate');return ++navigations===1?{expanded:true}:{url:'https://dy.feigua.cn/app/#/video/library/goods'};};
+  await browser.openSource('videos');assert.deepEqual(waits,[true,true,false]);
+});
+
 test('video week key uses the verified seven-day source period instead of a collection date', () => {
   assert.equal(videoRankingPeriod('2026-09-25 - 2026-10-01'), '2026-09-25 - 2026-10-01');
   assert.equal(videoRankingPeriod('2026-10-01T16:00:00Z'), null);
@@ -122,6 +131,13 @@ function fixture({ stored, collect, auth, write } = {}) {
 }
 
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
+
+test('catalog refresh cannot navigate away from a human verification prompt',async()=>{
+  const {service,browser}=fixture();let nextCatalog=0;
+  browser.getMusicTags=async()=>{throw Object.assign(new Error('synthetic verification'),{code:'FEIGUA_VERIFICATION_REQUIRED'});};
+  browser.getVideoFilters=async()=>{nextCatalog++;return videoCatalog;};
+  await assert.rejects(service.prepareCatalogs(),{code:'FEIGUA_VERIFICATION_REQUIRED'});assert.equal(nextCatalog,0);
+});
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
 // Isolate hotspot/video scheduler tests from other overdue modules.
 const topicReadyState = () => ({version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[],lastMusicCheck:{date:'2026-10-31',musicTag:[]},latestResults:[{kind:'topics',keyword:null,status:'completed',musicTag:[],result:validateCapture('topics',null,capture('topics'))}]});
