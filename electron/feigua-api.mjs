@@ -1,5 +1,5 @@
 import { FEIGUA_SOURCES, isFeiguaDataUrl, validateCaptureDates, isRankingMetric } from './feigua-contract.mjs';
-import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
+import { feiguaVideoLink, feiguaProductLink, feiguaAuthorLink } from './feigua-links.mjs';
 
 // Observed from the logged-in site's own GET requests, not guessed API routes.
 export const FEIGUA_ENDPOINTS = Object.freeze({
@@ -93,6 +93,7 @@ export async function readFeiguaApi({ endpoint, params }) {
       ...pick(row, ['MusicId', 'Title', 'Author', 'UserCount', 'TodayUserCount', 'DetailUrl', 'TopicId', 'RankNum', 'ViewCountIncRatioStr', 'UserCountIncRatioStr', 'HotId', 'Rank', 'HotValueStr', 'AwemeId', 'VideoUrl', 'Desc', 'BloggerNickName', 'Fans', 'PlayCount', 'LikeCount', 'CommentCount', 'ShareCount', 'CollectCount', 'SalesGmv', 'SaleCount', 'PubTimeStr', 'IsHasProduct']),
       topic: pick(row.BaseTopicDto, ['TopicName', 'TopicFullDetailUrl']),
       blogger: pick(row.BaseBloggerDto, ['BloggerName', 'MPlatform_Fans', 'Fans']),
+      creators: Array.isArray(row.BloggerCreators) && row.BloggerCreators.length <= 30 ? row.BloggerCreators.map(author => pick(author, ['Uid', 'NickName', 'DouyinBloggerUrl'])) : [],
       product: pick(row.ExtInfo, ['Gid', 'Title', 'Name', 'CosRatioShow', 'PromotionsCount', 'PromotionUrl']),
     })) : null,
   } };
@@ -123,7 +124,9 @@ export function captureFeiguaResponse(kind, request, context, response) {
     if (kind === 'music') return { id: shown(row.MusicId), url: link(row.DetailUrl, context.url), title: shown(row.Title), author: shown(row.Author), totalUsers: shown(row.UserCount), yesterdayUsers: shown(row.TodayUserCount) };
     if (kind === 'topics') return { id: shown(row.TopicId), url: link(row.topic?.TopicFullDetailUrl, context.url), title: shown(row.topic?.TopicName), author: shown(row.blogger?.BloggerName), followers: shown(row.blogger?.MPlatform_Fans ?? row.blogger?.Fans), participantGrowth: shown(row.UserCountIncRatioStr), playGrowth: shown(row.ViewCountIncRatioStr) };
     if (kind === 'hotspots') return { id: shown(row.HotId), url: null, title: shown(row.Title), peakHeat: shown(row.HotValueStr) };
-    return { id: shown(row.AwemeId), url: link(row.DetailUrl, context.url), videoUrl: feiguaVideoLink(row.VideoUrl, row.AwemeId), title: shown(row.Desc), author: shown(row.BloggerNickName), followers: shown(row.Fans), plays: shown(row.PlayCount), likes: shown(row.LikeCount), comments: shown(row.CommentCount), shares: shown(row.ShareCount), collects: shown(row.CollectCount), sales: shown(row.SalesGmv), salesCount: shown(row.SaleCount), publishedAt: shown(row.PubTimeStr),
+    const authors = (row.creators || []).filter(author => shown(author.NickName) === shown(row.BloggerNickName) && shown(author.NickName));
+    const authorUrl = authors.length === 1 ? feiguaAuthorLink(authors[0].DouyinBloggerUrl, authors[0].Uid) : null;
+    return { id: shown(row.AwemeId), url: link(row.DetailUrl, context.url), videoUrl: feiguaVideoLink(row.VideoUrl, row.AwemeId), title: shown(row.Desc), author: shown(row.BloggerNickName), authorUrl, followers: shown(row.Fans), plays: shown(row.PlayCount), likes: shown(row.LikeCount), comments: shown(row.CommentCount), shares: shown(row.ShareCount), collects: shown(row.CollectCount), sales: shown(row.SalesGmv), salesCount: shown(row.SaleCount), publishedAt: shown(row.PubTimeStr),
       products: row.IsHasProduct && shown(row.product?.Title || row.product?.Name) ? [{ id: shown(row.product.Gid), title: shown(row.product.Title || row.product.Name), commission: shown(row.product.CosRatioShow), url: feiguaProductLink(row.product.PromotionUrl) }] : [],
       productCount: Number(row.product?.PromotionsCount) || 0,
       productsIncomplete: Number(row.product?.PromotionsCount) > 1,

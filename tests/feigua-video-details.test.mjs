@@ -2,12 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VIDEO_DETAIL_ENDPOINTS, videoPublishedDate, observeVideoDetailRequest, readVideoDetailsApi, enrichVideoRow } from '../electron/feigua-video-details.mjs';
 import { validateCapture, FEIGUA_SOURCES } from '../electron/feigua-contract.mjs';
-import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
+import { feiguaVideoLink, feiguaProductLink, feiguaAuthorLink } from '../electron/feigua-links.mjs';
 import { FeiguaBrowser } from '../electron/feigua-browser.mjs';
 
 const origin='https://dy.feigua.cn',id='synthetic-video',dateCode='20261002';
 const row={id,url:`${origin}/app/#/synthetic/detail`,title:'合成视频',author:'合成达人',followers:'100',plays:null,likes:'166',comments:'0',shares:'2',collects:'3',sales:'10w~25w',salesCount:'2500-5000',publishedAt:'2026/10/02 12:11',products:[{id:'synthetic-goods',title:'合成商品',commission:null}],productCount:1};
 const detail={state:'verified',videoId:id,dateCode,playsCount:0,playsText:null,products:[{id:'synthetic-goods',title:'合成商品',commission:'0.00%',hasCommission:false}]};
+
+test('author links use public profile identities and discard transport parameters', () => {
+  const profile = 'https://www.douyin.com/user/MS4wLjABAAAA_synthetic-author';
+  assert.equal(feiguaAuthorLink(profile + '/?token=synthetic-secret#tracking'), profile);
+  assert.equal(feiguaAuthorLink(null, '700000000001'), 'https://www.iesdouyin.com/share/user/700000000001');
+  assert.equal(feiguaAuthorLink(null, 700000000001), 'https://www.iesdouyin.com/share/user/700000000001');
+  assert.equal(feiguaAuthorLink('https://www.iesdouyin.com/share/user/700000000002', '700000000001'), 'https://www.iesdouyin.com/share/user/700000000001');
+  for (const candidate of [profile.replace('https:', 'http:'), profile.replace('www.douyin.com', 'www.douyin.com.evil.example'), profile.replace('www.douyin.com', 'user:pass@www.douyin.com'), profile.replace('www.douyin.com', 'www.douyin.com:8443'), 'javascript:alert(1)', 'https://www.douyin.com/user/self', 'https://www.douyin.com/user/700000000001', 'https://dy.feigua.cn/app/#/blogger-detail/index']) assert.equal(feiguaAuthorLink(candidate), null);
+  for (const invalid of ['合成达人', 'synthetic-blogger-id', '123', Number.MAX_SAFE_INTEGER + 1, {}, null]) assert.equal(feiguaAuthorLink(null, invalid), null);
+});
+
+test('detail authors must match the listed author uniquely and survive durable validation', () => {
+  const authors = [{ name: row.author, uid: '700000000001', url: null }];
+  const enriched = enrichVideoRow(row, { ...detail, authors });
+  const clean = validateCapture('videos', '合成词', {url:`${origin}/app/#/synthetic/list`, keyword:'合成词', period:'近7天', sort:FEIGUA_SOURCES.videos.sort, direction:'desc', filtersVerified:true, categoryPath:[], tagPath:[], dateRange:'2026-10-01 - 2026-10-07', rows:[enriched]}).rows[0];
+  assert.equal(clean.authorUrl, 'https://www.iesdouyin.com/share/user/700000000001');
+  for (const changed of [{ videoId: 'another-video' }, { dateCode: '20261003' }, { authors: [{ ...authors[0], name: '其他作者' }] }, { authors: [...authors, { ...authors[0], uid: '700000000002' }] }]) assert.ok(!enrichVideoRow(row, { ...detail, authors, ...changed }).authorUrl);
+  assert.equal(enrichVideoRow({...row, authorUrl:clean.authorUrl}, {state:'restricted'}).authorUrl, clean.authorUrl);
+  assert.equal(enrichVideoRow({...row, authorUrl:clean.authorUrl}, {...detail, authors:[]}).authorUrl, clean.authorUrl);
+});
 
 test('public video links require matching source identity and drop tracking or signed parameters', () => {
   const videoId = '7000000000000000001';
@@ -38,7 +58,7 @@ test('verified detail links survive durable capture but mismatched product or vi
 test('already verified links and commission avoid extra detail navigation even when plays are absent', async () => {
   const browser = new FeiguaBrowser({});
   browser.navigate = async () => { throw new Error('unexpected detail lookup'); };
-  const capture = { rows: [{ ...row, videoUrl: 'https://www.douyin.com/video/7000000000000000001', products: [{...row.products[0],commission:'0.00%',url:'https://haohuo.jinritemai.com/ecommerce/trade/detail/index.html?id=3000000000000000001'}] }] };
+  const capture = { rows: [{ ...row, authorUrl: 'https://www.iesdouyin.com/share/user/700000000001', videoUrl: 'https://www.douyin.com/video/7000000000000000001', products: [{...row.products[0],commission:'0.00%',url:'https://haohuo.jinritemai.com/ecommerce/trade/detail/index.html?id=3000000000000000001'}] }] };
   let progress = 0; browser.onVideoDetailProgress = () => { progress++; };
   await browser.enrichVideoFields(capture);
   assert.equal(progress, 0);
@@ -87,6 +107,25 @@ async function withPage({main,products,entries,mask}={},operation){
 }
 test('detail API reuses observed source requests and exports only whitelisted metrics',async()=>{
   await withPage({},async calls=>{const result=await readVideoDetailsApi({videoId:id,dateCode});assert.equal(result.state,'verified');assert.equal(result.products[0].commission,'0.00%');assert.deepEqual(calls,['main','products']);assert.doesNotMatch(JSON.stringify(result),/synthetic-secret|"(?:Token|Sign|ts)"/);});
+});
+
+test('detail API exports only public author fields from the verified video response', async () => {
+  await withPage({main:{Code:200,Status:true,Data:{AwemeId:id,DateCode:dateCode,BloggerCreators:[{BloggerName:row.author,BloggerUid:'700000000001',DouyinBloggerUrl:null,Token:'synthetic-secret'}]}}}, async () => {
+    const result = await readVideoDetailsApi({videoId:id,dateCode});
+    assert.deepEqual(result.authors, [{name:row.author,uid:'700000000001',url:null}]);
+    assert.doesNotMatch(JSON.stringify(result), /synthetic-secret|Token/);
+  });
+});
+
+test('missing author links trigger existing detail enrichment despite complete video and products', async () => {
+  const browser = new FeiguaBrowser({}); let navigations = 0;
+  browser.navigate = async () => { navigations++; throw new Error('synthetic lookup failure'); };
+  const capture = {url:`${origin}/app/#/synthetic/list`, rows:[{...row, videoUrl:'https://www.douyin.com/video/7000000000000000001', products:[{...row.products[0],commission:'0.00%',url:'https://haohuo.jinritemai.com/ecommerce/trade/detail/index.html?id=3000000000000000001'}]}]};
+  await browser.enrichVideoFields(capture);
+  assert.equal(navigations, 1);
+  assert.equal(capture.rows[0].author, row.author);
+  assert.equal(capture.rows[0].products[0].commission, '0.00%');
+  assert.ok(!capture.rows[0].authorUrl);
 });
 test('missing observed requests and permission masks prevent guessed or unauthorized lookups',async()=>{
   for(const options of [{entries:[]},{mask:true}])await withPage(options,async calls=>{assert.notEqual((await readVideoDetailsApi({videoId:id,dateCode})).state,'verified');assert.deepEqual(calls,[]);});
