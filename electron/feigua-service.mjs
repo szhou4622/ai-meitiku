@@ -4,6 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
+import { pendingTopicCheck, settledTopicPeriod } from './feigua-topic-schedule.mjs';
+import { pendingMusicCheck } from './feigua-music-schedule.mjs';
+import { retainProductFields, restoreProductFieldsInState } from './feigua-product-cache.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -12,6 +15,12 @@ const videoFilterDefaults = (cached) => ({
   tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
 });
 const initial = () => ({ version: 1, loginEntryUrl: '', keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
+const assertNotCancelled = signal => { if (signal?.aborted) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' }); };
+const detailStopMessages = Object.freeze({
+  auth_required: '飞瓜登录已失效，已停止后续采集，请重新登录',
+  quota_exhausted: '飞瓜详情查询额度已用完，已停止后续采集',
+  rate_limited: '飞瓜详情请求频率受限，已停止后续采集，请稍后重试',
+});
 
 function recoverLatestResults(runs, cached = []) {
   const found = new Map();
@@ -60,12 +69,18 @@ export class FeiguaService {
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
         if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
-      }).catch(() => { this.auth = { status: 'error', message: '自动采集未能启动，请重试采集' }; });
+      }).catch(error => {
+        if (sequence !== this.loginSequence || this.disposed || error.code === 'FEIGUA_CANCELLED') return;
+        this.auth = error.code === 'FEIGUA_VERIFICATION_REQUIRED'
+          ? { status: 'verification_required', message: error.publicMessage || '飞瓜需要图形验证，完成后请重新采集' }
+          : { status: 'error', message: '自动采集未能启动，请重试采集' };
+      });
     };
     this.controller = null;
     this.writeQueue = Promise.resolve();
     this.configQueue = Promise.resolve();
     this.operation = null;
+    this.operationSequence = null;
     this.disposed = false;
     this.scheduleTimer = null;
     this.schedulePending = false;
@@ -86,8 +101,9 @@ export class FeiguaService {
   }
 
   async load() {
-    const data = await this.storage.read();
-    if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
+    const stored = await this.storage.read();
+    if (stored.version !== 1 || !Array.isArray(stored.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
+    const { data, changed: fieldsRestored } = restoreProductFieldsInState(stored);
     this.data = { version: 1, loginEntryUrl: normalizeLoginEntryUrl(data.loginEntryUrl ?? ''), keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
       videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
@@ -95,6 +111,10 @@ export class FeiguaService {
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
       lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? videoCollectionWeek(`${data.lastVideosScheduleDate}T04:00:00Z`) : null,
+      lastTopicsCheck: data.lastTopicsCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastTopicsCheck.slot) && typeof data.lastTopicsCheck.expectedPeriod === 'string'
+        ? { slot: data.lastTopicsCheck.slot, expectedPeriod: data.lastTopicsCheck.expectedPeriod, checkedAt: data.lastTopicsCheck.checkedAt, musicTag: normalizeMusicTag(data.lastTopicsCheck.musicTag) } : null,
+      lastMusicCheck: data.lastMusicCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastMusicCheck.date)
+        ? { date: data.lastMusicCheck.date, checkedAt: data.lastMusicCheck.checkedAt, musicTag: normalizeMusicTag(data.lastMusicCheck.musicTag) } : null,
       musicTagOptionsLoadedAt: typeof data.musicTagOptionsLoadedAt === 'string' ? data.musicTagOptionsLoadedAt : null,
       latestResults: recoverLatestResults(data.runs, data.latestResults),
       videoHistory: recoverVideoHistory(data.runs, data.latestResults || [], Array.isArray(data.videoHistory) ? data.videoHistory : []), runs: data.runs.slice(0, 12) };
@@ -113,7 +133,7 @@ export class FeiguaService {
     this.data.workspaceHint = normalizeWorkspaceHint(hint, this.data.loginEntryUrl);
     this.browser.setWorkspaceHint?.(this.data.workspaceHint);
     if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-    let recovered = false;
+    let recovered = fieldsRestored;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
         run.status = 'interrupted';
@@ -150,7 +170,7 @@ export class FeiguaService {
   startDailySchedule(canRun) {
     if (this.scheduleTimer || this.disposed) return;
     const tick = () => void this.checkDailySchedule(Date.now(), canRun).catch(() => {
-      this.scheduleMessage = '每日定时采集未能启动，请检查本机存储或手动重试';
+      this.scheduleMessage = '定时采集未能启动，请检查本机存储或手动重试';
     });
     this.scheduleTimer = setInterval(tick, 30_000);
     this.scheduleTimer.unref?.();
@@ -168,12 +188,18 @@ export class FeiguaService {
         if (this.disposed || !canRun()) return;
         const videosDate = dueVideosDate(now);
         const hotspotsDate = dueHotspotsDate(now);
+        const topicCheck = pendingTopicCheck(this.data, now);
+        const musicCheck = pendingMusicCheck(this.data, now);
         // One browser session: catch up the earlier video task first, then the
         // next timer tick starts hotspots once the session is idle.
         if (videosDate && (!this.data.lastVideosScheduleDate || this.data.lastVideosScheduleDate < videosDate) && this.data.videoQueries.length) {
           await this.launchRun([], [...this.data.keywords], { onlyVideos: true, verifyLogin: true, scheduledDate: videosDate });
         } else if (hotspotsDate && (!this.data.lastHotspotsScheduleDate || this.data.lastHotspotsScheduleDate < hotspotsDate)) {
           await this.launchRun([], [], { onlyHotspots: true, verifyLogin: true, scheduledDate: hotspotsDate });
+        } else if (musicCheck) {
+          await this.launchRun(musicCheck.musicTag, [], { onlyMusic: true, verifyLogin: true, musicCheck });
+        } else if (topicCheck) {
+          await this.launchRun(topicCheck.musicTag, [], { onlyTopics: true, verifyLogin: true, topicCheck });
         } else return;
         this.scheduleMessage = null;
       });
@@ -181,10 +207,13 @@ export class FeiguaService {
   }
 
   async exclusive(action) {
+    const sequence = this.loginSequence;
     await this.ready;
     if (this.operation || this.controller) throw new Error('正在执行飞瓜操作，请稍后再试');
+    if (this.disposed || sequence !== this.loginSequence) return;
+    this.operationSequence = sequence;
     this.operation = Promise.resolve().then(action);
-    try { return await this.operation; } finally { this.operation = null; }
+    try { return await this.operation; } finally { this.operation = null; this.operationSequence = null; }
   }
 
   async saveKeywords(input) {
@@ -230,13 +259,17 @@ export class FeiguaService {
   }
 
   async syncVideoFilters(signal) {
-    return this.cacheVideoFilters(await this.browser.getVideoFilters(signal));
+    assertNotCancelled(signal);
+    const catalog = await this.browser.getVideoFilters(signal);
+    assertNotCancelled(signal);
+    return this.cacheVideoFilters(catalog, signal);
   }
 
-  async cacheVideoFilters(catalog) {
+  async cacheVideoFilters(catalog, signal) {
     const videoFilterOptions = { categoryPath: normalizeVideoOptions(catalog.categoryPath), tagPath: normalizeVideoOptions(catalog.tagPath) };
     if (!videoFilterOptions.categoryPath.length || !videoFilterOptions.tagPath.length) throw new Error('视频分类目录为空');
     const save = this.writeQueue.then(async () => {
+      assertNotCancelled(signal);
       await this.storage.write({ ...structuredClone(this.data), videoFilterOptions });
       this.data.videoFilterOptions = videoFilterOptions;
     });
@@ -245,13 +278,29 @@ export class FeiguaService {
   }
 
   async prepareCatalogs() {
+    const sequence = this.loginSequence;
     await this.exclusive(async () => {
-      this.auth = await this.browser.checkLogin();
-      if (this.auth.status !== 'authenticated') throw new Error('请先登录飞瓜');
-      const errors = [];
-      try { await this.syncMusicTags(); } catch { errors.push('榜单分类'); }
-      try { await this.syncVideoFilters(); } catch { errors.push('视频分类'); }
-      this.catalogMessage = errors.length ? `${errors.join('、')}更新暂未完成，仍可使用已有分类；采集时将核验实际筛选。` : null;
+      const controller = new AbortController();
+      this.controller = controller;
+      const cancelled = () => controller.signal.aborted || this.disposed || sequence !== this.loginSequence;
+      try {
+        const auth = await this.browser.checkLogin();
+        if (cancelled()) return;
+        this.auth = auth;
+        if (this.auth.status !== 'authenticated') throw new Error('请先登录飞瓜');
+        const errors = [];
+        for (const [label, read] of [['榜单分类', () => this.syncMusicTags(controller.signal)], ['视频分类', () => this.syncVideoFilters(controller.signal)]]) {
+          if (cancelled()) return;
+          try { await read(); }
+          catch (error) {
+            if (cancelled() || error.code === 'FEIGUA_CANCELLED') return;
+            if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error;
+            errors.push(label);
+          }
+        }
+        if (!cancelled()) this.catalogMessage = errors.length ? `${errors.join('、')}更新暂未完成，仍可使用已有分类；采集时将核验实际筛选。` : null;
+      } catch (error) { if (!cancelled() && error.code !== 'FEIGUA_CANCELLED') throw error; }
+      finally { if (this.controller === controller) this.controller = null; }
     });
     return this.state();
   }
@@ -324,15 +373,18 @@ export class FeiguaService {
   }
 
   async syncMusicTags(signal) {
+    assertNotCancelled(signal);
     const catalog = await this.browser.getMusicTags(signal);
-    await this.cacheMusicTags(catalog);
+    assertNotCancelled(signal);
+    await this.cacheMusicTags(catalog, signal);
   }
 
-  async cacheMusicTags(catalog) {
+  async cacheMusicTags(catalog, signal) {
     const musicTagOptions = normalizeMusicTagOptions(catalog.options);
     const musicTagRestricted = catalog.restricted === true;
     const loadedAt = new Date().toISOString();
     const save = this.writeQueue.then(async () => {
+      assertNotCancelled(signal);
       await this.storage.write({ ...structuredClone(this.data), musicTagOptions, musicTagOptionsLoadedAt: loadedAt, musicTagRestricted });
       this.data.musicTagOptions = musicTagOptions;
       this.data.musicTagOptionsLoadedAt = loadedAt;
@@ -348,30 +400,49 @@ export class FeiguaService {
   }
 
   async start({ trigger = null } = {}) {
+    const sequence = this.loginSequence;
+    const cancelled = () => this.disposed || sequence !== this.loginSequence;
     await this.exclusive(async () => {
       await this.configQueue;
+      if (cancelled()) return;
       const musicTag = [...this.data.musicTag];
       const keywords = [...this.data.keywords];
       const videoQueries = structuredClone(this.data.videoQueries);
-      this.auth = await this.browser.checkLogin();
+      let auth;
+      try { auth = await this.browser.checkLogin(); }
+      catch (error) { if (cancelled()) return; throw error; }
+      if (cancelled()) return;
+      this.auth = auth;
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
-      await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null });
+      const topicCheck = trigger === 'login' ? pendingTopicCheck({ ...this.data, musicTag }, Date.now(), { ignorePreviousCheck: true }) : null;
+      const musicCheck = trigger === 'login' ? pendingMusicCheck({ ...this.data, musicTag }, Date.now(), { ignorePreviousCheck: true }) : null;
+      await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null, skipTopics: trigger === 'login' && !topicCheck, topicCheck, skipMusic: trigger === 'login' && !musicCheck, musicCheck });
     });
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null } = {}) {
-    const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : ['music', 'topics', 'hotspots']).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, onlyTopics = false, skipTopics = false, skipMusic = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null, topicCheck = null, musicCheck = null } = {}) {
+    const sequence = this.operationSequence ?? this.loginSequence;
+    if (this.disposed || sequence !== this.loginSequence) return;
+    const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : onlyTopics ? ['topics'] : ['music', 'topics', 'hotspots']).filter(kind => (kind !== 'topics' || !skipTopics) && (kind !== 'music' || !skipMusic)).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
     const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'weekly-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
     const previousRuns = this.data.runs;
+    const previousTopicsCheck = this.data.lastTopicsCheck;
+    const previousMusicCheck = this.data.lastMusicCheck;
+    if (musicCheck) { if (onlyMusic) run.trigger = 'daily-music'; run.musicCheck = structuredClone(musicCheck); this.data.lastMusicCheck = structuredClone(musicCheck); }
+    if (topicCheck) { if (onlyTopics) run.trigger = 'weekly-topics'; run.topicCheck = structuredClone(topicCheck); this.data.lastTopicsCheck = structuredClone(topicCheck); }
     const scheduleKey = onlyVideos ? 'lastVideosScheduleDate' : 'lastHotspotsScheduleDate';
     const previousScheduleDate = this.data[scheduleKey];
     if (scheduledDate) this.data[scheduleKey] = scheduledDate;
     this.data.runs = [run, ...previousRuns].slice(0, 12);
-    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; throw error; }
+    try { await this.persist(); } catch (error) { this.data.runs = previousRuns; this.data[scheduleKey] = previousScheduleDate; this.data.lastTopicsCheck = previousTopicsCheck; this.data.lastMusicCheck = previousMusicCheck; throw error; }
     this.storageMessage = null;
-    if (this.disposed) return;
+    if (this.disposed || sequence !== this.loginSequence) {
+      run.status = 'cancelled'; run.finishedAt = new Date().toISOString(); run.message = '已取消，未开始采集';
+      for (const group of groups) group.status = 'cancelled';
+      await this.persist(); return;
+    }
     this.controller = new AbortController();
     const signal = this.controller.signal;
     this.job = (async () => {
@@ -407,15 +478,16 @@ export class FeiguaService {
   async saveCapturedGroup(run, group, result) {
     const save = this.writeQueue.then(async () => {
       const snapshot = structuredClone(this.data);
+      const retained = group.kind === 'videos' ? retainProductFields(result, snapshot) : result;
       const savedRun = snapshot.runs.find(item => item.id === run.id);
       const savedGroup = savedRun.groups[run.groups.indexOf(group)];
-      Object.assign(savedGroup, { result, status: 'completed' });
+      Object.assign(savedGroup, { result: retained, status: 'completed' });
       snapshot.latestResults = recoverLatestResults([{ id: run.id, groups: [savedGroup] }], snapshot.latestResults);
       if (group.kind === 'videos') snapshot.videoHistory = recoverVideoHistory([{ groups: [savedGroup] }], [], snapshot.videoHistory);
       await this.storage.write(snapshot);
       // Publishing follows the durable write. Polling must never see a result
       // that would disappear on restart after a failed save.
-      Object.assign(group, { result, status: 'completed' });
+      Object.assign(group, { result: retained, status: 'completed' });
       this.data.latestResults = snapshot.latestResults;
       this.data.videoHistory = snapshot.videoHistory;
     });
@@ -455,9 +527,9 @@ export class FeiguaService {
   }
 
   async execute(run, signal) {
-    let stop = false;
+    let stop = false, stopMessage = null;
     for (const [index, group] of run.groups.entries()) {
-      if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; continue; }
+      if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; if (!signal.aborted && stopMessage) group.message = stopMessage; continue; }
       group.status = 'running'; group.attempts = 1;
       run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}（${index + 1}/${run.groups.length}）`;
       await this.persist();
@@ -465,10 +537,24 @@ export class FeiguaService {
         const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
         const capture = await this.collectWithRetry(run, group, signal, options, index);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
-        if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted });
-        if (group.kind === 'videos' && capture.videoFilterOptions) await this.cacheVideoFilters(capture.videoFilterOptions);
+        if (Object.hasOwn(detailStopMessages, capture.detailStopReason)) {
+          stop = true; stopMessage = detailStopMessages[capture.detailStopReason];
+          group.message = stopMessage;
+          if (capture.detailStopReason === 'auth_required') this.auth = { status: 'expired', message: stopMessage };
+        }
+        if (group.kind === 'music' && capture.musicTagOptions?.length) await this.cacheMusicTags({ options: capture.musicTagOptions, restricted: capture.musicTagRestricted }, signal);
+        if (group.kind === 'videos' && capture.videoFilterOptions) await this.cacheVideoFilters(capture.videoFilterOptions, signal);
         if (capture.catalogWarning) this.catalogMessage = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验';
         const result = validateCapture(group.kind, group.keyword, capture, { ...options, sourceOrigin: this.browser.sourceOrigin?.() });
+        if (group.kind === 'topics' && run.topicCheck) {
+          const period = settledTopicPeriod(result.dateRange, Date.parse(run.topicCheck.checkedAt));
+          if (!period || period > run.topicCheck.expectedPeriod) throw Object.assign(new Error('来源话题周榜不是已结束的完整自然周'), { publicMessage: '来源话题周榜日期不符合已结束的完整自然周，本组未保存' });
+          if (period < run.topicCheck.expectedPeriod) {
+            group.status = 'waiting';
+            group.message = `新一期话题周榜尚未发布（来源仍为 ${period}），保留已有结果，下次北京时间 09:00 再检查`;
+            continue;
+          }
+        }
         await this.saveCapturedGroup(run, group, result);
         continue;
       } catch (error) {
@@ -483,13 +569,18 @@ export class FeiguaService {
         if (error.code === 'FEIGUA_NOTICE_FAILED') {
           this.auth = { status: 'error', message: error.publicMessage }; stop = true;
         }
+        if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') {
+          this.auth = { status: 'verification_required', message: error.publicMessage }; stop = true;
+        }
       }
       await this.persist();
     }
     const completed = run.groups.filter(group => group.status === 'completed').length;
-    run.status = signal.aborted ? 'cancelled' : completed === run.groups.length ? 'completed' : completed ? 'partial' : 'failed';
+    run.status = signal.aborted ? 'cancelled' : completed === run.groups.length && !stop ? 'completed' : completed ? 'partial' : 'failed';
     run.finishedAt = new Date().toISOString();
     run.message = `${signal.aborted ? '已取消；' : ''}完成 ${completed}/${run.groups.length} 组`;
+    if (!signal.aborted && stopMessage) run.message += `；${stopMessage}`;
+    if (!signal.aborted && run.topicCheck && run.groups.every(group => group.status === 'waiting')) { run.status = 'waiting'; run.message = run.groups[0].message; }
     await this.persist();
   }
 

@@ -8,7 +8,7 @@ import { recoverVideoHistory, videoHistoryPeriods, videoGroupsForPeriod } from '
 import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
-type Row = { id: string; rank: number; title: string; videoUrl?: string | null; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; salesCount?: string; publishedAt?: string; products?: { title: string; commission: string | null; url?: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
+type Row = { id: string; rank: number; title: string; videoUrl?: string | null; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; salesCount?: string; publishedAt?: string; products?: { title: string; commission: string | null; commissionVerifiedAt?: string; url?: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
 type Result = { collectedAt: string; dateRange: string | null; dateWarning?: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
 type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; categoryPath?: string[]; tagPath?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
@@ -32,7 +32,7 @@ export type FeiguaBridge = {
 const emptyState: State = { keywords: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
 const savedVideoQueries = (state: State): VideoQuery[] => state.videoQueries || state.keywords.map(keyword => ({ keyword, categoryPath: [], tagPath: [] }));
 const pathLabel = (path?: string[]) => path?.join(' > ') || '全部';
-const names: Record<string, string> = { pending: '等待采集', running: '采集中', retrying: '自动重试中', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
+const names: Record<string, string> = { pending: '等待采集', running: '采集中', retrying: '自动重试中', waiting: '等待新周榜', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
 const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
@@ -68,12 +68,12 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
       <div className={styles.rowContent}>
         <h4 title={row.title}>{feiguaVideoLink(row.videoUrl, row.id) ? <a className={styles.contentLink} href={feiguaVideoLink(row.videoUrl, row.id)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开抖音视频">{row.title}</a> : row.title}</h4>
         {kind === 'videos' && <>
-          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}</small></p>) : <p>关联商品未取得</p>}</div>
+          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.commissionVerifiedAt ? `沿用 ${date(product.commissionVerifiedAt)} 采集的佣金率；本次未能更新` : product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}{product.commissionVerifiedAt && '（上次采集）'}</small></p>) : <p>关联商品未取得</p>}</div>
           <p>{display(row.author)} · 粉丝 {display(row.followers)}</p>
           <dl><div><dt>视频销售额</dt><dd>{display(row.sales)}</dd></div><div><dt>视频销量</dt><dd>{display(row.salesCount)}</dd></div><div><dt>点赞</dt><dd>{display(row.likes)}</dd></div></dl>
           {row.publishedAt && <small>发布时间 {row.publishedAt}</small>}
         </>}
-        {!!(kind === 'videos' ? videoMissingFields(row).length : row.missingFields.length) && <small className={styles.missing}>{kind === 'videos' ? `未取得：${videoMissingFields(row).map(field=>missingLabels[field]||field).join('、')}` : '部分字段未取得'}</small>}
+        {!!(kind === 'videos' ? videoMissingFields(row).length : row.missingFields.length) && <small className={styles.missing}>{kind === 'videos' ? `${row.products?.some(product=>product.commissionVerifiedAt) ? '本次未更新' : '未取得'}：${videoMissingFields(row).map(field=>missingLabels[field]||field).join('、')}` : '部分字段未取得'}</small>}
       </div>
     </li>)}
   </ol>;
@@ -90,10 +90,11 @@ function MusicCaption({group, kind, selection, dirty}: {group?: Group; kind:'mus
   return <>
     <p>飞瓜数据 · {kind === 'music' ? '热门音乐 · 视频标签' : '话题周榜 · 话题分类'}：<strong>{selected}</strong>{dirty ? '（未保存）' : ''} · {kind === 'music' ? '昨日使用人数降序' : '参与人数增长率降序'}</p>
     {retrying && <p className={styles.refreshing} role="status">{group?.refreshMessage || group?.message || '网络暂时不可用，正在自动重试'}</p>}
+    {status === 'waiting' && <p role="status">{group?.refreshMessage || group?.message || '新一期话题周榜尚未发布，保留已有结果，下次 09:00 再检查'}</p>}
     {(refreshing || queued) && <p className={styles.refreshing} role="status">{queued ? '等待采集' : '正在刷新'}「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」{kind === 'music' ? '热门 BGM' : '话题榜单'}…</p>}
     {failed && <p className={styles.refreshError} role="status">「{group?.requestedMusicTag?.join(' > ') || group?.musicTag?.join(' > ') || '全部'}」刷新未完成：{group?.refreshMessage || group?.message || names[status || 'failed']}</p>}
     {group?.result && (actual !== selected || group.showingPrevious) && <p>当前显示：{actual} · 上次采集结果</p>}
-    {!group?.result && !refreshing && !queued && !retrying && !failed && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
+    {!group?.result && !refreshing && !queued && !retrying && !failed && status !== 'waiting' && !dirty && <p>该类目尚未采集，保存后将自动刷新</p>}
   </>;
 }
 
@@ -128,6 +129,7 @@ export function FeiguaTrends() {
   const [desktop, setDesktop] = useState(false);
   const [error, setError] = useState('');
   const [action, setAction] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const initialized = useRef(false);
   const settingsPanel = useRef<HTMLDetailsElement>(null);
   const dirty = JSON.stringify(videoQueries) !== JSON.stringify(savedVideoQueries(state));
@@ -154,6 +156,7 @@ export function FeiguaTrends() {
         const next = await api.state();
         if (!alive) return;
         setDesktop(true); setState({ ...emptyState, ...next }); setLoaded(true);
+        if (!next.busy) setCancelling(false);
         if (!initialized.current) { setLoginEntryUrl(next.loginEntryUrl || ''); setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
       } catch { if (alive) { setError('热点数据读取失败，请重试；原有数据不会被覆盖。'); setLoaded(true); } }
       finally { pending = false; }
@@ -163,12 +166,21 @@ export function FeiguaTrends() {
     return () => { alive = false; clearInterval(timer); };
   }, []);
 
+  async function cancelCollection() {
+    const api = window.desktopBridge?.feigua;
+    if (!api || cancelling) return;
+    setCancelling(true); setError('');
+    try { const next = await api.cancel(); setState({ ...emptyState, ...next }); if (!next.busy) setCancelling(false); }
+    catch { setCancelling(false); setError('停止采集未完成，请重试'); }
+  }
+
   async function perform(name: string, operation: (api: FeiguaBridge) => Promise<State>) {
     const api = window.desktopBridge?.feigua;
     if (!api) { setError('请在 AI 媒体库桌面版使用飞瓜采集'); return; }
     setAction(name); setError('');
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
+      if (!next.busy) setCancelling(false);
       if (name === 'entry-save') setLoginEntryUrl(next.loginEntryUrl || '');
       if (name === 'video-save' || name === 'video-change') {
         setVideoPeriod('');
@@ -209,8 +221,8 @@ export function FeiguaTrends() {
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
         <button disabled={disabled || state.busy || loginEntryDirty || !state.loginEntryUrl} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />打开登录入口</button>
-        {state.busy ? <button disabled={disabled} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止采集</button>
-          : <button className={styles.primary} disabled={disabled || loginEntryDirty || dirty || musicDirty || editorDirty || state.auth.status !== 'authenticated'} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : '开始采集'}</button>}
+        {state.busy ? <button disabled={!desktop || !loaded || cancelling} onClick={() => void cancelCollection()}><Square size={14} />{cancelling ? '正在停止…' : '停止采集'}</button>
+          : <button className={styles.primary} disabled={disabled || loginEntryDirty || dirty || musicDirty || editorDirty || !['authenticated','verification_required'].includes(state.auth.status)} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : state.auth.status === 'verification_required' ? '验证后重新采集' : '开始采集'}</button>}
       </div>
     </header>
     <form className={styles.loginEntry} onSubmit={event => { event.preventDefault(); void perform('entry-save', api => api.saveLoginEntryUrl(loginEntryUrl)); }}>
@@ -219,13 +231,13 @@ export function FeiguaTrends() {
       <button type="submit" disabled={disabled || state.busy || !loginEntryDirty}>{action === 'entry-save' ? '保存中…' : '保存网址'}</button>
       <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
     </form>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
-    <p>本周品类新发布每周一北京时间 06:30 自动采集；全网热点日榜每天 07:00 自动采集。请保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采当前周榜和当天热点各一次。</p>
+    <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
@@ -295,7 +307,7 @@ export function FeiguaTrends() {
         return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : group.result?.rows.some(row=>videoMissingFields(row).length) ? '榜单已采集 · 部分信息不可用' : names[group.status]}</small></h3>
           <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
           {changed && <p>已保存设置 · 带货品类：{pathLabel(configured.categoryPath)} · 视频标签：{pathLabel(configured.tagPath)}（当前结果尚未更新）</p>}
-          {['pending', 'running', 'retrying', 'failed', 'cancelled', 'interrupted'].includes(status) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
+          {(['pending', 'running', 'retrying', 'failed', 'cancelled', 'interrupted','skipped'].includes(status) || status === 'completed' && !!group.message) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
           <ResultBody group={group} kind="videos" />{group.result && <ResultFooter result={group.result} />}</section>;
       })}
       {!!videoPeriod && state.keywords.some(keyword => !videoGroups.some(group => group.keyword === keyword)) && <p className={styles.videoPeriodNotice}>这一周未保存以下关键词的榜单：{state.keywords.filter(keyword => !videoGroups.some(group => group.keyword === keyword)).join('、')}</p>}

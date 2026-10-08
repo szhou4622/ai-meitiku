@@ -11,6 +11,21 @@ const assert = (name, passed) => { outputs.push(`${passed ? 'PASS' : 'FAIL'} ${n
 const shell = '<aside>个人中心 收藏夹 视频/素材</aside>';
 try {
   {
+    await mount(shell + '<section class="notice-list-wrap"><div class="el-loading-mask">加载公告</div></section>');
+    assert('首页无关组件加载不阻止已认证导航', run('ready',{navigationOnly:true}).ready===true);
+    assert('榜单和详情仍需等待加载完成', run('ready').ready===false);
+    const dialog=frame.contentDocument.createElement('div');dialog.setAttribute('role','dialog');
+    dialog.innerHTML=`<h2>风险提示</h2><img width="116" height="28" src="${location.origin}/Login/GetPTDogValidateCode"><input placeholder="请输入正确的图形验证码后继续使用"><button>继续使用</button>`;
+    frame.contentDocument.body.append(dialog);let clicked=0;dialog.querySelector('button').onclick=()=>clicked++;
+    assert('验证码弹窗不能视为登录就绪', run('auth').authenticated===false&&run('auth').actionRequired==='verification');
+    assert('首页导航也不能忽略验证码', run('ready',{navigationOnly:true}).actionRequired==='verification');
+    assert('验证码出现时不能继续采集',run('capture-context',{kind:'videos'}).actionRequired==='verification');
+    assert('普通声明确认不能提交验证码',run('accept-terms').accepted===false&&clicked===0);
+    dialog.style.display='none';assert('隐藏验证码不误报正在验证',run('auth').authenticated===true);
+    dialog.remove();await mount('<h1>微信扫码登录</h1>');
+    assert('首页导航仍然要求登录',run('ready',{navigationOnly:true}).authRequired===true);
+  }
+  {
     const loginHtml='<form><input id="username" name="username"><input id="password" name="password" type="password"><input id="save_pass" type="checkbox" checked><button type="button">登录</button></form>';
     await mount(loginHtml);
     const doc=frame.contentDocument, origin=frame.contentWindow.location.origin;
@@ -55,6 +70,36 @@ try {
   await mount('<h1>微信扫码登录/注册飞瓜数据</h1>');
   assert('登录页面不能视为已登录', run('auth').authenticated === false);
   assert('登录页不能采集为空榜单', run('capture', {kind:'videos'}).authRequired === true);
+  {
+    await mount(shell + '<article><h2>账号提示请重新登录怎么办？教你排查</h2><p>微信扫码登录功能说明</p></article>');
+    assert('正常榜单标题的登录文案不冒充掉线',run('auth').authenticated===true&&run('ready').ready===true);
+    const dialog=frame.contentDocument.createElement('div');dialog.setAttribute('role','dialog');
+    dialog.innerHTML='<h2>视频详情</h2><p>标题：账号提示请重新登录怎么办？</p>';frame.contentDocument.body.append(dialog);
+    assert('视频详情弹窗中的普通标题也不冒充登录弹窗',run('auth').authenticated===true);
+    dialog.innerHTML='<h2>登录提示</h2><p>登录已过期，请重新登录</p><button>重新登录</button>';
+    assert('真实过期登录弹窗仍阻止采集',run('auth').authenticated===false&&run('ready').authRequired===true);
+    dialog.style.display='none';assert('隐藏登录弹窗不使正常工作台掉线',run('auth').authenticated===true);
+    dialog.style.display='block';dialog.innerHTML='<div class="el-message-box__message">登录已过期，请重新登录</div><button>确定</button>';
+    assert('结构化的过期消息框仍被识别',run('auth').authenticated===false);
+    dialog.remove();const iframe=frame.contentDocument.createElement('iframe');iframe.src='about:blank#login';frame.contentDocument.body.append(iframe);
+    assert('工作台覆盖扫码登录框仍需重新登录',run('auth').authenticated===false);
+  }
+  {
+    await mount(shell + '<div class="tag-cascader"><span class="tag-label">视频标签</span><ul class="tag-list"><li class="tag-element"><span class="tag-text">合成一级</span></li></ul></div><div id="video-own-panel" class="el-popover" style="display:none"><label><span>合成二级</span></label></div><div class="el-popover"><label><span>合成二级</span></label></div>');
+    const doc=frame.contentDocument,root=doc.querySelector('.tag-cascader'),panel=doc.querySelector('#video-own-panel');
+    const props={value:'0',options:[{Id:'0',Name:'全部',Sub:[]},{Id:'p',Name:'合成一级',Sub:[{Id:'c',Name:'合成二级',Sub:[]}]}]};
+    root.__vue__={$props:props,popover:{$refs:{popper:panel}}};
+    root.querySelector('.tag-text').onmouseenter=()=>{panel.style.display='block';};
+    let clicked=0;panel.querySelector('label').onclick=()=>{clicked++;props.value='c';};
+    assert('视频分类从真实文字节点展开浮层',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'expand',depth:0}).changed===true&&panel.style.display==='block');
+    assert('视频二级分类使用自己的外置浮层且忽略同名干扰',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).changed===true&&clicked===1);
+    assert('视频外置浮层选择后回读完整路径',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],verify:true}).verified===true);
+    props.value='0';const mask=doc.createElement('div');mask.className='purview-mask-layer';panel.append(mask);
+    assert('视频外置浮层权限遮罩不可穿透',/权限受限/.test(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===1);mask.remove();
+    const peer=doc.createElement('div');peer.innerHTML='<label>其他受限分类</label><div class="purview-mask-layer"></div>';panel.append(peer);
+    assert('外置浮层内其他选项受限不妨碍合法选项',run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).changed===true&&clicked===2);
+    props.value='0';panel.style.display='none';assert('隐藏的外置浮层不能靠同名干扰选中',Boolean(run('video-filter',{label:'视频标签',path:['合成一级','合成二级'],phase:'select'}).error)&&clicked===2);
+  }
   await mount('<header><a href="https://dy.feigua.cn/synthetic/workspace">进入工作台</a><img alt="用户头像"></header>');
   assert('官网登录后首页识别工作台入口', run('auth').workspaceAvailable === true);
   assert('官网首页本身不冒充后台验证成功', run('auth').authenticated === false);
@@ -93,12 +138,15 @@ try {
   const customMusic = run('capture', {kind:'music',sort:'昨日使用人数',period:'昨日使用人数'});
   assert('新版列表表头与数据行分离仍正确提取', customMusic.rows.length === 1 && customMusic.rows[0].yesterdayUsers === '5w');
   await mount(shell + `<div><input readonly value="视频关键词"><input placeholder="请输入视频标题关键词或链接搜索"><button id="search">模糊搜索</button></div><span id="filters"></span>
-    <div class="permission-wrapper active"><button><span>近7天</span></button></div>
-    <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01">
+    <div id="video-period"><span>时间周期</span><div class="permission-wrapper active"><button><span>近7天</span></button></div>
+    <input placeholder="开始日期" value="2026-09-25"><input placeholder="结束日期" value="2026-10-01"></div>
     <table><thead><tr><th>带货视频/发布时间</th><th>关联商品</th><th>达人</th><th aria-sort="descending">视频销售额</th><th>点赞</th></tr></thead><tbody>
     <tr><td><a href="https://dy.feigua.cn/synthetic/video/1" title="合成完整标题">合成标题…</a><p>09/26 16:00</p></td><td><a href="https://dy.feigua.cn/synthetic/product/1">合成商品</a><span>佣金率 5.00%</span></td><td><a href="https://dy.feigua.cn/synthetic/author/1">合成达人</a><span>粉丝数：10w</span></td><td>10w~25w</td><td>5000</td></tr>
     </tbody></table>`);
   assert('新版时间周期选中状态核验', run('choice', {label:'近7天',verify:true}).verified === true);
+  assert('视频快捷周期同时核验七天日期',run('video-period',{verify:true}).dateRange==='2026-09-25 - 2026-10-01');
+  const restrictedPeriod=frame.contentDocument.createElement('div');restrictedPeriod.className='permission-wrapper';restrictedPeriod.innerHTML='<button>近180天</button><div class="purview-mask-layer"></div>';frame.contentDocument.querySelector('#video-period').append(restrictedPeriod);
+  assert('近180天的遮罩不会误拦已选中的近7天快捷项',run('video-period',{verify:true}).verified===true);
   frame.contentDocument.querySelector('#search').onclick = () => { frame.contentDocument.querySelector('#filters').textContent = `视频关键词：${frame.contentDocument.querySelector('input:not([readonly])').value}`; };
   run('keyword', {keyword:'合成词'});
   assert('关键词设置与筛选回读', run('keyword', {keyword:'合成词',verify:true}).verified === true);
@@ -256,5 +304,51 @@ try {
   assert('接口采集上下文只回读控件，不携带表格数据',context.dateRange==='2026-10-01'&&!Object.hasOwn(context,'rows'));
   frame.contentDocument.querySelector('section').remove();
   assert('表格不存在也能完成接口请求的筛选上下文核验',run('capture-context',hotspotArgs).filtersVerified===true);
+  {
+    const dates='<div id="statistics"><span>时间周期</span><div class="el-date-editor--daterange"><input placeholder="开始日期" value="2026-10-01"><input placeholder="结束日期" value="2026-10-07"></div></div>';
+    const categories=['带货品类','视频标签'].map(label=>`<div class="tag-cascader"><span class="tag-label">${label}</span></div>`).join('');
+    await mount(shell + dates + categories + '<div><input readonly value="视频关键词"><input value="合成词"><button>模糊搜索</button></div><span>视频关键词：合成词</span><section id="publication"><span>发布时间段</span><button class="active">近7天</button><input placeholder="开始日期" value="2026-09-01"><input placeholder="结束日期" value="2026-10-07"></section>');
+    frame.contentWindow.Date.now=()=>Date.parse('2026-10-07T14:00:00Z');
+    for(const root of frame.contentDocument.querySelectorAll('.tag-cascader'))root.__vue__={$props:{value:['0'],options:[{Id:'0',Name:'全部',Sub:[]}]}};
+    const doc=frame.contentDocument,root=doc.querySelector('#statistics'),start=root.querySelector('input'),end=root.querySelectorAll('input')[1];
+    let clicks=0;root.onclick=()=>{clicks++;};
+    assert('没有快捷按钮时直接核验真实近7天日期',run('video-period').verified===true&&clicks===0);
+    const unrelated=doc.createElement('div');unrelated.className='permission-wrapper';unrelated.innerHTML='<button>近180天</button><div class="purview-mask-layer"></div>';root.append(unrelated);
+    assert('其他时间选项的权限限制不阻止合法近7天区间',run('video-period').verified===true&&clicks===0);
+    assert('无快捷按钮的 API 上下文忽略发布时间筛选日期',run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).dateRange==='2026-10-01 - 2026-10-07');
+    start.value='2026-09-24';end.value='2026-09-30';
+    assert('任意历史七天不冒充当前近7天',run('video-period',{verify:true}).verified===false);
+    assert('其他筛选区的同名快捷按钮不能代替统计周期',run('video-period').calendar===true);
+    assert('请求期间周期变化不能继续保存',Boolean(run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).error));
+    start.value='2026-02-30';end.value='2026-03-08';
+    assert('无效日历日期不能通过',run('video-period',{verify:true}).verified===false);
+    start.value='2026-10-01';end.value='2026-10-07';
+    const duplicate=start.cloneNode();root.append(duplicate);
+    assert('同一统计控件日期重复时拒绝猜测',Boolean(run('video-period',{verify:true}).error));duplicate.remove();
+    const mask=doc.createElement('div');mask.className='purview-mask-layer';root.append(mask);
+    assert('时间周期权限遮罩不可穿透',/权限/.test(run('video-period').error)&&clicks===0);mask.remove();
+    root.querySelector('span').textContent='未知时间';
+    assert('缺少时间周期标识不能使用发布时间',Boolean(run('video-period').error));
+  }
+  {
+    await mount(shell + '<div><span>时间周期</span><div class="el-date-editor--daterange"><input placeholder="开始日期" value="2026-11-01"><input placeholder="结束日期" value="2026-11-07"></div></div><div id="own" class="el-date-range-picker" style="display:none"><div class="el-date-range-picker__content"><div class="el-date-range-picker__header"><button class="el-icon-arrow-left"></button><div>2026 年 10 月</div></div><table class="el-date-table"><tbody><tr><td class="available"><span>28</span></td></tr></tbody></table></div><div class="el-date-range-picker__content"><div class="el-date-range-picker__header"><button class="el-icon-arrow-right"></button><div>2026 年 11 月</div></div><table class="el-date-table"><tbody><tr><td class="available"><span>3</span></td></tr></tbody></table></div></div><div class="el-date-range-picker"><button>28</button></div>');
+    frame.contentWindow.Date.now=()=>Date.parse('2027-01-02T16:00:00Z');
+    const doc=frame.contentDocument,editor=doc.querySelector('.el-date-editor--daterange'),panel=doc.querySelector('#own');
+    const props=Object.freeze({disabled:false});editor.__vue__={$props:props,picker:{$el:panel}};
+    editor.onclick=()=>{panel.style.display='block';};
+    let picked=0;const cells=panel.querySelectorAll('td');
+    for(const cell of cells)cell.onclick=()=>{if(++picked===2){editor.querySelectorAll('input')[0].value='2026-12-28';editor.querySelectorAll('input')[1].value='2027-01-03';panel.style.display='none';}};
+    let moves=0;
+    panel.querySelector('.el-icon-arrow-right').onclick=()=>{const headers=panel.querySelectorAll('.el-date-range-picker__header > div');moves++;headers[0].textContent=moves===1?'2026 年 11 月':'2026 年 12 月';headers[1].textContent=moves===1?'2026 年 12 月':'2027 年 1 月';cells[1].querySelector('span').textContent=moves===1?'28':'3';};
+    assert('错误周期请求正常日历选择',run('video-period').calendar===true);
+    assert('通过控件点击打开所属面板',run('video-period',{phase:'open'}).opened===true);
+    assert('跨月仅点击普通月份导航',run('video-period',{phase:'start'}).moved===true);
+    cells[1].classList.add('disabled');
+    assert('禁用日期不能被点击',Boolean(run('video-period',{phase:'start'}).error)&&picked===0);cells[1].classList.remove('disabled');
+    assert('跨年起始日按完整年月识别',run('video-period',{phase:'start'}).picked===true&&picked===1);
+    assert('终止日在下一月时继续普通导航',run('video-period',{phase:'end'}).moved===true&&moves===2);
+    assert('终止日通过正常点击提交',run('video-period',{phase:'end'}).picked===true&&picked===2);
+    assert('选择后核验日期值且不修改 Vue 状态',run('video-period',{verify:true}).dateRange==='2026-12-28 - 2027-01-03'&&editor.__vue__.$props===props);
+  }
 } catch (error) { outputs.push(`ERROR ${error.message}`); }
 document.querySelector('#result').textContent = outputs.join('\n');

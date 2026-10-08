@@ -44,6 +44,7 @@ export async function readVideoDetailsApi({ videoId, dateCode }) {
       return { state: status === 401 ? 'auth_required' : status === 403 ? 'restricted' : status === 429 ? 'rate_limited' : 'lookup_failed' };
     }
     if (response?.Code === 401) return { state: 'auth_required' };
+    if (response?.Code === 430) return { state: 'verification_required' };
     if (response?.Code === 403 && [0, '0'].includes(response?.Data?.Remainder)) return { state: 'quota_exhausted' };
     if (response?.Code === 429) return { state: 'rate_limited' };
     if (response?.Code !== 200 || response.Status !== true || response.ExampleData || response.Data?.ExampleData) return { state: 'restricted' };

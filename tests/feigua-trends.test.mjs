@@ -10,6 +10,15 @@ import { recoverVideoHistory, videoRankingPeriod, videoCollectionWeek, videoHist
 
 const historyVideo = (keyword, collectedAt, rows = [{ id: collectedAt }], dateRange = '2026-09-25 - 2026-10-01') => ({ kind: 'videos', keyword, status: 'completed', result: { collectedAt, rows, dateRange, filters: { categoryPath: ['历史分类'], tagPath: [] } } });
 
+test('opening a ranking ignores home widget loading only until its menu navigation completes',async()=>{
+  const browser=new FeiguaBrowser({});const waits=[];let navigations=0;
+  browser.navigate=async()=>{};browser.resolveAuth=async()=>({authenticated:true});
+  browser.window={webContents:{getURL:()=> 'https://dy.feigua.cn/app/'}};
+  browser.settle=async(_signal,options)=>{waits.push(options?.navigationOnly===true);};
+  browser.execute=async(command)=>{assert.equal(command,'navigate');return ++navigations===1?{expanded:true}:{url:'https://dy.feigua.cn/app/#/video/library/goods'};};
+  await browser.openSource('videos');assert.deepEqual(waits,[true,true,false]);
+});
+
 test('video week key uses the verified seven-day source period instead of a collection date', () => {
   assert.equal(videoRankingPeriod('2026-09-25 - 2026-10-01'), '2026-09-25 - 2026-10-01');
   assert.equal(videoRankingPeriod('2026-10-01T16:00:00Z'), null);
@@ -102,7 +111,7 @@ test('successful video save archives the new week without losing the prior week'
 
 const capture = (kind, keyword = null, extra = {}) => ({
   url: `https://dy.feigua.cn/test/${kind}`, keyword, sort: FEIGUA_SOURCES[kind].sort, direction: 'desc', period: FEIGUA_SOURCES[kind].period,
-  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : '2026-09-25 - 2026-10-01',
+  musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : kind === 'topics' ? '2026-09-21 - 2026-09-27' : '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
 });
@@ -122,7 +131,92 @@ function fixture({ stored, collect, auth, write } = {}) {
 }
 
 const videoCatalog = { categoryPath: [{ label: '食品', children: [{ label: '调味品', children: [{ label: '酱料', children: [] }] }] }, { label: '家居', children: [] }], tagPath: [{ label: '美食', children: [{ label: '教程', children: [] }] }, { label: '生活', children: [] }] };
+
+test('catalog refresh cannot navigate away from a human verification prompt',async()=>{
+  const {service,browser}=fixture();let nextCatalog=0;
+  browser.getMusicTags=async()=>{throw Object.assign(new Error('synthetic verification'),{code:'FEIGUA_VERIFICATION_REQUIRED'});};
+  browser.getVideoFilters=async()=>{nextCatalog++;return videoCatalog;};
+  await assert.rejects(service.prepareCatalogs(),{code:'FEIGUA_VERIFICATION_REQUIRED'});assert.equal(nextCatalog,0);
+});
 const videoQueries = [{ keyword: '拌饭', categoryPath: ['食品', '调味品', '酱料'], tagPath: ['美食', '教程'] }, { keyword: '收纳', categoryPath: ['家居'], tagPath: ['生活'] }];
+// Isolate hotspot/video scheduler tests from other overdue modules.
+const topicReadyState = () => ({version:1,loginEntryUrl:'https://dy.feigua.cn/',keywords:[],runs:[],lastMusicCheck:{date:'2026-10-31',musicTag:[]},latestResults:[{kind:'topics',keyword:null,status:'completed',musicTag:[],result:validateCapture('topics',null,capture('topics'))}]});
+
+const flushMicrotasks = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
+
+test('stopping automatic collection during fresh login verification prevents all later reads', async () => {
+  for (const rejectCheck of [false, true]) {
+    const {service,browser,calls}=fixture();let entered,release,reject;
+    const checking=new Promise(resolve=>{entered=resolve;});
+    browser.checkLogin=async()=>{entered();return new Promise((resolve,fail)=>{release=resolve;reject=fail;});};
+    await service.login();browser.onAuthChange({status:'authenticated',message:'已登录'});await checking;
+    assert.equal((await service.state()).busy,true);assert.equal(service.controller,null);
+    await service.cancel();
+    if(rejectCheck)reject(new Error('cancelled browser request'));else release({status:'authenticated'});
+    await service.autoStart;await service.job;
+    const state=await service.state();
+    assert.equal(state.busy,false);assert.equal(state.runs.length,0);assert.deepEqual(calls,[]);
+    assert.notEqual(state.auth.status,'error');
+  }
+});
+
+test('cancellation while the initial run is being saved never starts a controller or reads the provider', async () => {
+  let entered,release;const enteredSave=new Promise(resolve=>{entered=resolve;});const gate=new Promise(resolve=>{release=resolve;});
+  const {service,calls,disk}=fixture({write:async data=>{if(data.runs[0]?.status==='running'){entered();await gate;}}});
+  const starting=service.start();await enteredSave;await service.cancel();release();await starting;
+  assert.equal(service.controller,null);assert.deepEqual(calls,[]);
+  assert.equal(disk().runs[0].status,'cancelled');assert.ok(disk().runs[0].groups.every(group=>group.status==='cancelled'));
+});
+
+test('cancellation during keyword saving preserves settings but cannot start the queued collection', async () => {
+  let entered,release;const enteredSave=new Promise(resolve=>{entered=resolve;});const gate=new Promise(resolve=>{release=resolve;});
+  const {service,calls,disk}=fixture({write:async data=>{if(data.keywords.length&&!data.runs.length){entered();await gate;}}});
+  const saving=service.saveAndRefreshVideoQueries([{keyword:'合成新词'}],{changedOnly:true});
+  await enteredSave;await service.cancel();release();await saving;
+  assert.deepEqual(disk().keywords,['合成新词']);assert.equal(disk().runs.length,0);assert.deepEqual(calls,[]);
+});
+
+test('a keyword task takes over the login window without stale monitor callbacks closing it', async () => {
+  for (const monitorFirst of [true,false]) {
+    const entry='http://192.0.2.10:16888/',origin='http://192.0.2.10:13042';
+    const browser=new FeiguaBrowser({});let closed=false,hidden=0,collects=0;const pending=[];
+    const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>({version:1,loginEntryUrl:entry,workspaceHint:{entryUrl:entry,origin},keywords:[],runs:[]}),write:async()=>{}}});
+    await service.ready;
+    browser.window={isDestroyed:()=>closed,webContents:{getURL:()=>origin+'/app/'},hide:()=>{hidden++;},close:()=>{closed=true;browser.window=null;browser.stopLoginWatch();}};
+    browser.execute=async()=>new Promise(resolve=>pending.push(resolve));
+    browser.collect=async(kind,keyword,_signal,options)=>{collects++;return capture(kind,keyword,{...options,url:origin+'/app/#/synthetic'});};
+    service.autoCollectRequested=true;service.autoCatalogRequested=true;browser.startLoginWatch();
+    await service.saveAndRefreshVideoQueries([{keyword:'合成新词'}],{changedOnly:true});await flushMicrotasks();
+    assert.equal(pending.length,2);
+    pending[monitorFirst?0:1]({authenticated:true});await flushMicrotasks();
+    pending[monitorFirst?1:0]({authenticated:true});await service.job;await service.autoStart;await flushMicrotasks();
+    const state=await service.state();
+    assert.equal(closed,false);assert.equal(hidden,1);assert.equal(collects,1);assert.equal(state.runs[0].status,'completed');
+    assert.equal(state.auth.status,'authenticated');assert.equal(browser.loginTimer,null);browser.stopLoginWatch();
+  }
+});
+
+test('stopped or closed login checks cannot authenticate a stale window', async () => {
+  const browser=new FeiguaBrowser({});let release;let closed=false;const notifications=[];
+  browser.window={isDestroyed:()=>closed,webContents:{getURL:()=> 'https://dy.feigua.cn/app/'},close:()=>{closed=true;}};
+  browser.execute=async()=>new Promise(resolve=>{release=resolve;});browser.onAuthChange=auth=>notifications.push(auth);
+  browser.startLoginWatch();browser.stopLoginWatch();release({authenticated:true});await flushMicrotasks();
+  assert.deepEqual(notifications,[]);assert.equal(closed,false);
+  const resolving=browser.resolveAuth();browser.window=null;closed=true;release({authenticated:true});
+  await assert.rejects(resolving,error=>error.code==='FEIGUA_CANCELLED');assert.equal(browser.sourceOrigin(),null);
+});
+
+test('a still-signed-out task check restores monitoring so later user login remains automatic', async () => {
+  const browser=new FeiguaBrowser({});let authenticated=false,closed=0,notified=0;
+  browser.window={isDestroyed:()=>false,webContents:{getURL:()=> 'https://dy.feigua.cn/app/'},close:()=>{closed++;}};
+  browser.execute=async()=>({authenticated,loginVisible:!authenticated});
+  browser.onAuthChange=auth=>{if(auth.status==='authenticated')notified++;};
+  browser.startLoginWatch();
+  assert.equal((await browser.checkLogin()).status,'signed_out');await flushMicrotasks();
+  assert.ok(browser.loginTimer);assert.equal(closed,0);assert.equal(notified,0);
+  authenticated=true;browser.startLoginWatch();await flushMicrotasks();
+  assert.equal(closed,1);assert.equal(notified,1);assert.equal(browser.loginTimer,null);
+});
 
 test('new and legacy installs can choose actual bundled categories before login or collection', async () => {
   for(const videoFilterOptions of [undefined,{categoryPath:[],tagPath:[]}]) {
@@ -280,8 +374,9 @@ test('catalogs update on their visited source pages and failed rereads preserve 
   assert.match(state.catalogMessage,/目录更新暂未完成/);
 });
 
-test('login confirmation starts collection before any separate catalog work',async()=>{
-  const {service,browser}=fixture();
+test('login confirmation starts collection before any separate catalog work',async t=>{
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
+  const {service,browser}=fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
   let started,release;
   const first=new Promise(resolve=>{started=resolve;});
   const gate=new Promise(resolve=>{release=resolve;});
@@ -326,12 +421,43 @@ test('browser applies both video paths, then keyword, period and sales sort for 
     ['video-filter',{label:'视频标签',path:videoQueries[0].tagPath,phase:'select'}],
   ]);
   assert.ok(calls.some(([command,args])=>command==='keyword' && args.keyword==='拌饭'));
-  assert.ok(calls.some(([command,args])=>command==='choice' && args.label==='近7天'));
+  assert.ok(calls.some(([command])=>command==='video-period'));
   assert.ok(calls.some(([command,args])=>command==='sort' && args.label==='视频销售额'));
   calls.length=0;
   await browser.collect('videos','全部');
   assert.equal(calls[0][0],'clear');
   assert.deepEqual(calls.filter(([command])=>command==='video-filter').map(([,args])=>args.path),[[],[]]);
+});
+
+test('video period adaptation handles verified ranges, shortcuts and calendar clicks then rereads dates', async () => {
+  for (const mode of ['verified','shortcut','calendar']) {
+    const browser=new FeiguaBrowser({}), calls=[];let moved=false;
+    browser.settle=async()=>{};
+    browser.execute=async(command,args={})=>{calls.push([command,args]);
+      if(args.verify)return{verified:true};
+      if(mode==='verified')return{verified:true};
+      if(mode==='shortcut')return{changed:true};
+      if(!args.phase)return{calendar:true};
+      if(args.phase==='open')return{opened:true};
+      if(args.phase==='start'&&!moved){moved=true;return{moved:true};}
+      return{picked:true};
+    };
+    await browser.chooseVideoPeriod();
+    assert.equal(calls[0][0],'video-period');
+    if(mode==='verified')assert.equal(calls.length,1);
+    else assert.equal(calls.at(-1)[1].verify,true);
+    if(mode==='calendar')assert.deepEqual(calls.filter(([,a])=>a.phase).map(([,a])=>a.phase),['open','start','start','end']);
+  }
+});
+
+test('calendar traversal is bounded and cancellation or failed reread prevents collection', async () => {
+  const browser=new FeiguaBrowser({});browser.settle=async()=>{};let calls=0;
+  browser.execute=async(_command,args={})=>{calls++;return !args.phase?{calendar:true}:args.phase==='open'?{opened:true}:{moved:true};};
+  await assert.rejects(browser.chooseVideoPeriod(),/跨度过大/);assert.equal(calls,15);
+  const signal=AbortSignal.abort();calls=0;
+  await assert.rejects(browser.chooseVideoPeriod(signal),/已取消/);assert.equal(calls,0);
+  browser.execute=async(_command,args={})=>args.verify?{verified:false}:{changed:true};
+  await assert.rejects(browser.chooseVideoPeriod(),/未能确认近7天/);
 });
 
 test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
@@ -378,7 +504,7 @@ test('existing daily video marker migrates into its week and does not collect ag
   assert.deepEqual(calls, []);
 });
 
-test('late startup catches up videos first, waits while busy, then independently catches up hotspots',async()=>{
+test('late startup serializes videos, hotspots, BGM and the topic week check',async()=>{
   let release;
   const gate=new Promise(resolve=>{release=resolve;});
   const {service,calls,disk}=fixture({collect:async(kind,keyword,_signal,options)=>{if(kind==='videos')await gate;return capture(kind,keyword,options);}});
@@ -389,16 +515,17 @@ test('late startup catches up videos first, waits while busy, then independently
   assert.equal(disk().runs.length,1);
   release();await service.job;
   await service.checkDailySchedule(now,()=>true);await service.job;
-  await service.checkDailySchedule(now,()=>true);
-  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null]]);
-  assert.equal(disk().runs.length,2);
+  await service.checkDailySchedule(now,()=>true);await service.job;
+  await service.checkDailySchedule(now,()=>true);await service.job;
+  assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null],['music',null],['topics',null]]);
+  assert.equal(disk().runs.length,4);
   assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
 
 test('video schedule failure and cancellation do not retry that week or consume hotspot schedule',async()=>{
   for(const cancel of [false,true]) {
-    const {service,browser,calls,disk}=fixture();await service.saveKeywords(['词']);
+    const {service,browser,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['词']);
     let release;
     browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
     const now=Date.parse('2026-10-01T22:30:00Z');
@@ -441,7 +568,7 @@ test('adding or editing a keyword immediately collects only changed groups; dele
 });
 
 test('new groups still collect immediately after the weekly schedule is used, without resetting it',async()=>{
-  const {service,calls,disk}=fixture();await service.saveKeywords(['旧关键词']);
+  const {service,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['旧关键词']);
   const now=Date.parse('2026-10-01T22:30:00Z');
   await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
   await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
@@ -451,7 +578,7 @@ test('new groups still collect immediately after the weekly schedule is used, wi
 });
 
 test('without keywords the daily collection catches up only hotspots once per day, including after restart', async () => {
-  const { service, calls, disk } = fixture();
+  const { service, calls, disk } = fixture({stored:topicReadyState()});
   const now = Date.parse('2026-10-02T01:00:00Z');
   await Promise.all([service.checkDailySchedule(now, () => true), service.checkDailySchedule(now, () => true)]);
   await service.job;
@@ -468,7 +595,7 @@ test('without keywords the daily collection catches up only hotspots once per da
 });
 
 test('daily collection waits for 07:00, authorization and idle state', async () => {
-  const { service, calls, disk } = fixture();
+  const { service, calls, disk } = fixture({stored:topicReadyState()});
   const now = Date.parse('2026-10-01T23:00:00Z');
   await service.checkDailySchedule(now - 1, () => true);
   await service.checkDailySchedule(now, () => false);
@@ -520,7 +647,7 @@ test('disposing stops the daily timer and prevents subsequent collection', async
 });
 
 test('cancelling scheduled login prevents collection and does not requeue that day', async () => {
-  const { service, browser, calls, disk } = fixture();
+  const { service, browser, calls, disk } = fixture({stored:topicReadyState()});
   let release;
   browser.checkLogin = () => new Promise(resolve => { release = resolve; });
   const now = Date.parse('2026-10-01T23:00:00Z');
@@ -548,7 +675,7 @@ test('daily-only history rotation preserves cached BGM, topics and keyword video
   const restored = fixture({ stored: disk() });
   const state = await restored.service.state();
   assert.equal(state.runs.length, 12);
-  assert.ok(state.runs.every(run => run.groups.length === 1 && ['hotspots','videos'].includes(run.groups[0].kind)));
+  assert.ok(state.runs.every(run => run.groups.length === 1 && ['hotspots','videos','topics'].includes(run.groups[0].kind)));
   assert.deepEqual(new Set(state.latestResults.map(group => group.kind)), new Set(['music', 'topics', 'hotspots', 'videos']));
 });
 
@@ -896,8 +1023,9 @@ test('known provider notice is confirmed once and login then closes automaticall
   browser.stopLoginWatch();
 });
 
-test('login success starts a single collection automatically using saved keywords', async () => {
-  const {service,browser,calls} = fixture();
+test('login success starts a single collection automatically using saved keywords', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
+  const {service,browser,calls} = fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
   await service.saveKeywords(['测试词']);
   browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); };
   await service.login(); await service.autoStart; await service.job;

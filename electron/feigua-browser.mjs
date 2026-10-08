@@ -30,7 +30,8 @@ export class FeiguaBrowser {
     this.BrowserWindow = BrowserWindow; this.session = session;
     this.window = null; this.pending = new Set(); this.lastNetwork = 0;
     this.wasAuthenticated = false;
-    this.loginTimer = null; this.loginCheckPending = false;
+    this.loginTimer = null; this.loginWatchGeneration = 0;
+    this.verificationTimer = null; this.verificationGeneration = 0; this.verificationWindow = null; this.verificationSeen = false;
     this.onAuthChange = null;
     this.loginEntryUrl = '';
     this.loginRelayOrigins = new Set();
@@ -58,6 +59,7 @@ export class FeiguaBrowser {
     const next = normalizeLoginEntryUrl(value);
     if (next === this.loginEntryUrl) return;
     this.stopLoginWatch();
+    this.stopVerificationWatch();
     this.wasAuthenticated = false;
     this.loginRelayOrigins.clear();
     this.verifiedSourceOrigin = null;
@@ -132,11 +134,15 @@ export class FeiguaBrowser {
     if (this.workspaceHint) this.loginRelayOrigins.add(this.workspaceHint.origin);
   }
 
-  async verifyWorkspace(auth) {
-    if (!auth.authenticated || !this.isRelayWorkspace(this.window.webContents.getURL())) return;
-    const origin = new URL(this.window.webContents.getURL()).origin;
+  async verifyWorkspace(auth, window = this.window, isCurrent = () => true) {
+    if (!auth.authenticated) return;
+    const valid = () => isCurrent() && window && this.window === window && !window.isDestroyed?.();
+    if (!valid()) throw issue('登录检查已取消或窗口已关闭', 'FEIGUA_CANCELLED');
+    if (!this.isRelayWorkspace(window.webContents.getURL())) return;
+    const origin = new URL(window.webContents.getURL()).origin;
     const hint = normalizeWorkspaceHint({ entryUrl: this.loginEntryUrl, origin }, this.loginEntryUrl);
     if (JSON.stringify(hint) !== JSON.stringify(this.workspaceHint)) await this.onWorkspaceVerified?.(hint);
+    if (!valid()) throw issue('登录检查已取消或窗口已关闭', 'FEIGUA_CANCELLED');
     this.workspaceHint = hint;
     this.verifiedSourceOrigin = origin;
   }
@@ -191,7 +197,7 @@ export class FeiguaBrowser {
       else this.onAuthChange?.({ status: 'signed_out', message: '入口跳转地址尚不支持，请返回入口重试或核对网址' });
       return { action: 'deny' };
     });
-    window.on('closed', () => { this.stopCredentialMemory(); this.stopLoginWatch(); if (this.window === window) this.window = null; this.pending.clear(); this.rankingRequests = []; });
+    window.on('closed', () => { this.stopCredentialMemory(); this.stopLoginWatch(); if (this.window === window) { this.stopVerificationWatch(); this.window = null; } this.pending.clear(); this.rankingRequests = []; });
     return window;
   }
 
@@ -204,12 +210,19 @@ export class FeiguaBrowser {
 
   async execute(command, argument = {}, retryNotice = true) {
     if (!this.window || this.window.isDestroyed()) throw issue('飞瓜窗口已关闭，请重新打开');
-    const currentUrl = this.window.webContents.getURL();
+    const window = this.window, generation = this.loginWatchGeneration, verificationGeneration = this.verificationGeneration;
+    const isCurrent = () => this.window === window && !window.isDestroyed() && generation === this.loginWatchGeneration && verificationGeneration === this.verificationGeneration;
+    const currentUrl = window.webContents.getURL();
     if (!this.isProviderUrl(currentUrl) && !this.isRelayWorkspace(currentUrl)) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
     if (!this.isProviderUrl(currentUrl) && !['auth', 'accept-terms'].includes(command)) throw issue('请先核验代理工作台登录', 'FEIGUA_AUTH_REQUIRED');
     let result;
-    try { result = await this.window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
-    catch { throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
+    try { result = await window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
+    catch { if (!isCurrent()) throw issue('页面读取已取消', 'FEIGUA_CANCELLED'); throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
+    if (!isCurrent()) throw issue('页面读取已取消', 'FEIGUA_CANCELLED');
+    if (result?.actionRequired === 'verification') {
+      if (command === 'auth' && argument.passiveVerification === true) return result;
+      this.requireVerification(true);
+    }
     if (result?.authRequired) throw issue('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
     if (command !== 'auth' && result?.actionRequired) {
       if (retryNotice) { await this.resolveAuth(); return this.execute(command, argument, false); }
@@ -219,37 +232,107 @@ export class FeiguaBrowser {
     return result;
   }
 
-  async resolveAuth(signal) {
+  requireVerification(observed = false) {
+    const message = '飞瓜需要图形验证，请在已打开的飞瓜窗口完成验证后重新采集';
+    this.stopLoginWatch();
+    this.ensureWindow(true);
+    this.onAuthChange?.({ status: 'verification_required', message });
+    this.startVerificationWatch(observed);
+    throw issue(message, 'FEIGUA_VERIFICATION_REQUIRED');
+  }
+
+  stopVerificationWatch() {
+    this.verificationGeneration++;
+    clearInterval(this.verificationTimer);
+    this.verificationTimer = null; this.verificationWindow = null; this.verificationSeen = false;
+  }
+
+  startVerificationWatch(observed = false) {
+    const window = this.window;
+    if (!window || window.isDestroyed()) return;
+    if (this.verificationTimer && this.verificationWindow === window) { this.verificationSeen ||= observed; return; }
+    this.stopVerificationWatch();
+    this.verificationWindow = window;
+    this.verificationSeen = observed;
+    const generation = this.verificationGeneration;
+    const isCurrent = () => generation === this.verificationGeneration && this.window === window && !window.isDestroyed();
+    let pending = false;
+    const check = async () => {
+      if (pending || !isCurrent()) return;
+      pending = true;
+      try {
+        // Observe only. Never navigate, accept a notice or submit a CAPTCHA.
+        const auth = await this.execute('auth', { passiveVerification: true });
+        if (!isCurrent()) return;
+        if (auth.actionRequired === 'verification') this.verificationSeen = true;
+        if (auth.actionRequired || auth.loading) return;
+        if (auth.authenticated && this.verificationSeen) {
+          await this.verifyWorkspace(auth, window, isCurrent);
+          if (!isCurrent()) return;
+          this.wasAuthenticated = true;
+          window.hide?.(); // Keep the same verified window available for a retry.
+          this.stopVerificationWatch();
+          this.onAuthChange?.({ status: 'authenticated', message: '飞瓜页面已就绪，可以重新采集' });
+        } else if (auth.loginVisible) {
+          this.stopVerificationWatch();
+          this.onAuthChange?.({ status: 'expired', message: '飞瓜登录已失效，请重新登录' });
+        }
+      } catch (error) {
+        if (isCurrent() && error.code === 'FEIGUA_AUTH_REQUIRED') {
+          this.stopVerificationWatch();
+          this.onAuthChange?.({ status: 'expired', message: '飞瓜登录已失效，请重新登录' });
+        }
+      } finally { pending = false; }
+    };
+    this.verificationTimer = setInterval(() => void check(), 1000);
+    this.verificationTimer.unref?.();
+    void check();
+  }
+
+  async resolveAuth(signal, isCurrent = () => true) {
+    const window = this.window;
+    const assertCurrent = () => {
+      if (signal?.aborted || !isCurrent() || !window || this.window !== window || window.isDestroyed?.()) throw issue('登录检查已取消或窗口已关闭', 'FEIGUA_CANCELLED');
+    };
+    assertCurrent();
     let auth = await this.execute('auth');
+    assertCurrent();
     const deadline = Date.now() + 15000;
     while (auth.loading && Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
       await delay(300, undefined, { signal });
+      assertCurrent();
       auth = await this.execute('auth');
+      assertCurrent();
     }
     if (auth.loading) throw issue('飞瓜工作台尚未加载完成，请稍后重试', 'FEIGUA_NETWORK');
-    await this.verifyWorkspace(auth);
+    await this.verifyWorkspace(auth, window, isCurrent);
+    assertCurrent();
     if (auth.actionRequired !== 'terms') return auth;
     this.onAuthChange?.({ status: 'checking', message: '正在自动处理飞瓜声明…' });
     await this.execute('accept-terms');
+    assertCurrent();
     for (let attempt = 0; attempt < 25; attempt++) {
       await delay(300, undefined, { signal });
+      assertCurrent();
       auth = await this.execute('auth');
+      assertCurrent();
       if (!auth.actionRequired) {
-        await this.verifyWorkspace(auth);
+        await this.verifyWorkspace(auth, window, isCurrent);
+        assertCurrent();
         return auth;
       }
     }
     throw issue('飞瓜声明确认未生效，请稍后重试', 'FEIGUA_NOTICE_FAILED');
   }
 
-  async settle(signal) {
+  async settle(signal, { navigationOnly = false } = {}) {
     const deadline = Date.now() + 25000;
     let stable = 0;
     while (Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
       await delay(300, undefined, { signal });
-      const ready = await this.execute('ready');
+      const ready = await this.execute('ready', { navigationOnly });
       if (ready.ready && !this.pending.size && Date.now() - this.lastNetwork > 600) stable++; else stable = 0;
       if (stable >= 2) return;
     }
@@ -259,6 +342,7 @@ export class FeiguaBrowser {
   async openLogin() {
     if (!this.loginEntryUrl) throw issue('请先配置并保存登录入口网址', 'FEIGUA_ENTRY_REQUIRED');
     this.stopLoginWatch();
+    this.stopVerificationWatch();
     this.onAuthChange?.({ status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台' });
     this.ensureWindow(true);
     try { await this.window.loadURL(this.loginEntryUrl); }
@@ -271,21 +355,26 @@ export class FeiguaBrowser {
   }
 
   stopLoginWatch() {
+    this.loginWatchGeneration++;
     if (this.loginTimer) clearInterval(this.loginTimer);
     this.loginTimer = null;
   }
 
   startLoginWatch() {
+    this.stopVerificationWatch();
     this.stopLoginWatch();
+    const generation = this.loginWatchGeneration;
     const enteredUrls = new Set();
+    let pending = false;
     const check = async () => {
-      if (this.loginCheckPending || !this.window || this.window.isDestroyed()) return;
-      this.loginCheckPending = true;
+      if (pending || generation !== this.loginWatchGeneration || !this.window || this.window.isDestroyed()) return;
+      pending = true;
       const loginWindow = this.window;
+      const isCurrent = () => generation === this.loginWatchGeneration && this.window === loginWindow && !loginWindow.isDestroyed();
       try {
         if (!this.isProviderUrl(loginWindow.webContents.getURL()) && !this.isRelayWorkspace(loginWindow.webContents.getURL())) return;
-        const auth = await this.resolveAuth();
-        if (this.window !== loginWindow || loginWindow.isDestroyed()) return;
+        const auth = await this.resolveAuth(undefined, isCurrent);
+        if (!isCurrent()) return;
         if (!auth.authenticated && auth.workspaceAvailable) {
           const currentUrl = loginWindow.webContents.getURL();
           if (enteredUrls.has(currentUrl)) return;
@@ -300,12 +389,12 @@ export class FeiguaBrowser {
         this.stopLoginWatch();
         loginWindow.close(); // Session is persistent; closing only dismisses the login UI.
       } catch (error) {
-        if (error.code === 'FEIGUA_NOTICE_FAILED') {
+        if (isCurrent() && error.code === 'FEIGUA_NOTICE_FAILED') {
           this.stopLoginWatch();
           this.onAuthChange?.({ status: 'error', message: error.publicMessage });
         }
       }
-      finally { this.loginCheckPending = false; }
+      finally { pending = false; }
     };
     this.loginTimer = setInterval(() => void check(), 1000);
     this.loginTimer.unref?.();
@@ -313,22 +402,47 @@ export class FeiguaBrowser {
   }
 
   async checkLogin() {
+    // A task takes ownership of the shared window. Invalidate even an already
+    // pending monitor so it cannot close the window when its old check resolves.
+    const watching = Boolean(this.loginTimer || this.verificationTimer);
+    this.stopVerificationWatch();
+    this.stopLoginWatch();
+    const generation = this.loginWatchGeneration;
+    const isCurrent = () => generation === this.loginWatchGeneration;
+    try {
+      const auth = await this.checkLoginSession(isCurrent);
+      if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
+      if (watching && auth.status === 'authenticated') {
+        this.window?.hide?.();
+        this.onAuthChange?.(auth);
+      } else if (watching && this.window && !this.window.isDestroyed?.()) this.startLoginWatch();
+      return auth;
+    } catch (error) {
+      if (watching && isCurrent() && this.window && !this.window.isDestroyed?.()) this.startLoginWatch();
+      throw error;
+    }
+  }
+
+  async checkLoginSession(isCurrent) {
     if (!this.loginEntryUrl && (!this.window || this.window.isDestroyed?.())) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     this.ensureWindow();
+    if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
     const currentUrl = this.window.webContents.getURL();
     if (!currentUrl || this.workspaceHint && isLoginEntryNavigation(currentUrl, this.loginEntryUrl) && !this.isRelayWorkspace(currentUrl)) {
       if (!this.loginEntryUrl) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
       const workspaceOrigin = this.verifiedSourceOrigin || this.workspaceHint?.origin;
       try { await this.window.loadURL(workspaceOrigin ? `${workspaceOrigin}/app/` : this.loginEntryUrl); }
       catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
+      if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
     }
     if (!this.isProviderUrl(this.window.webContents.getURL()) && !this.isRelayWorkspace(this.window.webContents.getURL())) return this.wasAuthenticated || this.workspaceHint
       ? { status: 'expired', message: '飞瓜登录已失效，请点击“打开登录入口”重新登录' }
       : { status: 'signed_out', message: '请点击“打开登录入口”完成登录，并进入飞瓜工作台' };
-    let auth = await this.resolveAuth();
+    let auth = await this.resolveAuth(undefined, isCurrent);
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();
-      auth = await this.waitForWorkspace();
+      if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
+      auth = await this.waitForWorkspace(undefined, isCurrent);
     }
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
     return { status: this.wasAuthenticated || this.workspaceHint ? 'expired' : 'signed_out', message: this.wasAuthenticated || this.workspaceHint ? '飞瓜登录已失效，请点击“打开登录入口”重新登录' : '请点击“打开登录入口”完成飞瓜登录' };
@@ -339,11 +453,11 @@ export class FeiguaBrowser {
     if (entry.url) await this.navigate(entry.url);
   }
 
-  async waitForWorkspace(signal) {
+  async waitForWorkspace(signal, isCurrent = () => true) {
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
-      const auth = await this.resolveAuth(signal);
+      const auth = await this.resolveAuth(signal, isCurrent);
       if (auth.authenticated || auth.loginVisible || auth.actionRequired) return auth;
       await delay(300, undefined, { signal });
     }
@@ -358,6 +472,30 @@ export class FeiguaBrowser {
     if (!verified.verified) throw issue('未能确认筛选条件，已停止本组采集');
   }
 
+  async chooseVideoPeriod(signal) {
+    if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+    const selected = await this.execute('video-period');
+    if (selected.verified) return;
+    if (selected.calendar) {
+      if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+      await this.execute('video-period', { phase: 'open' });
+      await this.settle(signal);
+      for (const phase of ['start', 'end']) {
+        let picked = false;
+        for (let attempt = 0; attempt < 13; attempt++) {
+          if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+          const result = await this.execute('video-period', { phase });
+          if (result.picked) { picked = true; break; }
+          if (!result.moved) throw issue('视频统计日期选择未完成');
+          await this.settle(signal);
+        }
+        if (!picked) throw issue('视频统计日期跨度过大，请打开飞瓜核对时间周期');
+      }
+    }
+    await this.settle(signal);
+    if (!(await this.execute('video-period', { verify: true })).verified) throw issue('未能确认近7天统计日期，已停止本组采集');
+  }
+
   async openSource(kind, signal) {
     const source = FEIGUA_SOURCES[kind];
     if (!source) throw issue('未知飞瓜来源');
@@ -369,10 +507,10 @@ export class FeiguaBrowser {
       await this.enterWorkspace();
       await this.waitForWorkspace(signal);
     }
-    await this.settle(signal);
+    await this.settle(signal, { navigationOnly: true });
     const previousUrl = this.window.webContents.getURL();
     let destination = await this.execute('navigate', { labels: source.navigation });
-    if (destination.expanded) { await this.settle(signal); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
+    if (destination.expanded) { await this.settle(signal, { navigationOnly: true }); destination = await this.execute('navigate', { labels: source.navigation, expanded: true }); }
     if (destination.url) await this.navigate(destination.url);
     if (destination.clicked) {
       for (let attempt = 0; attempt < 40 && this.window.webContents.getURL() === previousUrl; attempt++) await delay(250, undefined, { signal });
@@ -406,7 +544,7 @@ export class FeiguaBrowser {
         }
         await this.choose('video-filter', { label, path, phase: 'select' }, signal);
       }
-      await this.choose('choice', { label: '近7天' }, signal);
+      await this.chooseVideoPeriod(signal);
       await this.choose('keyword', { keyword }, signal);
     } else {
       if (kind === 'topics') {
@@ -449,7 +587,10 @@ export class FeiguaBrowser {
         capture.musicTagOptions = catalog.options;
         capture.musicTagRestricted = catalog.restricted;
       } else if (kind === 'videos') capture.videoFilterOptions = await this.execute('video-filter-options');
-    } catch { capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验'; }
+    } catch (error) {
+      if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error;
+      capture.catalogWarning = '分类目录更新暂未完成，保留已有目录；本次数据仍按实际筛选校验';
+    }
     if (kind === 'videos' && Array.isArray(capture.rows)) await this.enrichVideoFields(capture, signal);
     return capture;
   }
@@ -485,10 +626,15 @@ export class FeiguaBrowser {
           }
         } catch (error) {
           if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
+          if (error.code === 'FEIGUA_VERIFICATION_REQUIRED') throw error;
           detail = { state: error.code === 'FEIGUA_AUTH_REQUIRED' ? 'auth_required' : 'lookup_failed' };
         }
       }
-      if (['auth_required', 'quota_exhausted', 'rate_limited'].includes(detail?.state)) blocked = detail.state;
+      if (detail?.state === 'verification_required') this.requireVerification();
+      if (['auth_required', 'quota_exhausted', 'rate_limited'].includes(detail?.state)) {
+        blocked = detail.state;
+        capture.detailStopReason = detail.state;
+      }
       if (detail?.state === 'auth_required') this.onAuthChange?.({ status: 'expired', message: '飞瓜登录已失效，列表已保留，请重新登录后补充详情' });
       capture.rows[index] = enrichVideoRow(row, detail);
     }
@@ -512,6 +658,7 @@ export class FeiguaBrowser {
       Promise.resolve(result).then(value => { cleanup(); resolve(value); }, () => { cleanup(); reject(issue('飞瓜接口请求失败，请检查网络或登录状态', 'FEIGUA_NETWORK')); });
       if (signal?.aborted) abort();
     });
+    if (response?.code === 430) this.requireVerification();
     if (response?.error) throw issue(response.error, ['FEIGUA_NETWORK', 'FEIGUA_AUTH_REQUIRED', 'FEIGUA_PERMISSION', 'FEIGUA_RATE_LIMIT'].includes(response.errorCode) ? response.errorCode : 'FEIGUA_API_INVALID');
     const sent = this.rankingRequests.filter(record => record.kind === kind && record.sequence > beforeApi).at(-1);
     validateFeiguaRequest(kind, sent, context);
@@ -519,6 +666,6 @@ export class FeiguaBrowser {
     return captureFeiguaResponse(kind, sent, context, response);
   }
 
-  stop() { this.window?.webContents.stop(); }
-  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
+  stop() { this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.webContents.stop?.(); }
+  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
 }

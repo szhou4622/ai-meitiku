@@ -36,12 +36,20 @@ test('retry exhaustion stops at three attempts and leaves prior successful resul
 });
 
 test('authentication, permission, quota, rate limit, validation and storage failures are never retried',async()=>{
-  for(const code of ['FEIGUA_AUTH_REQUIRED','FEIGUA_PERMISSION','FEIGUA_QUOTA','FEIGUA_RATE_LIMIT','FEIGUA_API_INVALID','FEIGUA_PAGE_CHANGED','FEIGUA_STORAGE']){
+  for(const code of ['FEIGUA_AUTH_REQUIRED','FEIGUA_PERMISSION','FEIGUA_QUOTA','FEIGUA_RATE_LIMIT','FEIGUA_API_INVALID','FEIGUA_PAGE_CHANGED','FEIGUA_STORAGE','FEIGUA_VERIFICATION_REQUIRED']){
     const f=fixture({collect:async kind=>{if(kind==='music')throw Object.assign(new Error('synthetic failure'),{code});return capture(kind);},retryWait:async()=>{assert.fail(`unexpected retry: ${code}`);}});
     await f.service.start();await f.service.job;
     assert.equal(f.calls.filter(kind=>kind==='music').length,1);
-    if(['FEIGUA_AUTH_REQUIRED','FEIGUA_QUOTA','FEIGUA_RATE_LIMIT','FEIGUA_STORAGE'].includes(code))assert.deepEqual(f.calls,['music']);
+    if(['FEIGUA_AUTH_REQUIRED','FEIGUA_QUOTA','FEIGUA_RATE_LIMIT','FEIGUA_STORAGE','FEIGUA_VERIFICATION_REQUIRED'].includes(code))assert.deepEqual(f.calls,['music']);
   }
+});
+
+test('human verification stops later groups, preserves old data and permits a manual retry after completion',async()=>{
+  let blocked=true;const f=fixture({collect:async kind=>{if(blocked)throw Object.assign(new Error('synthetic verification'),{code:'FEIGUA_VERIFICATION_REQUIRED',publicMessage:'请完成人工验证'});return capture(kind);}});
+  await f.service.start();await f.service.job;let s=await f.service.state();
+  assert.deepEqual(f.calls,['music']);assert.equal(s.auth.status,'verification_required');
+  assert.ok(s.runs[0].groups.slice(1).every(g=>g.status==='skipped'));assert.deepEqual(s.latestResults[0],old);
+  blocked=false;await f.service.start();await f.service.job;s=await f.service.state();assert.equal(s.runs[0].status,'completed');
 });
 
 test('cancel aborts a real backoff timer immediately and prevents later provider calls',async()=>{
