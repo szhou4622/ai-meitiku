@@ -17,6 +17,7 @@ export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog =
     collectedAt: '2026-10-01T11:00:00Z', dateRange: '2026-09-25 - 2026-10-01', period: '近7天',
     rows: Array.from({ length: 5 }, (_, index) => ({ id: `${kind}-${index}`, rank: index + 1, title: `合成测试${kind === 'videos' ? '视频' : '条目'} ${index + 1}`, author: '合成测试达人', totalUsers: '100w', yesterdayUsers: '3.2w', followers: '10w', participantGrowth: '24.5%', playGrowth: '32.1%', peakHeat: '1000w', plays: index ? '20w' : null, likes: '5000', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }], missingFields: index ? [] : ['plays'] })),
   } });
+  const authorProfile = 'https://www.douyin.com/user/MS4wLjABAAAA_synthetic-author';
   if (weeklyHistory) {
     state.videoQueries = ['合成甲', '合成乙'].map(keyword => ({ keyword, categoryPath: [], tagPath: [] }));
     state.keywords = state.videoQueries.map(query => query.keyword);
@@ -27,6 +28,9 @@ export function installFeiguaPreview({ musicRefreshFails = false, videoCatalog =
       const current = group('videos', keyword);
       current.result.collectedAt = '2026-10-05T02:00:00Z'; current.result.dateRange = '2026-09-29 - 2026-10-05';
       current.result.rows.forEach(row => { row.salesCount = '5000-1w'; });
+      current.result.rows[0].authorUrl = authorProfile;
+      current.result.rows[1].authorUrl = 'https://www.iesdouyin.com/share/user/700000000001';
+      current.result.rows[2].authorUrl = 'javascript:alert(1)';
       return current;
     });
     state.runs = [{ id:'weekly-latest', status:'completed', groups:[group('music'), group('topics'), group('hotspots'), ...latest] }, { id:'weekly-old', status:'completed', groups:[old] }];

@@ -2,6 +2,22 @@
 
 更新日期：2026-10-02。分支：`codex/feigua-hot-trends`。
 
+## 2026-10-08：作者功能与采集调度整合
+
+- `codex/feigua-author-profile` 的作者链接改动已整合到 `codex/feigua-new-keyword-failure`。桌面预览使用后者的独立工作目录，保留 BGM 每天 08:00、话题周榜和已有登录、筛选修复；创建另一分支不会自动改变正在运行的程序。
+- 合并后 194 项采集回归、TypeScript、定向 ESLint、Node 22.23.3 生产构建和仓库规范检查通过。重新打开的桌面已加载整合版本，既有结果和调度标记保留。
+- 实际补采遇到来源返回码 430 和“风险提示”人工校验，任务没有写入未经验证的新结果；旧结果中的作者仍为普通文字。真实作者补链和主页跳转需完成来源验证后继续验收，不能用合成测试代替。
+
+## 2026-10-08：带货视频作者主页跳转
+
+分支：`codex/feigua-author-profile`，从 `origin/main` 建立。
+
+- 卡片作者名称复用现有链接样式，在系统浏览器打开抖音主页，保留粉丝数、商品和销售指标布局。缺少有效地址的历史结果继续显示普通文字，重新采集后补链。
+- API 白名单只增加作者的公开身份字段。列表 `BloggerCreators` 使用 `NickName` / `Uid`；视频详情使用 `BloggerName` / `BloggerUid`，核对视频 ID、日期和唯一同名作者后才补链。主页优先取 `DouyinBloggerUrl`，其次采用来源 UID 的公开分享页；不使用昵称或飞瓜内部 ID。
+- 字段证据来自当天飞瓜公开前端代码：[列表作者组件](https://appqd.feigua.cn/dy/js/v3/7258.a8c5a2bb.js)、[视频详情作者及 mainPart 响应合并](https://appqd.feigua.cn/dy/js/v3/video-detail.65c7d16a.js)、[博主详情公共主页和 UID 分享二维码](https://appqd.feigua.cn/dy/js/v3/blogger-detail.d1497be0.js)。没有导入第三方代码或保留下载工作副本。
+- 验证：159 项采集回归、TypeScript、定向 ESLint、Node 22.23.3 生产构建通过。浏览器合成预览确认两种主页链接的地址、`target="_blank"` 和 `rel="noopener noreferrer"`；无效链接不渲染为链接，旧周榜保持普通文字和原数据。
+- 本轮没有可用的已登录飞瓜浏览器会话，因此未验证真实账号 API 补链和真实博主跳转；合成页面验证只覆盖本地显示。未合并、未发布安装包或部署生产。
+
 ## 实现范围
 
 - 在现有侧栏新增“热点采集”，保留原媒体库布局和功能入口。

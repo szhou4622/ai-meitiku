@@ -528,7 +528,7 @@ export class FeiguaBrowser {
     for (let index = 0; index < Math.min(capture.rows.length, 5); index++) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
       const row = capture.rows[index];
-      if (row.videoUrl && !row.productsIncomplete && row.products?.length && row.products.every(product => product.commission && product.url)) continue;
+      if (row.videoUrl && row.authorUrl && !row.productsIncomplete && row.products?.length && row.products.every(product => product.commission && product.url)) continue;
       this.onVideoDetailProgress?.({ index: index + 1, total: Math.min(capture.rows.length, 5) });
       let detail = { state: blocked || 'lookup_failed' };
       const dateCode = videoPublishedDate(row.publishedAt);
