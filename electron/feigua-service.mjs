@@ -6,6 +6,7 @@ import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-e
 import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
 import { pendingTopicCheck, settledTopicPeriod } from './feigua-topic-schedule.mjs';
 import { pendingMusicCheck } from './feigua-music-schedule.mjs';
+import { retainProductFields, restoreProductFieldsInState } from './feigua-product-cache.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
 import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
@@ -89,8 +90,9 @@ export class FeiguaService {
   }
 
   async load() {
-    const data = await this.storage.read();
-    if (data.version !== 1 || !Array.isArray(data.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
+    const stored = await this.storage.read();
+    if (stored.version !== 1 || !Array.isArray(stored.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
+    const { data, changed: fieldsRestored } = restoreProductFieldsInState(stored);
     this.data = { version: 1, loginEntryUrl: normalizeLoginEntryUrl(data.loginEntryUrl ?? ''), keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
       videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
@@ -120,7 +122,7 @@ export class FeiguaService {
     this.data.workspaceHint = normalizeWorkspaceHint(hint, this.data.loginEntryUrl);
     this.browser.setWorkspaceHint?.(this.data.workspaceHint);
     if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-    let recovered = false;
+    let recovered = fieldsRestored;
     for (const run of this.data.runs) {
       if (run.status === 'running') {
         run.status = 'interrupted';
@@ -442,15 +444,16 @@ export class FeiguaService {
   async saveCapturedGroup(run, group, result) {
     const save = this.writeQueue.then(async () => {
       const snapshot = structuredClone(this.data);
+      const retained = group.kind === 'videos' ? retainProductFields(result, snapshot) : result;
       const savedRun = snapshot.runs.find(item => item.id === run.id);
       const savedGroup = savedRun.groups[run.groups.indexOf(group)];
-      Object.assign(savedGroup, { result, status: 'completed' });
+      Object.assign(savedGroup, { result: retained, status: 'completed' });
       snapshot.latestResults = recoverLatestResults([{ id: run.id, groups: [savedGroup] }], snapshot.latestResults);
       if (group.kind === 'videos') snapshot.videoHistory = recoverVideoHistory([{ groups: [savedGroup] }], [], snapshot.videoHistory);
       await this.storage.write(snapshot);
       // Publishing follows the durable write. Polling must never see a result
       // that would disappear on restart after a failed save.
-      Object.assign(group, { result, status: 'completed' });
+      Object.assign(group, { result: retained, status: 'completed' });
       this.data.latestResults = snapshot.latestResults;
       this.data.videoHistory = snapshot.videoHistory;
     });

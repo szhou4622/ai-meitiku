@@ -8,7 +8,7 @@ import { recoverVideoHistory, videoHistoryPeriods, videoGroupsForPeriod } from '
 import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
 
 type Kind = 'music' | 'topics' | 'hotspots' | 'videos';
-type Row = { id: string; rank: number; title: string; videoUrl?: string | null; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; salesCount?: string; publishedAt?: string; products?: { title: string; commission: string | null; url?: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
+type Row = { id: string; rank: number; title: string; videoUrl?: string | null; author?: string; totalUsers?: string; yesterdayUsers?: string; followers?: string; participantGrowth?: string; playGrowth?: string; peakHeat?: string; plays?: string; playsScope?: string; likes?: string; comments?: string; shares?: string; collects?: string; sales?: string; salesCount?: string; publishedAt?: string; products?: { title: string; commission: string | null; commissionVerifiedAt?: string; url?: string | null; hasCommission?: boolean }[]; fieldAvailability?: {plays?:string;commission?:string}; missingFields: string[] };
 type Result = { collectedAt: string; dateRange: string | null; dateWarning?: string | null; period: string; rows: Row[]; filters?: { category?: string; categoryPath?: string[]; tagPath?: string[] } };
 type Group = { kind: Kind; keyword: string | null; status: string; message?: string; result?: Result; musicTag?: string[]; categoryPath?: string[]; tagPath?: string[]; showingPrevious?: boolean; refreshStatus?: string; refreshMessage?: string; requestedMusicTag?: string[] };
 type Run = { id: string; startedAt: string; finishedAt: string | null; status: string; message: string; keywords: string[]; groups: Group[] };
@@ -68,12 +68,12 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
       <div className={styles.rowContent}>
         <h4 title={row.title}>{feiguaVideoLink(row.videoUrl, row.id) ? <a className={styles.contentLink} href={feiguaVideoLink(row.videoUrl, row.id)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开抖音视频">{row.title}</a> : row.title}</h4>
         {kind === 'videos' && <>
-          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}</small></p>) : <p>关联商品未取得</p>}</div>
+          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.commissionVerifiedAt ? `沿用 ${date(product.commissionVerifiedAt)} 采集的佣金率；本次未能更新` : product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}{product.commissionVerifiedAt && '（上次采集）'}</small></p>) : <p>关联商品未取得</p>}</div>
           <p>{display(row.author)} · 粉丝 {display(row.followers)}</p>
           <dl><div><dt>视频销售额</dt><dd>{display(row.sales)}</dd></div><div><dt>视频销量</dt><dd>{display(row.salesCount)}</dd></div><div><dt>点赞</dt><dd>{display(row.likes)}</dd></div></dl>
           {row.publishedAt && <small>发布时间 {row.publishedAt}</small>}
         </>}
-        {!!(kind === 'videos' ? videoMissingFields(row).length : row.missingFields.length) && <small className={styles.missing}>{kind === 'videos' ? `未取得：${videoMissingFields(row).map(field=>missingLabels[field]||field).join('、')}` : '部分字段未取得'}</small>}
+        {!!(kind === 'videos' ? videoMissingFields(row).length : row.missingFields.length) && <small className={styles.missing}>{kind === 'videos' ? `${row.products?.some(product=>product.commissionVerifiedAt) ? '本次未更新' : '未取得'}：${videoMissingFields(row).map(field=>missingLabels[field]||field).join('、')}` : '部分字段未取得'}</small>}
       </div>
     </li>)}
   </ol>;
