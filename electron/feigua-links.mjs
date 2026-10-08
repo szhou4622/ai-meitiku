@@ -19,20 +19,3 @@ export function feiguaProductLink(value) {
     return url.href;
   } catch { return null; }
 }
-
-// Feigua's public blogger view uses DouyinBloggerUrl and a UID-based QR link.
-// A display name or Feigua's internal blogger ID cannot identify a profile.
-export function feiguaAuthorLink(value, uid = null) {
-  const identity = typeof uid === 'string' ? uid : Number.isSafeInteger(uid) ? String(uid) : '';
-  const authorUid = /^\d{6,25}$/.test(identity) ? identity : null;
-  try {
-    const url = new URL(value);
-    if (url.protocol === 'https:' && !url.port && !url.username && !url.password) {
-      const profile = url.pathname.match(/^\/user\/(MS4wLjAB[A-Za-z0-9_-]{4,192})\/?$/);
-      if (url.hostname === 'www.douyin.com' && profile) return `https://www.douyin.com/user/${profile[1]}`;
-      const shared = url.pathname.match(/^\/share\/user\/(\d{6,25})\/?$/);
-      if (url.hostname === 'www.iesdouyin.com' && shared && (!authorUid || shared[1] === authorUid)) return `https://www.iesdouyin.com/share/user/${shared[1]}`;
-    }
-  } catch { /* A source UID can still supply the public share page. */ }
-  return authorUid ? `https://www.iesdouyin.com/share/user/${authorUid}` : null;
-}

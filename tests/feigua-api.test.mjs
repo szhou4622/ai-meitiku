@@ -50,23 +50,6 @@ test('ranking response retains verified public video and product links while ign
   assert.equal(captureFeiguaResponse('videos',request('videos'),contexts.videos,raw).rows[0].products[0].url, null);
 });
 
-test('ranking author links are matched to one source creator and saved without secrets', async () => {
-  const old = globalThis.document;
-  const entry = {...row, BloggerCreators:[{NickName:row.BloggerNickName,Uid:'700000000001',DouyinBloggerUrl:null,Token:'synthetic-secret'}], ExtInfo:row.product};
-  const model = {url:FEIGUA_ENDPOINTS.videos,GET:async()=>({Code:200,Status:true,Data:{Total:1,PageIndex:1,List:[entry]}})};
-  globalThis.document = {querySelector:()=>({__vue__:{$api:{video:{list:model}}}})};
-  try {
-    const parsed = await readFeiguaApi({endpoint:FEIGUA_ENDPOINTS.videos,params:request('videos').params});
-    assert.doesNotMatch(JSON.stringify(parsed), /synthetic-secret|Token/);
-    const clean = validateCapture('videos','合成词',captureFeiguaResponse('videos',request('videos'),contexts.videos,parsed));
-    assert.equal(clean.rows[0].authorUrl,'https://www.iesdouyin.com/share/user/700000000001');
-    for (const creators of [[], [{...parsed.data.list[0].creators[0],NickName:'其他达人'}], [parsed.data.list[0].creators[0], {...parsed.data.list[0].creators[0],Uid:'700000000002'}]]) {
-      parsed.data.list[0].creators = creators;
-      assert.equal(captureFeiguaResponse('videos',request('videos'),contexts.videos,parsed).rows[0].authorUrl,null);
-    }
-  } finally { globalThis.document = old; }
-});
-
 test('observes only verified ranking GET endpoints and excludes transport secrets',()=>{
   for(const kind of Object.keys(FEIGUA_ENDPOINTS)){
     const expected=request(kind);

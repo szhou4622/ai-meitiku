@@ -1,5 +1,5 @@
 import { VIDEO_DETAIL_ENDPOINTS } from './feigua-video-details.mjs';
-import { feiguaVideoLink, feiguaProductLink, feiguaAuthorLink } from './feigua-links.mjs';
+import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
 export const FEIGUA_HOME = 'https://dy.feigua.cn/';
 export const FEIGUA_SOURCES = Object.freeze({
   music: { label: '本周爆款 BGM Top5', navigation: ['热门音乐'], sort: '昨日使用人数', period: '昨日使用人数', fields: ['title', 'author', 'totalUsers', 'yesterdayUsers'] },
@@ -185,7 +185,6 @@ export function validateCapture(kind, keyword, capture, options = {}) {
     clean.missingFields = source.fields.filter(field => field === 'products' ? row.productsIncomplete === true || !clean.products.length || clean.products.some(product => !product.commission) : !clean[field]);
     if (kind === 'videos') {
       clean.videoUrl = feiguaVideoLink(row.videoUrl, clean.id);
-      clean.authorUrl = clean.author ? feiguaAuthorLink(row.authorUrl) : null;
       for (const field of ['comments','shares','collects']) clean[field] = value(row[field]);
       if (row.playsScope === 'detail-total' && clean.plays) clean.playsScope = 'detail-total';
       clean.fieldAvailability = Object.fromEntries(['plays','commission'].filter(field => ['source_unavailable','restricted','lookup_failed'].includes(row.fieldAvailability?.[field])).map(field => [field,row.fieldAvailability[field]]));

@@ -1,4 +1,4 @@
-import { feiguaVideoLink, feiguaProductLink, feiguaAuthorLink } from './feigua-links.mjs';
+import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
 
 export const VIDEO_DETAIL_ENDPOINTS = Object.freeze({
   main: '/api/v3/aweme/detail/detail/mainPart',
@@ -54,7 +54,6 @@ export async function readVideoDetailsApi({ videoId, dateCode }) {
   if (String(main?.AwemeId) !== videoId || String(main?.DateCode) !== dateCode || !Array.isArray(products) || products.length > 30) return { state: 'lookup_failed' };
   const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) || value === null ? value : null;
   return { state: 'verified', videoId, dateCode, videoUrl: scalar(main.VideoUrl), playsText: scalar(main.PlayCountStr), playsCount: scalar(main.PlayCount),
-    authors: Array.isArray(main.BloggerCreators) && main.BloggerCreators.length <= 30 ? main.BloggerCreators.map(author => ({ name: scalar(author.BloggerName), uid: scalar(author.BloggerUid), url: scalar(author.DouyinBloggerUrl) })) : [],
     products: products.map(row => ({ id: row.Goods?.Gid == null ? null : String(row.Goods.Gid), title: scalar(row.Goods?.Title), commission: scalar(row.Goods?.CosRatio), hasCommission: scalar(row.Goods?.HasCos), url: scalar(row.Goods?.PromotionLink) })) };
 }
 
@@ -76,8 +75,6 @@ export function enrichVideoRow(row, detail) {
     return clean;
   }
   clean.videoUrl = feiguaVideoLink(clean.videoUrl, row.id) || feiguaVideoLink(detail.videoUrl, row.id);
-  const authors = (detail.authors || []).filter(author => author.name && author.name === row.author);
-  clean.authorUrl = feiguaAuthorLink(clean.authorUrl) || (authors.length === 1 ? feiguaAuthorLink(authors[0].url, authors[0].uid) : null);
   if (!clean.plays) {
     // A raw zero with no formatted display value is the provider's placeholder.
     const plays = count(detail.playsText) || (Number(detail.playsCount) > 0 ? count(detail.playsCount) : null);
