@@ -24,11 +24,11 @@ export function validateRegion(region) {
 export function cloudErrorMessage(error) {
   const code = String(error?.code || '').split(':')[0];
   if (/InvalidAccessKey|SignatureDoesNotMatch|InvalidSecurityToken/.test(code)) return '密钥无效或签名失败，请检查 AccessKey ID 和 Secret';
-  if (/Forbidden|Unauthorized|NoPermission/.test(code)) return '阿里云拒绝访问，请确认已开通视频生产服务并授予视觉智能平台权限';
-  if (/Balance|Arrearage|Pay|Quota/.test(code)) return '阿里云余额或额度不足，请在控制台检查';
-  if (/Throttl|LimitExceeded/.test(code)) return '阿里云请求限流，请稍后再试';
-  if (/InvalidParameter|InvalidFile|InvalidImage|InvalidVideo/.test(code)) return '阿里云不接受该文件或区域参数，请检查视频格式与字幕区域';
-  return '阿里云请求未完成，请检查网络、服务开通状态和账户权限';
+  if (/Forbidden|Unauthorized|NoPermission/.test(code)) return '云服务拒绝访问，请确认已开通视频生产服务并授予视觉智能平台权限';
+  if (/Balance|Arrearage|Pay|Quota/.test(code)) return '云服务余额或额度不足，请在控制台检查';
+  if (/Throttl|LimitExceeded/.test(code)) return '云服务请求限流，请稍后再试';
+  if (/InvalidParameter|InvalidFile|InvalidImage|InvalidVideo/.test(code)) return '云服务不接受该文件或区域参数，请检查视频格式与字幕区域';
+  return '云服务请求未完成，请检查网络、服务开通状态和账户权限';
 }
 
 export function createAliyunClient(credentials) {
@@ -88,7 +88,7 @@ export async function probeVideo(filePath, ffmpeg, { input = true } = {}) {
 
 export function safeResultUrl(value) {
   const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || !url.hostname.endsWith('.aliyuncs.com')) throw new Error('阿里云返回了无法识别的下载地址');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || !url.hostname.endsWith('.aliyuncs.com')) throw new Error('云服务返回了无法识别的下载地址');
   // OSS signatures do not bind the protocol. Always transport the signed URL over TLS.
   url.protocol = 'https:';
   return url.href;

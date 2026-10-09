@@ -1,9 +1,11 @@
+import { ApplicationLog, authorizationFileStatus, diagnosticHandler } from "./application-log.mjs";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, safeStorage, session, shell } from "electron";
 import { AliyunSubtitleService } from "./aliyun-subtitle-service.mjs";
+import { collectSubtitleFolder } from "./subtitle-folder-input.mjs";
 import { probeVideo } from "./aliyun-subtitle-client.mjs";
 import { createAliyunBrowser } from "./aliyun-browser.mjs";
 import { createReadStream, statSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn as nodeSpawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFile, chmod, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -71,6 +73,8 @@ import { extractProductInfoFiles, extractScannedProductInfoFiles, PRODUCT_INFO_S
 import { StorageManagementService } from "./storage-management.mjs";
 import { UpdateService, UPDATE_CHECK_INTERVAL_MS, UPDATE_STARTUP_DELAY_MS } from "./update-service.mjs";
 import { createViralCopyService, parseManualTranscript } from "./viral-copy-service.mjs";
+import { createPromptLibraryService } from "./prompt-library-service.mjs";
+import { inspectReverseSource, reverseMedia } from "./prompt-reverse.mjs";
 import { decodeCsvBuffer, inspectViralDataCsv, inspectViralLibraryCsv, parseViralDataCsv, parseViralLibraryCsv } from "./viral-library-csv.mjs";
 import { parseViralVisualClassification, viralVisualClassificationPrompt } from "./viral-visual-classifier.mjs";
 import { createMachineIdentityService } from "./machine-identity/service.mjs";
@@ -110,6 +114,41 @@ const RUNTIME_USER_DATA_PATH = licenseUserDataPath({
 // and makes an existing encrypted credential impossible to decrypt.
 app.setPath("userData", RUNTIME_USER_DATA_PATH);
 app.setName(RUNTIME_USER_DATA_DIRECTORY_NAME);
+const applicationLog = new ApplicationLog({ userDataPath: RUNTIME_USER_DATA_PATH, metadata: { version: app.getVersion(), platform: process.platform, arch: process.arch, electron: process.versions.electron, node: process.versions.node, os: os.release(), packaged: app.isPackaged } });
+applicationLog.write("info", "application.start", { metadata: applicationLog.metadata });
+function spawn(command, args = [], options = {}) {
+  const processId = randomUUID();
+  const child = nodeSpawn(command, args, options);
+  applicationLog.write("info", "subprocess.start", { processId, command: path.basename(command), argumentCount: args.length, pid: child.pid });
+  for (const stream of ["stdout", "stderr"]) {
+    child[stream]?.setEncoding("utf8");
+    child[stream]?.on("data", text => applicationLog.write(stream === "stderr" ? "warning" : "info", "subprocess.output", { processId, stream, text }));
+  }
+  child.once("error", error => applicationLog.write("error", "subprocess.error", { processId, error }));
+  child.once("close", (code, signal) => applicationLog.write(code === 0 ? "info" : "error", "subprocess.exit", { processId, code, signal }));
+  return child;
+}
+
+function registerDiagnosticHandle(channel, handler) { ipcMain.handle(channel, diagnosticHandler(applicationLog, channel, handler)); }
+process.on("uncaughtExceptionMonitor", error => applicationLog.write("error", "process.uncaughtException", { error }));
+process.on("unhandledRejection", error => applicationLog.write("error", "process.unhandledRejection", { error }));
+for (const level of ["log", "info", "warn", "error"]) {
+  const original = console[level].bind(console);
+  console[level] = (...args) => { applicationLog.write(level, "main.console", { args }); original(...args); };
+}
+app.on("web-contents-created", (_event, contents) => {
+  const send = contents.send.bind(contents);
+  contents.send = (channel, ...args) => {
+    if (/progress|state-changed|diagnostic/.test(channel)) applicationLog.write("info", "task.event", { channel, args });
+    return send(channel, ...args);
+  };
+  contents.on("console-message", (_event, ...args) => applicationLog.write("info", "renderer.console", { args }));
+  contents.on("render-process-gone", (_event, details) => applicationLog.write("error", "renderer.crash", { details }));
+  contents.on("did-fail-load", (_event, code, description, url) => applicationLog.write("error", "renderer.load", { code, description, url }));
+});
+app.on("child-process-gone", (_event, details) => applicationLog.write("error", "child.crash", { details }));
+app.on("before-quit", () => applicationLog.write("info", "application.quit"));
+
 
 let mainWindow = null;
 const licenseDiagnosticLog = new LicenseDiagnosticLog({
@@ -151,13 +190,15 @@ async function getAliyunSubtitleService() {
   if (!apiSettingsSecureStore) throw new Error("安全凭证存储尚未就绪");
   if (!aliyunSubtitleReady) {
     aliyunSubtitleService = new AliyunSubtitleService({
-      defaultOutputDirectory: path.join(app.getPath("downloads"), "阿里云去字幕"),
+      assertAccess: () => requireWorkflowAccess("subtitle-removal"),
+      onChange: state => { if (workflowAccessAllowed("subtitle-removal") && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("aliyun-subtitle-changed", state); },
+      defaultOutputDirectory: path.join(app.getPath("downloads"), "一键去字幕"),
       secureStore: apiSettingsSecureStore,
       probe: async (filePath, options) => probeVideo(filePath, await viralVisionFfmpegPath(), options),
     });
     aliyunSubtitleReady = aliyunSubtitleService.initialize().catch(() => {
       aliyunSubtitleService?.shutdown(); aliyunSubtitleService = null; aliyunSubtitleReady = null;
-      throw new Error("阿里云设置或任务记录读取失败，原数据未改动，请重试");
+      throw new Error("去字幕服务设置或任务记录读取失败，原数据未改动，请重试");
     });
   }
   return aliyunSubtitleReady;
@@ -392,6 +433,23 @@ const viralCopyService = createViralCopyService({
   appRoot: getAppRoot(),
 });
 
+const promptLibraryService = createPromptLibraryService({
+  assertAccess: () => requireWorkflowAccess("prompt-library"),
+  onTaskChange: value => { if (workflowAccessAllowed("prompt-library") && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("prompt-library-progress", value); },
+  userDataPath: app.getPath("userData"),
+  getProfiles: loadClassificationProfiles,
+  reverseMedia: async options => reverseMedia({ ...options, ffmpeg: await viralVisionFfmpegPath(), transcribe: file => viralCopyService.transcribe(file) }),
+});
+
+function requireWorkflowAccess(featureId) {
+  if (!licenseService) throw new Error("授权服务尚未就绪");
+  licenseService.assertFeature(featureId);
+}
+
+function workflowAccessAllowed(featureId) {
+  try { requireWorkflowAccess(featureId); return true; } catch { return false; }
+}
+
 async function requireCopyAsset(assetId, { videoOnly = false } = {}) {
   if (!Number.isSafeInteger(assetId)) throw new Error("素材 ID 无效");
   let payload;
@@ -526,6 +584,7 @@ async function initializeVideoDownloadService() {
     isPackaged: app.isPackaged,
     authProvider: (platform) => downloadAuthService?.prepareDownloadAuth(platform) ?? null,
     fallbackRunner: (task, onProgress) => downloadAuthService?.downloadDouyinWithBrowser(task, onProgress),
+    onDiagnostic: details => applicationLog.write("info", "download.backend", details),
     onStateChange: (state) => mainWindow?.webContents.send("video-download-state-changed", state),
   });
   await downloadService.initialize();
@@ -620,7 +679,14 @@ async function initializeLicenseService() {
     localMachineIdentity: machineIdentity,
     machineCode: async () => (await machineIdentity()).active_machine_code,
     previewAllFeatures: !app.isPackaged && process.env.AI_MEDIA_LIBRARY_PREVIEW_ALL_FEATURES === "true",
-    onDiagnostic: (level, stage, message, details) => licenseDiagnosticLog.add(level, stage, message, details),
+    onDiagnostic: (level, stage, message, details) => {
+      const entry = licenseDiagnosticLog.add(level, stage, message, details);
+      // Persist only the already sanitized entry so a restart does not erase
+      // the evidence needed to diagnose automatic refresh failures.
+      applicationLog.write(level === "success" ? "info" : level, "license.diagnostic", {
+        stage: entry.stage, message, details,
+      });
+    },
     onOnlineValidated: () => { void identityObserveCoordinator?.onlineValidationSucceeded(); },
     onStateChange: (state) => {
       identityObserveCoordinator?.noteLicenseState(state);
@@ -2541,11 +2607,43 @@ async function runClassifier(payload) {
 }
 
 function registerProtectedHandle(channel, handler) {
-  ipcMain.handle(channel, protectedIpcHandler(featureRegistry, channel, () => licenseService, handler));
+  registerDiagnosticHandle(channel, protectedIpcHandler(featureRegistry, channel, () => licenseService, handler));
 }
 
 if (hasSingleInstanceLock) {
-  ipcMain.handle("license-bootstrap", () => licenseService?.publicState() ?? {
+  registerDiagnosticHandle("storage-management-log-get", () => applicationLog.snapshot());
+  registerDiagnosticHandle("storage-management-log-save", (_event, patch) => applicationLog.save(patch || {}));
+  registerDiagnosticHandle("storage-management-log-export", async () => {
+    const result = await dialog.showSaveDialog(mainWindow, { title: "导出诊断日志", defaultPath: `AI媒体库-诊断日志-${new Date().toISOString().replace(/[:.]/g, "-")}.json.gz`, filters: [{ name: "诊断日志压缩包", extensions: ["gz"] }] });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    let encryptionAvailable = null;
+    let encryptionCheckError = "";
+    try { encryptionAvailable = safeStorage.isEncryptionAvailable(); }
+    catch (error) { encryptionCheckError = error?.code || error?.name || "UNKNOWN"; }
+    await applicationLog.export(result.filePath, {
+      license: licenseDiagnosticLog.snapshot(),
+      licensing: {
+        state: licenseService?.publicState() ?? { phase: "not_initialized" },
+        files: authorizationFileStatus(app.getPath("userData")),
+        secureStorage: { encryptionAvailable, encryptionCheckError,
+          asyncReaderSupported: typeof safeStorage.decryptStringAsync === "function",
+          asyncWriterSupported: typeof safeStorage.encryptStringAsync === "function" },
+        validationPolicy: { checkIntervalMinutes: 15, requestTimeoutSeconds: 12,
+          offlineGraceDays: LICENSE_CONFIG.offlineGraceDays,
+          endpoint: LICENSE_CONFIG.baseUrl },
+      },
+      identity: machineIdentityService?.diagnostics?.() ?? { state: "not_initialized" },
+      runtime: { platform: process.platform, arch: process.arch, osRelease: os.release(),
+        osType: os.type(), node: process.versions.node, electron: process.versions.electron,
+        appVersion: app.getVersion(), packaged: app.isPackaged, processUptimeSeconds: process.uptime(),
+        totalMemoryBytes: os.totalmem(), freeMemoryBytes: os.freemem(),
+        processMemory: process.memoryUsage(), cpuCount: os.cpus().length,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    });
+    return { canceled: false, path: result.filePath };
+  });
+  ipcMain.on("application-renderer-log", (_event, details) => applicationLog.write("error", "renderer.error", { details }));
+  registerDiagnosticHandle("license-bootstrap", () => licenseService?.publicState() ?? {
     appName: LICENSE_CONFIG.appName,
     softwareName: LICENSE_CONFIG.softwareName,
     protocolVersion: LICENSE_CONFIG.protocolVersion,
@@ -2556,23 +2654,23 @@ if (hasSingleInstanceLock) {
     message: "正在验证授权",
     license: null,
   });
-  ipcMain.handle("license-diagnostic-log", () => licenseDiagnosticLog.snapshot());
-  ipcMain.handle("license-copy-diagnostic-log", () => {
+  registerDiagnosticHandle("license-diagnostic-log", () => licenseDiagnosticLog.snapshot());
+  registerDiagnosticHandle("license-copy-diagnostic-log", () => {
     clipboard.writeText(licenseDiagnosticLog.toText());
     licenseDiagnosticLog.add("info", "diagnostic", "已复制脱敏授权诊断日志");
     return { ok: true };
   });
-  ipcMain.handle("license-clear-diagnostic-log", () => licenseDiagnosticLog.clear());
-  ipcMain.handle("license-machine-code", async () => {
+  registerDiagnosticHandle("license-clear-diagnostic-log", () => licenseDiagnosticLog.clear());
+  registerDiagnosticHandle("license-machine-code", async () => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     return licenseService.machineCode();
   });
-  ipcMain.handle("license-machine-identity", async () => {
+  registerDiagnosticHandle("license-machine-identity", async () => {
     if (!licenseService || !apiSettingsSecureStore) throw new Error("授权服务尚未就绪");
     const identity = await licenseService.localMachineIdentity();
     return publicMachineIdentity(identity);
   });
-  ipcMain.handle("license-identity-diagnostics", () => {
+  registerDiagnosticHandle("license-identity-diagnostics", () => {
     // Hash prefixes and status only. Raw hardware values do not exist at this
     // layer: the collectors discard them before returning.
     if (!machineIdentityService) return { available: false, state: "idle", factors: [] };
@@ -2582,62 +2680,62 @@ if (hasSingleInstanceLock) {
       return { available: false, state: "failed", factors: [] };
     }
   });
-  ipcMain.handle("license-copy-identity-diagnostics", () => {
+  registerDiagnosticHandle("license-copy-identity-diagnostics", () => {
     if (!machineIdentityService || machineIdentityService.state !== "ready") {
       return { ok: false, reason: machineIdentityService?.state || "unavailable" };
     }
     clipboard.writeText(redactedIdentityDiagnosticText(machineIdentityService.diagnostics()));
     return { ok: true };
   });
-  ipcMain.handle("license-copy-machine-code", async () => {
+  registerDiagnosticHandle("license-copy-machine-code", async () => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     clipboard.writeText(await licenseService.machineCode());
     return { ok: true };
   });
-  ipcMain.handle("license-reveal-activation-code", async () => {
+  registerDiagnosticHandle("license-reveal-activation-code", async () => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     return licenseService.activationCode();
   });
-  ipcMain.handle("license-copy-activation-code", async () => {
+  registerDiagnosticHandle("license-copy-activation-code", async () => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     clipboard.writeText(await licenseService.activationCode());
     return { ok: true };
   });
-  ipcMain.handle("license-save-activation-code", async (_event, activationCode) => {
+  registerDiagnosticHandle("license-save-activation-code", async (_event, activationCode) => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     return licenseService.saveActivationCode(activationCode);
   });
-  ipcMain.handle("license-activate", async (_event, activationCode) => {
+  registerDiagnosticHandle("license-activate", async (_event, activationCode) => {
     return runLicenseAction(() => machineIdentityRepair.activate(activationCode));
   });
-  ipcMain.handle("license-repair-identity", async (_event, activationCode) => {
+  registerDiagnosticHandle("license-repair-identity", async (_event, activationCode) => {
     return runLicenseAction(() => machineIdentityRepair.repair(activationCode));
   });
-  ipcMain.handle("license-renew-time", async (_event, activationCode) => {
+  registerDiagnosticHandle("license-renew-time", async (_event, activationCode) => {
     return runLicenseAction(() => licenseService.renewTimeLicense(activationCode));
   });
-  ipcMain.handle("license-redeem-time", async (_event, activationCode) => {
+  registerDiagnosticHandle("license-redeem-time", async (_event, activationCode) => {
     if (!licenseService) throw new Error("授权服务尚未就绪");
     const state = await licenseService.redeemTimeCode(activationCode);
     await syncLicensedRuntime(state);
     return state;
   });
-  ipcMain.handle("license-refresh", async (_event, options) => {
+  registerDiagnosticHandle("license-refresh", async (_event, options) => {
     const resetOfflineCache = Boolean(options && typeof options === "object" && options.resetOfflineCache === true);
     return runLicenseAction(() => resetOfflineCache ? licenseService.resetOfflineCache() : machineIdentityRepair.refresh());
   });
-  ipcMain.handle("license-unbind", async () => {
+  registerDiagnosticHandle("license-unbind", async () => {
     return runLicenseAction(() => licenseService.unbind());
   });
 
-  ipcMain.handle("update-bootstrap", () => updateService?.publicState() ?? null);
-  ipcMain.handle("update-check", () => updateService?.check({ manual: true }));
-  ipcMain.handle("update-download", () => updateService?.download());
-  ipcMain.handle("update-cancel-download", () => updateService?.cancelDownload());
-  ipcMain.handle("update-remind-later", () => updateService?.remindLater());
-  ipcMain.handle("update-install-now", () => updateService?.install({ quitAfterLaunch: true }));
-  ipcMain.handle("update-install-on-quit", () => updateService?.setInstallOnQuit());
-  ipcMain.handle("update-exit", () => {
+  registerDiagnosticHandle("update-bootstrap", () => updateService?.publicState() ?? null);
+  registerDiagnosticHandle("update-check", () => updateService?.check({ manual: true }));
+  registerDiagnosticHandle("update-download", () => updateService?.download());
+  registerDiagnosticHandle("update-cancel-download", () => updateService?.cancelDownload());
+  registerDiagnosticHandle("update-remind-later", () => updateService?.remindLater());
+  registerDiagnosticHandle("update-install-now", () => updateService?.install({ quitAfterLaunch: true }));
+  registerDiagnosticHandle("update-install-on-quit", () => updateService?.setInstallOnQuit());
+  registerDiagnosticHandle("update-exit", () => {
     allowApplicationQuit = true;
     app.quit();
     return { ok: true };
@@ -2673,6 +2771,29 @@ if (hasSingleInstanceLock) {
     return { ...source, url: (await registerMediaFile(source.path))?.url };
   });
   registerProtectedHandle("aliyun-subtitle-submit", async (_event, payload) => (await getAliyunSubtitleService()).submit(payload));
+  registerProtectedHandle("aliyun-subtitle-start-batch", async (_event, payload) => (await getAliyunSubtitleService()).startBatch(payload));
+  registerProtectedHandle("aliyun-subtitle-pause-batch", async (_event, id) => (await getAliyunSubtitleService()).pauseBatch(id));
+  registerProtectedHandle("aliyun-subtitle-resume-batch", async (_event, id) => (await getAliyunSubtitleService()).resumeBatch(id));
+  registerProtectedHandle("aliyun-subtitle-cancel-pending", async (_event, id) => (await getAliyunSubtitleService()).cancelPending(id));
+  registerProtectedHandle("aliyun-subtitle-choose-many", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ["openFile", "multiSelections"], filters: [{ name: "MP4 视频", extensions: ["mp4"] }] });
+    return result.canceled ? [] : result.filePaths;
+  });
+  registerProtectedHandle("aliyun-subtitle-choose-folder", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { title: "选择视频文件夹（包含子文件夹）", properties: ["openDirectory"] });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return collectSubtitleFolder(result.filePaths[0]);
+  });
+  registerProtectedHandle("aliyun-subtitle-open-output", async (_event, directory) => {
+    if (typeof directory !== "string" || !path.isAbsolute(directory)) throw new Error("保存目录无效");
+    const service = await getAliyunSubtitleService();
+    const trusted = directory === service.defaultOutputDirectory || service.jobs.some(job => path.dirname(job.outputPath) === directory);
+    if (!trusted) throw new Error("请选择任务中使用的成片目录");
+    if (directory === service.defaultOutputDirectory) await mkdir(directory, { recursive: true });
+    const error = await shell.openPath(directory);
+    if (error) throw new Error("无法打开成片目录，请检查目录是否可访问");
+    return { ok: true };
+  });
   registerProtectedHandle("aliyun-subtitle-retry", async (_event, id) => (await getAliyunSubtitleService()).retry(id));
   registerProtectedHandle("aliyun-subtitle-recover", async (_event, id, jobId) => (await getAliyunSubtitleService()).recoverJobId(id, jobId));
   registerProtectedHandle("aliyun-subtitle-imported", async (_event, id) => (await getAliyunSubtitleService()).markImported(id));
@@ -3238,6 +3359,74 @@ if (hasSingleInstanceLock) {
     return { ok: true };
   });
   registerProtectedHandle("api-settings-get", () => loadApiSettings());
+  registerProtectedHandle("prompt-library-list", () => promptLibraryService.list());
+  registerProtectedHandle("prompt-library-status", () => promptLibraryService.status());
+  registerProtectedHandle("prompt-library-save", (_event, payload) => promptLibraryService.save(payload));
+  registerProtectedHandle("prompt-library-remove", (_event, id, revision) => promptLibraryService.remove(id, revision));
+  registerProtectedHandle("prompt-library-visit", (_event, id) => promptLibraryService.visit(id));
+  registerProtectedHandle("prompt-library-generate", (_event, payload) => promptLibraryService.generate(payload));
+  registerProtectedHandle("prompt-library-source-choose", async (_event, id, revision, assetId) => {
+    let file;
+    if (assetId !== undefined) {
+      const asset = await requireCopyAsset(assetId);
+      if (!asset.localPath || asset.deleted) throw new Error("请选择可访问的本地图片或视频");
+      file = asset.localPath;
+    } else {
+      const selection = await dialog.showOpenDialog(mainWindow, { properties: ["openFile"], filters: [{ name: "反推原素材", extensions: ["jpg", "jpeg", "png", "webp", "mp4", "mov", "mkv", "webm"] }] });
+      if (selection.canceled) return null;
+      file = selection.filePaths[0];
+    }
+    const metadata = await inspectReverseSource(file, await viralVisionFfmpegPath());
+    return promptLibraryService.setSource(id, revision, file, metadata);
+  });
+  registerProtectedHandle("prompt-library-source-preview", async (_event, id) => (await registerMediaFile(await promptLibraryService.sourcePath(id)))?.url || null);
+  registerProtectedHandle("prompt-library-reverse", (event, id, revision, transcript) => promptLibraryService.reverse(id, revision, transcript, message => {
+    if (workflowAccessAllowed("prompt-library") && !event.sender.isDestroyed()) event.sender.send("prompt-library-progress", { id, message });
+  }));
+  registerProtectedHandle("prompt-library-migrate", (_event, id, revision) => promptLibraryService.migrate(id, revision));
+  registerProtectedHandle("prompt-library-import", async () => {
+    const selection = await dialog.showOpenDialog(mainWindow, { properties: ["openFile", "multiSelections"], filters: [{ name: "提示词文本", extensions: ["txt", "md"] }] });
+    if (selection.canceled) return [];
+    const results = [];
+    for (const file of selection.filePaths) {
+      if ((await stat(file)).size > 400_000) throw new Error("提示词文件过大，请控制在 100,000 字以内");
+      results.push(await promptLibraryService.importText(path.basename(file, path.extname(file)), await readFile(file, "utf8")));
+    }
+    return results;
+  });
+  registerProtectedHandle("prompt-library-material-add", async (_event, id, revision, role, assetIds, droppedPaths) => {
+    let paths;
+    if (droppedPaths !== undefined) {
+      if (assetIds !== undefined || !Array.isArray(droppedPaths) || !droppedPaths.length || droppedPaths.length > 9 || droppedPaths.some(file => typeof file !== "string" || !path.isAbsolute(file) || !/\.(jpe?g|png|webp)$/i.test(file))) throw new Error("请拖入 1–9 张本地 JPG、PNG 或 WebP 图片");
+      paths = droppedPaths;
+    } else if (assetIds !== undefined) {
+      if (!Array.isArray(assetIds) || !assetIds.length || assetIds.length > 9) throw new Error("请选择 1–9 张媒体库图片");
+      paths = [];
+      for (const assetId of assetIds) {
+        const asset = await requireCopyAsset(assetId);
+        if (asset.type !== "image" || !asset.localPath || asset.deleted) throw new Error("只能选择媒体库中的本地图片");
+        paths.push(asset.localPath);
+      }
+    } else {
+      const selection = await dialog.showOpenDialog(mainWindow, { properties: ["openFile", "multiSelections"], filters: [{ name: "参考图片", extensions: ["jpg", "jpeg", "png", "webp"] }] });
+      if (selection.canceled) return null;
+      paths = selection.filePaths;
+    }
+    return promptLibraryService.addMaterials(id, revision, role, paths);
+  });
+  registerProtectedHandle("prompt-library-material-remove", (_event, id, revision, materialId) => promptLibraryService.removeMaterial(id, revision, materialId));
+  registerProtectedHandle("prompt-library-material-preview", async (_event, id, materialId) => (await registerMediaFile(await promptLibraryService.materialPath(id, materialId)))?.url || null);
+  registerProtectedHandle("prompt-library-copy", (_event, text) => {
+    if (typeof text !== "string" || text.length > 100_000) throw new Error("提示词文本无效");
+    clipboard.writeText(text); return { ok: true };
+  });
+  registerProtectedHandle("prompt-library-export", async (_event, title, text) => {
+    if (typeof text !== "string" || text.length > 100_000) throw new Error("提示词文本无效");
+    const safeName = String(title || "提示词").replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 100);
+    const selection = await dialog.showSaveDialog(mainWindow, { defaultPath: `${safeName}.txt`, filters: [{ name: "提示词文本", extensions: ["txt"] }] });
+    if (selection.canceled || !selection.filePath) return { ok: false };
+    await writeFile(selection.filePath, `\uFEFF${text}`, "utf8"); return { ok: true };
+  });
   registerProtectedHandle("api-settings-save", (_event, payload) => saveApiSettings(payload));
   registerProtectedHandle("api-settings-test", (_event, kind, payload) => testApiSettings(kind, payload));
   registerProtectedHandle("classifier-create-template", async (_event, payload) => {
@@ -3638,6 +3827,11 @@ async function startLocalServer() {
     userDataPath: app.getPath("userData"),
   });
   localServer = createServer(async (request, response) => {
+    const requestId = randomUUID();
+    const startedAt = Date.now();
+    applicationLog.write("info", "http.start", { requestId, method: request.method, url: request.url?.split("?")[0] });
+    response.once("finish", () => applicationLog.write(response.statusCode >= 400 ? "error" : "info", "http.finish", { requestId, status: response.statusCode, durationMs: Date.now() - startedAt }));
+    request.once("aborted", () => applicationLog.write("warning", "http.aborted", { requestId }));
     try {
       const requestUrl = new URL(request.url ?? "/", APP_URL);
       if (requestUrl.pathname === "/api/contact") {
@@ -3713,6 +3907,7 @@ async function startLocalServer() {
 
       createReadStream(resolved.filePath).pipe(response);
     } catch (error) {
+      applicationLog.write("error", "http.error", { requestId, error });
       response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
       response.end(error instanceof Error ? error.message : "Local server error");
     }
@@ -3861,13 +4056,6 @@ if (hasSingleInstanceLock) {
       await initializeStorageManagementService();
       await startLocalServer();
       await createMainWindow();
-      getFeiguaService().startDailySchedule(() => {
-        try {
-          if (!licenseService || applicationQuitRequested) return false;
-          licenseService.assertFeature("feigua-trends");
-          return true;
-        } catch { return false; }
-      });
       // Strictly after the first paint. start() never throws and is not awaited.
       const factorCollection = machineIdentityService?.start();
       if (factorCollection) {
@@ -3884,14 +4072,22 @@ if (hasSingleInstanceLock) {
           licenseDiagnosticLog.add("warning", "machine_identity", "设备身份因子采集失败", { message: error?.message || "" });
         });
       }
+      getFeiguaService().startDailySchedule(() => {
+        try {
+          if (!licenseService || applicationQuitRequested) return false;
+          licenseService.assertFeature("feigua-trends");
+          return true;
+        } catch { return false; }
+      });
       void getAliyunSubtitleService().catch(() => {});
       scheduleAutomaticUpdateChecks();
       licenseRefreshTimer = setInterval(() => {
-        if (!licenseService || licenseService.state.phase === "needs_activation") return;
+        if (!licenseService) return;
         void runLicenseAction(() => machineIdentityRepair.refresh());
       }, 15 * 60 * 1000);
       licenseRefreshTimer.unref?.();
     } catch (error) {
+      applicationLog.write("error", "application.startup.failed", { error });
       dialog.showErrorBox(
         "AI 媒体库启动失败",
         `软件初始化未能完成。\n\n${error instanceof Error ? error.message : String(error)}`,

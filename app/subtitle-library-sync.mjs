@@ -3,11 +3,17 @@ const pathKey = value => {
   return /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
 };
 
+export const SUBTITLE_RESULT_COLLECTION = '已去字幕';
+export const LEGACY_SUBTITLE_RESULT_COLLECTION = '阿里云去字幕';
+export function normalizeSubtitleCollection(value) {
+  return value === LEGACY_SUBTITLE_RESULT_COLLECTION ? SUBTITLE_RESULT_COLLECTION : value;
+}
+
 export function subtitleSourceVideos(assets, jobs) {
   const outputs = new Set(jobs.map(job => pathKey(job.outputPath)).filter(Boolean));
   return assets.filter(asset => asset.type === 'video' && /\.mp4$/i.test(asset.localPath || '')
     && !asset.deleted && !asset.broken && asset.available !== false
-    && asset.collection !== '阿里云去字幕' && !outputs.has(pathKey(asset.localPath)));
+    && ![SUBTITLE_RESULT_COLLECTION, LEGACY_SUBTITLE_RESULT_COLLECTION].includes(asset.collection) && !outputs.has(pathKey(asset.localPath)));
 }
 
 // Lives at application level so navigating away from the workbench cannot stop syncing.

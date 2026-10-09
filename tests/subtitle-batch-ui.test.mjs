@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { readFile, writeFile, rm } from 'node:fs/promises';
+import ts from 'typescript';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+test('batch screen renders complete controls without monetary estimates and is kept mounted across navigation', async () => {
+  const source=await readFile(new URL('../app/aliyun-subtitle.tsx',import.meta.url),'utf8');
+  const modulePath=new URL(`../app/.subtitle-ui-${randomUUID()}.mjs`,import.meta.url);
+  try {
+    await writeFile(modulePath,ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
+    const {AliyunSubtitleWorkbench,AliyunSubtitleSettings}=await import(modulePath.href);
+    const settingsHtml=renderToStaticMarkup(createElement(AliyunSubtitleSettings,{notify(){},onStart(){}}));
+    assert.doesNotMatch(settingsHtml,/阿里云|AliyunVIAPIFullAccess/);
+    assert.doesNotMatch(settingsHtml.replace(/<[^>]*>/g,''),/aliyun/i);
+    for(const label of ['首次使用：连接去字幕服务','AccessKey ID','AccessKey Secret','保存并检查密钥','云服务账户支付'])assert.ok(settingsHtml.includes(label),label);
+    assert.doesNotMatch(settingsHtml, /as-connect-steps|去开通服务|去获取密钥|重新查看开通与密钥获取步骤/);
+    assert.ok(settingsHtml.includes('粘贴密钥，保存并检查'));
+    const settingsSource=source.slice(source.indexOf('export function AliyunSubtitleSettings'),source.indexOf('export function AliyunSubtitleBackgroundStatus'));
+    assert.doesNotMatch(settingsSource,/阿里云|AliyunVIAPIFullAccess/);
+    assert.doesNotMatch(settingsHtml,/官方接入说明/);
+    assert.ok(!settingsSource.includes("open('guide')"));
+    const html=renderToStaticMarkup(createElement(AliyunSubtitleWorkbench,{notify(){},onConfigure(){},onImport(){},assets:[],contactAuthor:null}));
+    assert.doesNotMatch(html, /阿里云/);
+    assert.doesNotMatch(source, /阿里云/);
+    assert.ok(source.includes('先连接去字幕服务，只需设置一次。'));
+    for(const label of ['一键去字幕','添加本地视频','从媒体库添加','重新框选','使用底部区域','精确调整区域','应用到全部','完成后自动同步到媒体库','历史记录','打开成片文件夹'])assert.ok(html.includes(label),label);
+    assert.ok(!html.includes('预计费用')&&!html.includes('¥')&&!html.includes('收费说明'));
+    assert.ok(!html.includes('我确认上传所选视频') && !source.includes('!consent'));
+    assert.ok(html.includes('拖入视频到此处') && html.includes('可拖入 MP4 视频'));
+    assert.match(source, /startBatch\([\s\S]*?consent: true/);
+    assert.ok(source.includes('选择本地文件夹') && source.includes('选择媒体库文件夹'));
+    assert.ok(source.includes('await bridge().chooseFolder()') && source.includes('await addPaths(selection.paths)'));
+    const preload = await readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8');
+    const main = await readFile(new URL('../electron/main.mjs', import.meta.url), 'utf8');
+    assert.match(preload, /chooseFolder:.*aliyun-subtitle-choose-folder/);
+    assert.match(main, /registerProtectedHandle\("aliyun-subtitle-choose-folder"/);
+    assert.ok(main.includes('return collectSubtitleFolder(result.filePaths[0])'));
+    const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
+    const settingsTabs=page.match(/<nav className="settings-section-tabs"[\s\S]*?<\/nav>/)?.[0];
+    assert.ok(settingsTabs?.includes('去字幕服务'));
+    assert.doesNotMatch(settingsTabs,/阿里云/);
+    assert.ok(page.includes('管理去字幕服务的连接与密钥。'));
+    assert.match(page,/persistent-subtitle-host[\s\S]*hidden=\{activeModule !== "subtitle-removal"\}/);
+    assert.match(page,/AliyunSubtitleBackgroundStatus visible=\{activeModule !== "subtitle-removal"\}/);
+    assert.match(page, /defaultProjectCollections = \[.*VIRAL_FRAME_COLLECTION, SUBTITLE_RESULT_COLLECTION\]/);
+    assert.match(page, /desktopRecordAsset\(record, imported.sourceKind, SUBTITLE_RESULT_COLLECTION,/);
+    assert.ok(!page.includes('desktopRecordAsset(record, imported.sourceKind, "阿里云去字幕"'));
+    assert.match(source,/onChange\?\.\(next/);
+  }finally{await rm(modulePath,{force:true});}
+});

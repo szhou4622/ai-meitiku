@@ -3,6 +3,13 @@ import { constants } from "node:fs";
 import { access, copyFile, mkdtemp, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { traditionalToSimplified } from "./traditional-to-simplified.mjs";
+
+export function whisperTranscribeArguments(model, audio, output) {
+  // A Chinese-only initial prompt can suppress English in code-switching audio.
+  // Convert Chinese after decoding instead of influencing spoken content.
+  return ["-m", model, "-f", audio, "-l", "auto", "-oj", "-of", output];
+}
 
 export const VIRAL_COPY_CATEGORIES = ["未分类", "开头钩子", "痛点共鸣", "产品卖点", "效果描述", "信任背书", "价格利益", "促单引导"];
 
@@ -101,10 +108,17 @@ export function parseManualTranscript(value) {
 }
 
 export function parseWhisperTranscript(payload) {
+  const language = payload?.result?.language || payload?.language;
+  if (language && !["zh", "en"].includes(language)) {
+    throw Object.assign(new Error("当前仅支持中文和英文语音"), { code: "ASR_UNSUPPORTED_LANGUAGE" });
+  }
   const source = Array.isArray(payload?.segments) ? payload.segments : Array.isArray(payload?.transcription) ? payload.transcription : [];
+  if (source.some(segment => /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Thai}]/u.test(segment.text || ""))) {
+    throw Object.assign(new Error("当前仅支持中文和英文语音"), { code: "ASR_UNSUPPORTED_LANGUAGE" });
+  }
   return source.map((segment, index) => normalizeCopySegment({
     id: `S${index + 1}`,
-    text: segment.text,
+    text: traditionalToSimplified(segment.text),
     start: Number.isFinite(Number(segment.start)) ? Number(segment.start) : Number.isFinite(Number(segment.offsets?.from)) ? Number(segment.offsets.from) / 1000 : parseClock(segment.timestamps?.from),
     end: Number.isFinite(Number(segment.end)) ? Number(segment.end) : Number.isFinite(Number(segment.offsets?.to)) ? Number(segment.offsets.to) / 1000 : parseClock(segment.timestamps?.to),
   }, index)).filter(Boolean);
@@ -328,7 +342,10 @@ export function createViralCopyService({ userDataPath, resourcesPath = "", appRo
     ], constants.X_OK);
     const model = await firstAvailable([
       process.env.WHISPER_MODEL,
+      path.join(resourcesPath, "models", "whisper", "ggml-large-v3-turbo-q5_0.bin"),
+      path.join(appRoot, "bundled-models", "whisper", "ggml-large-v3-turbo-q5_0.bin"),
       path.join(resourcesPath, "models", "whisper", "ggml-small.bin"),
+      path.join(appRoot, "bundled-models", "whisper", "ggml-small.bin"),
       path.join(appRoot, "models", "whisper", "ggml-small.bin"),
     ], constants.R_OK);
     return { ffmpeg, whisper, model };
@@ -338,6 +355,7 @@ export function createViralCopyService({ userDataPath, resourcesPath = "", appRo
     const { ffmpeg, whisper, model } = await resolveTranscriber();
     return {
       transcribeAvailable: Boolean(ffmpeg && whisper && model),
+      missing: [!ffmpeg && "音轨处理组件", !whisper && "Whisper 识别组件", !model && "Whisper 语音模型"].filter(Boolean),
       message: ffmpeg && whisper && model ? "本地转写组件已就绪" : "未检测到完整的本地转写组件或模型；可使用字幕导入与人工补录。",
     };
   }
@@ -349,7 +367,10 @@ export function createViralCopyService({ userDataPath, resourcesPath = "", appRo
     catch { throw new Error("原视频暂不可访问，请检查本地文件或共享网盘连接"); }
     if (!source.isFile()) throw new Error("原视频不可用");
     const { ffmpeg, whisper, model } = await resolveTranscriber();
-    if (!ffmpeg || !whisper || !model) throw new Error("本机缺少本地转写组件或模型；可先补录文案，自动转写需配置 Whisper。");
+    if (!ffmpeg || !whisper || !model) {
+      const missing = [!ffmpeg && "音轨处理组件", !whisper && "Whisper 识别组件", !model && "Whisper 语音模型"].filter(Boolean);
+      throw Object.assign(new Error(`本机缺少本地转写组件：${missing.join("、")}，请安装包含语音组件的完整版本`), { code: "ASR_COMPONENTS_MISSING" });
+    }
     busy = true;
     const workDir = await mkdtemp(path.join(os.tmpdir(), "ai-media-viral-copy-"));
     try {
@@ -359,11 +380,11 @@ export function createViralCopyService({ userDataPath, resourcesPath = "", appRo
         await runCommand(ffmpeg, ["-nostdin", "-y", "-i", localPath, "-vn", "-ac", "1", "-ar", "16000", audio], 10 * 60 * 1000);
       } catch { throw new Error("原视频音轨读取失败或处理超时，请确认文件仍可访问"); }
       try {
-        await runCommand(whisper, ["-m", model, "-f", audio, "-l", "zh", "-oj", "-of", output], 20 * 60 * 1000);
+        await runCommand(whisper, whisperTranscribeArguments(model, audio, output), 20 * 60 * 1000);
       } catch { throw new Error("本地转写失败或超时，原视频和已有文案均未修改"); }
       const segments = parseWhisperTranscript(JSON.parse(await readFile(`${output}.json`, "utf8")));
       if (!segments.length) throw new Error("转写完成，但没有识别到可用口播；请手动补录或检查原视频音轨。");
-      return { segments, source: "local-asr" };
+      return { segments, source: "local-asr", textNormalization: "simplified-chinese-preserve-english" };
     } finally {
       busy = false;
       await rm(workDir, { recursive: true, force: true });

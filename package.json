@@ -1,6 +1,6 @@
 {
   "name": "ai-media-library",
-  "version": "1.1.17",
+  "version": "1.1.19",
   "packageManager": "pnpm@11.19.0",
   "private": true,
   "description": "本地优先的 AI 媒体库",
@@ -107,6 +107,9 @@
       "app/viral-display-columns.mjs",
       "THIRD_PARTY_NOTICES.md",
       "third_party/video-downloaders/**/*",
+      "!third_party/**/.*",
+      "!third_party/**/.*/**/*",
+      "!third_party/**/__pycache__/**/*",
       "build/icon.png",
       "dist/client/**/*",
       "package.json"
@@ -218,6 +221,7 @@
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "AI媒体库"
-    }
+    },
+    "beforePack": "./scripts/verify-local-asr-assets.mjs"
   }
 }

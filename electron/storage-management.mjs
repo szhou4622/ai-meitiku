@@ -277,6 +277,7 @@ export class StorageManagementService {
       web: browserCacheRelativePaths.map((relativePath) => path.join(this.userDataPath, relativePath)),
       localModel: [path.join(this.userDataPath, "Service Worker", "CacheStorage")],
       platformLogin: [path.join(this.userDataPath, "Partitions")],
+      logs: [path.join(this.userDataPath, "diagnostic-logs")],
     };
     const sizeOf = async (items) => {
       let total = 0;

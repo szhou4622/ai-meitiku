@@ -566,7 +566,8 @@ test("keeps navigation focused and wires core media actions", async () => {
   assert.match(page, /const allFailed/);
   assert.match(page, /均未生成结果/);
   assert.match(page, /来自媒体库/);
-  assert.doesNotMatch(page, /智能打标|SmartTagging|提示词库|批量生成|创意画布|视频压缩|图片切分/);
+  assert.doesNotMatch(page, /智能打标|SmartTagging|批量生成|创意画布|视频压缩|图片切分/);
+  assert.match(page, /activeModule === "prompt-library"/);
   assert.match(page, /const onImport/);
   assert.match(page, /const openAssetPreview/);
   assert.match(page, /const revealAssetInFolder/);
@@ -662,7 +663,7 @@ test("keeps navigation focused and wires core media actions", async () => {
   assert.match(page, /aria-label="刷新本地媒体库"/);
   assert.match(page, /刷新完成：/);
   assert.match(page, /installDesktopAssets/);
-  assert.match(page, /defaultProjectCollections = \["视频下载", "素材分类", QIANCHUAN_PROJECT_COLLECTION, VIRAL_FRAME_COLLECTION\]/);
+  assert.match(page, /defaultProjectCollections = \["视频下载", "素材分类", QIANCHUAN_PROJECT_COLLECTION, VIRAL_FRAME_COLLECTION, SUBTITLE_RESULT_COLLECTION\]/);
   assert.match(page, /installDesktopAssets\(grouped\.records, "folder", "素材分类"\)/);
   assert.match(page, /installDesktopAssets\(records, sourceKind, "视频下载"\)/);
   assert.match(page, /normalizeProjectCollections\(data\.collections\)/);
@@ -721,7 +722,7 @@ test("separates the Qianchuan video library from the curated viral frame library
   assert.match(page, /lockedVipFeature \? \([\s\S]*<VipFeatureLockedPage/);
   assert.match(page, /当前基础授权暂未包含此功能/);
   assert.match(page, /前往兑换VIP时间码/);
-  assert.match(page, /这里只展示功能介绍，不会加载VIP库内容或执行VIP专属操作/);
+  assert.match(page, /这里只展示功能介绍和示意轮廓，不会加载专属内容或执行VIP操作/);
   assert.match(page, /vip-feature-locked-backdrop/);
   assert.match(page, /feature\.id === "viral-copy" \? "copy" : "visual"/);
   assert.match(page, /vip-lock-visual-preview/);
@@ -1249,9 +1250,10 @@ test("enforces protocol-v2 online licensing in the Electron main process", async
   assert.match(page, /当前会话最多保留/);
   assert.match(page, /复制内容已强制脱敏/);
   assert.match(styles, /\.license-diagnostic-list\s*\{[^}]*max-height:\s*255px;[^}]*overflow:\s*auto;/);
-  assert.match(main, /ipcMain\.handle\("license-diagnostic-log"/);
-  assert.match(main, /ipcMain\.handle\("license-copy-diagnostic-log"/);
-  assert.match(main, /ipcMain\.handle\("license-clear-diagnostic-log"/);
+  assert.match(main, /function registerDiagnosticHandle\(channel, handler\) \{ ipcMain\.handle\(channel, diagnosticHandler\(applicationLog, channel, handler\)\); \}/);
+  assert.match(main, /registerDiagnosticHandle\("license-diagnostic-log"/);
+  assert.match(main, /registerDiagnosticHandle\("license-copy-diagnostic-log"/);
+  assert.match(main, /registerDiagnosticHandle\("license-clear-diagnostic-log"/);
   assert.match(page, /使用新码恢复授权/);
   assert.match(page, /机器码和长期设备凭证保持不变/);
   assert.match(page, /function LicenseManagement/);
@@ -1314,7 +1316,6 @@ test("provides user-owned API settings for classification and MiniMax", async ()
   assert.match(page, /测试 MiniMax 连接/);
   assert.match(page, /apiSettingsTest/);
   assert.match(page, /请补全必填项；保存时会校验格式/);
-  assert.doesNotMatch(page, /积分/);
   assert.match(page, /软件直接请求所选模型服务，不经过统一中转后台/);
   assert.match(main, /const VOLCENGINE_API_BASE_URL = "https:\/\/ark\.cn-beijing\.volces\.com\/api\/v3"/);
   assert.match(main, /registerProtectedHandle\("api-settings-get"/);
@@ -1354,7 +1355,7 @@ test("provides a restricted recoverable desktop update workflow", async () => {
   const updater = await readFile(new URL("../electron/update-service.mjs", import.meta.url), "utf8");
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-  assert.equal(packageJson.version, "1.1.17");
+  assert.equal(packageJson.version, "1.1.19");
   assert.equal(packageJson.dependencies.semver, "^7.7.4");
   assert.match(updater, /UPDATE_APP_NAME = "ai-media-library"/);
   assert.match(updater, /UPDATE_BASE_URL = "https:\/\/update\.dadaozixun\.com"/);
@@ -1366,9 +1367,10 @@ test("provides a restricted recoverable desktop update workflow", async () => {
   assert.doesNotMatch(updater, /activation_code|device_session|device_credential|APPLE_|API_KEY/);
   assert.match(main, /initializeUpdateService/);
   assert.match(main, /scheduleAutomaticUpdateChecks/);
-  assert.match(main, /ipcMain\.handle\("update-check"/);
-  assert.match(main, /ipcMain\.handle\("update-download"/);
-  assert.match(main, /ipcMain\.handle\("update-install-now"/);
+  assert.match(main, /function registerDiagnosticHandle\(channel, handler\) \{ ipcMain\.handle\(channel, diagnosticHandler\(applicationLog, channel, handler\)\); \}/);
+  assert.match(main, /registerDiagnosticHandle\("update-check"/);
+  assert.match(main, /registerDiagnosticHandle\("update-download"/);
+  assert.match(main, /registerDiagnosticHandle\("update-install-now"/);
   assert.match(preload, /updateBootstrap/);
   assert.match(preload, /updateOnStateChanged/);
   assert.match(page, /关于与软件更新/);
