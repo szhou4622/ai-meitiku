@@ -1,6 +1,18 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+ipcRenderer.on("application-operation-error", (_event, details) => window.dispatchEvent(new CustomEvent("application-error-detail", { detail: details })));
+const originalInvoke = ipcRenderer.invoke.bind(ipcRenderer);
+ipcRenderer.invoke = async (channel, ...args) => {
+  try { return await originalInvoke(channel, ...args); }
+  catch (error) {
+    window.dispatchEvent(new CustomEvent("application-error-detail", { detail: { message: error.message, operation: channel } }));
+    throw error;
+  }
+};
+window.addEventListener("error", event => ipcRenderer.send("application-renderer-log", { message: event.message, stack: event.error?.stack, filename: event.filename, line: event.lineno, column: event.colno }));
+window.addEventListener("unhandledrejection", event => ipcRenderer.send("application-renderer-log", { message: String(event.reason?.message || event.reason), stack: event.reason?.stack }));
+
 contextBridge.exposeInMainWorld("desktopBridge", {
   feigua: {
     state: () => ipcRenderer.invoke("feigua-state"),
@@ -15,14 +27,49 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     start: () => ipcRenderer.invoke("feigua-start"),
     cancel: () => ipcRenderer.invoke("feigua-cancel"),
   },
+  promptLibrary: {
+    chooseSource: (id, revision, assetId) => ipcRenderer.invoke("prompt-library-source-choose", id, revision, assetId),
+    sourcePreview: id => ipcRenderer.invoke("prompt-library-source-preview", id),
+    reverse: (id, revision, transcript) => ipcRenderer.invoke("prompt-library-reverse", id, revision, transcript),
+    migrate: (id, revision) => ipcRenderer.invoke("prompt-library-migrate", id, revision),
+    onProgress: callback => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("prompt-library-progress", listener);
+      return () => ipcRenderer.removeListener("prompt-library-progress", listener);
+    },
+    list: () => ipcRenderer.invoke("prompt-library-list"),
+    status: () => ipcRenderer.invoke("prompt-library-status"),
+    save: (payload) => ipcRenderer.invoke("prompt-library-save", payload),
+    remove: (id, revision) => ipcRenderer.invoke("prompt-library-remove", id, revision),
+    visit: (id) => ipcRenderer.invoke("prompt-library-visit", id),
+    generate: (payload) => ipcRenderer.invoke("prompt-library-generate", payload),
+    importFiles: () => ipcRenderer.invoke("prompt-library-import"),
+    addMaterials: (id, revision, role, assetIds, droppedPaths) => ipcRenderer.invoke("prompt-library-material-add", id, revision, role, assetIds, droppedPaths),
+    removeMaterial: (id, revision, materialId) => ipcRenderer.invoke("prompt-library-material-remove", id, revision, materialId),
+    materialPreview: (id, materialId) => ipcRenderer.invoke("prompt-library-material-preview", id, materialId),
+    copy: (text) => ipcRenderer.invoke("prompt-library-copy", text),
+    exportText: (title, text) => ipcRenderer.invoke("prompt-library-export", title, text),
+  },
   aliyunSubtitle: {
+    onChange: (callback) => {
+      const listener = (_event, state) => callback(state);
+      ipcRenderer.on("aliyun-subtitle-changed", listener);
+      return () => ipcRenderer.removeListener("aliyun-subtitle-changed", listener);
+    },
     state: () => ipcRenderer.invoke("aliyun-subtitle-state"),
     save: (payload) => ipcRenderer.invoke("aliyun-subtitle-save", payload),
     verify: () => ipcRenderer.invoke("aliyun-subtitle-verify"),
     open: (page, mode) => ipcRenderer.invoke("aliyun-subtitle-open", page, mode),
     choose: () => ipcRenderer.invoke("aliyun-subtitle-choose"),
+    chooseMany: () => ipcRenderer.invoke("aliyun-subtitle-choose-many"),
+    chooseFolder: () => ipcRenderer.invoke("aliyun-subtitle-choose-folder"),
     inspect: (filePath) => ipcRenderer.invoke("aliyun-subtitle-inspect", filePath),
     submit: (payload) => ipcRenderer.invoke("aliyun-subtitle-submit", payload),
+    startBatch: (payload) => ipcRenderer.invoke("aliyun-subtitle-start-batch", payload),
+    pauseBatch: (id) => ipcRenderer.invoke("aliyun-subtitle-pause-batch", id),
+    resumeBatch: (id) => ipcRenderer.invoke("aliyun-subtitle-resume-batch", id),
+    cancelPending: (id) => ipcRenderer.invoke("aliyun-subtitle-cancel-pending", id),
+    openOutput: (directory) => ipcRenderer.invoke("aliyun-subtitle-open-output", directory),
     retry: (id) => ipcRenderer.invoke("aliyun-subtitle-retry", id),
     recover: (id, jobId) => ipcRenderer.invoke("aliyun-subtitle-recover", id, jobId),
     imported: (id) => ipcRenderer.invoke("aliyun-subtitle-imported", id),
@@ -155,6 +202,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   apiSettingsGet: () => ipcRenderer.invoke("api-settings-get"),
   apiSettingsSave: (payload) => ipcRenderer.invoke("api-settings-save", payload),
   apiSettingsTest: (kind, payload) => ipcRenderer.invoke("api-settings-test", kind, payload),
+  diagnosticReport: (details) => ipcRenderer.send("application-renderer-log", details),
+  diagnosticOnError: (callback) => {
+    const listener = event => callback(event.detail);
+    window.addEventListener("application-error-detail", listener);
+    return () => window.removeEventListener("application-error-detail", listener);
+  },
+  storageLogGet: () => ipcRenderer.invoke("storage-management-log-get"),
+  storageLogSave: (patch) => ipcRenderer.invoke("storage-management-log-save", patch),
+  storageLogExport: () => ipcRenderer.invoke("storage-management-log-export"),
   storageManagementGet: () => ipcRenderer.invoke("storage-management-get"),
   storageManagementSave: (settings) => ipcRenderer.invoke("storage-management-save", settings),
   storageManagementClear: (category) => ipcRenderer.invoke("storage-management-clear", category),

@@ -1,6 +1,12 @@
 "use client";
 
-import { AliyunSubtitleAutoSync, AliyunSubtitleSettings, AliyunSubtitleWorkbench, type AliyunSubtitleBridge } from "./aliyun-subtitle";
+import { AliyunSubtitleAutoSync, AliyunSubtitleBackgroundStatus, AliyunSubtitleSettings, AliyunSubtitleWorkbench, type AliyunSubtitleBridge } from "./aliyun-subtitle";
+import { SUBTITLE_RESULT_COLLECTION, normalizeSubtitleCollection } from "./subtitle-library-sync.mjs";
+import { PromptLibrary, type PromptLibraryBridge } from "./prompt-library";
+import { classifyUserAction } from "../electron/user-action-errors.mjs";
+import { CURRENT_API_BILLING_NOTICE, CURRENT_PLATFORM_API_NOTICE } from "../electron/points-policy.mjs";
+import { ErrorDetailDialog, UserActionNotice, type GuidanceTarget } from "./user-action-notice";
+import { VipWorkflowPreview } from "./vip-workflow-preview";
 import { FeiguaTrends, type FeiguaBridge } from "./feigua-trends";
 
 import {
@@ -302,12 +308,12 @@ const QIANCHUAN_PROJECT_COLLECTION = "千川素材";
 const LEGACY_QIANCHUAN_PROJECT_COLLECTION = "千川导入";
 const VIRAL_FRAME_COLLECTION = "爆款画面";
 const DEFAULT_VIRAL_VISUAL_TYPES = ["痛点展示", "使用演示", "效果对比", "产品特写", "场景应用", "价格促单钩子", "证言共鸣", "人工标注"] as const;
-const defaultProjectCollections = ["视频下载", "素材分类", QIANCHUAN_PROJECT_COLLECTION, VIRAL_FRAME_COLLECTION];
+const defaultProjectCollections = ["视频下载", "素材分类", QIANCHUAN_PROJECT_COLLECTION, VIRAL_FRAME_COLLECTION, SUBTITLE_RESULT_COLLECTION];
 const legacyDemoCollections = new Set(["示例项目", "灵感收藏", "AI 实验室"]);
 
 function normalizeAssetCollection(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return undefined;
-  return value.trim() === LEGACY_QIANCHUAN_PROJECT_COLLECTION ? QIANCHUAN_PROJECT_COLLECTION : value.trim();
+  return value.trim() === LEGACY_QIANCHUAN_PROJECT_COLLECTION ? QIANCHUAN_PROJECT_COLLECTION : normalizeSubtitleCollection(value.trim());
 }
 
 function normalizeProjectCollections(value: unknown) {
@@ -844,6 +850,7 @@ type ClassifierDraftQuality = { passed: boolean; issues: Array<{ code: string; s
 declare global {
   interface Window {
     desktopBridge?: {
+      promptLibrary: PromptLibraryBridge;
       aliyunSubtitle: AliyunSubtitleBridge;
       feigua: FeiguaBridge;
       licenseBootstrap: () => Promise<LicenseState>;
@@ -948,6 +955,11 @@ declare global {
       apiSettingsGet: () => Promise<ApiSettingsState>;
       apiSettingsSave: (payload: ApiSettingsSavePayload) => Promise<ApiSettingsState>;
       apiSettingsTest: (kind: "classification" | "minimax", payload: ApiSettingsSavePayload) => Promise<{ ok: boolean; message: string; latencyMs: number }>;
+      diagnosticReport: (details: unknown) => void;
+      diagnosticOnError: (callback: (details: { message: string; operation?: string }) => void) => () => void;
+      storageLogGet: () => Promise<StorageLogState>;
+      storageLogSave: (patch: Partial<StorageLogState["settings"]>) => Promise<StorageLogState>;
+      storageLogExport: () => Promise<{ canceled: boolean; path?: string }>;
       storageManagementGet: () => Promise<StorageManagementState>;
       storageManagementSave: (settings: Partial<StorageManagementSettings>) => Promise<StorageManagementState>;
       storageManagementClear: (category: "classifier" | "updates" | "web") => Promise<{ result: StorageCleanupResult; state: StorageManagementState }>;
@@ -1118,6 +1130,24 @@ type ApiSettingsSavePayload = {
   };
 };
 
+type StorageLogState = { path: string; bytes: number; fileCount: number; settings: { retentionDays: number; maxMegabytes: number }; lastWriteError: string };
+
+function errorDetails(error: unknown, operation: string): string {
+  const action = classifyUserAction(error, operation);
+  if (action) {
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("user-action-required", { detail: action }));
+    return action.message;
+  }
+  const reason = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
+  const message = `${operation}：${reason || "未提供错误原因"}`;
+  if (typeof window !== "undefined") {
+    window.desktopBridge?.diagnosticReport?.({ operation, message, stack: error instanceof Error ? error.stack : undefined, cause: error instanceof Error ? String(error.cause || "") : undefined });
+    window.dispatchEvent(new CustomEvent("local-error-detail", { detail: { message } }));
+  }
+  return message;
+}
+
+
 type StorageManagementSettings = {
   version: number;
   autoCleanupClassifierCache: boolean;
@@ -1129,7 +1159,7 @@ type StorageCategoryState = { bytes: number; path: string };
 
 type StorageManagementState = {
   settings: StorageManagementSettings;
-  categories: Record<"classifier" | "video" | "voice" | "updates" | "web" | "localModel" | "platformLogin", StorageCategoryState>;
+  categories: Record<"classifier" | "video" | "voice" | "updates" | "web" | "localModel" | "platformLogin" | "logs", StorageCategoryState>;
   totalBytes: number;
   classifierCleanupBlockedReason: string;
   videoDirectory: string;
@@ -1559,7 +1589,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
       setServiceError("");
       if (!silent) notify("试听记录已刷新");
     } catch (error) {
-      setServiceError(error instanceof Error ? error.message : "声音服务不可用");
+      setServiceError(errorDetails(error, "声音服务不可用"));
     }
   };
 
@@ -1572,7 +1602,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
         setServiceError("");
       })
       .catch((error) => {
-        if (!cancelled) setServiceError(error instanceof Error ? error.message : "声音服务不可用");
+        if (!cancelled) setServiceError(errorDetails(error, "声音服务不可用"));
       });
     return () => { cancelled = true; };
   }, []);
@@ -1633,7 +1663,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
       }
       notify("试听已生成并开始下载，不会正式启用音色");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "试听生成失败";
+      const message = errorDetails(error, "试听生成失败");
       setServiceError(message);
       notify(message);
     } finally {
@@ -1650,7 +1680,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
       await loadVoices(true);
       notify("声音名称已更新");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "重命名失败");
+      notify(errorDetails(error, "重命名失败"));
     }
   };
 
@@ -1666,7 +1696,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
       await loadVoices(true);
       notify("声音已删除");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "删除失败");
+      notify(errorDetails(error, "删除失败"));
     }
   };
 
@@ -2218,7 +2248,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
         notify("时间码兑换成功，权益已更新");
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : "兑换失败，请保留时间码重试");
+      notify(errorDetails(error, "兑换失败，请保留时间码重试"));
     } finally {
       setRedeeming(false);
     }
@@ -2255,7 +2285,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
       setActivationCode(await readActivationCode());
       setActivationCodeVisible(true);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "激活码读取失败");
+      notify(errorDetails(error, "激活码读取失败"));
     } finally {
       setActivationCodeLoading(false);
     }
@@ -2268,7 +2298,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
       setActivationCodeCopied(true);
       window.setTimeout(() => setActivationCodeCopied(false), 1600);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "激活码复制失败");
+      notify(errorDetails(error, "激活码复制失败"));
     }
   };
 
@@ -2282,7 +2312,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
       setActivationCodeDraft("");
       notify("激活码已加密保存到系统安全存储");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "激活码补录失败");
+      notify(errorDetails(error, "激活码补录失败"));
     } finally {
       setActivationCodeSaving(false);
     }
@@ -2296,7 +2326,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
     try {
       setRebindCode(await readActivationCode());
     } catch (error) {
-      notify(error instanceof Error ? error.message : "激活码读取失败");
+      notify(errorDetails(error, "激活码读取失败"));
     } finally {
       setRebindCodeLoading(false);
     }
@@ -2385,6 +2415,16 @@ function LicenseManagement({ state, onStateChange, notify }: {
             {state.previewAllFeatures
               ? <small className="preview-ready">双期限兑换界面已启用；源码预览不提交真实时间码。</small>
               : (state.license?.redemptionProtocolVersion || 0) < 1 && <small>服务端尚未启用双期限兑换，暂不可提交。</small>}
+          </div>
+          <div className="license-redemption-card license-points-redemption-card">
+            <span>积分兑换</span>
+            <div className="license-redemption-controls">
+              <input type="password" placeholder="输入积分兑换码" aria-label="积分兑换码" autoComplete="off" spellCheck={false} disabled />
+              <button type="button" disabled>兑换</button>
+            </div>
+            <small>积分兑换暂未开放</small>
+            <small className="preview-ready">{CURRENT_API_BILLING_NOTICE}</small>
+            <small>{CURRENT_PLATFORM_API_NOTICE}</small>
           </div>
         </div>
         <MachineCodeField compact />
@@ -2526,7 +2566,7 @@ function UpdateDialog({ state, notify }: { state: UpdateState; notify: (message:
       const next = await action();
       if (next?.message) notify(next.message);
     } catch (error) {
-      notify(error instanceof Error ? error.message : fallback);
+      notify(errorDetails(error, fallback));
     }
   };
   const bridge = window.desktopBridge;
@@ -2583,10 +2623,25 @@ const storageCategoryMetadata = [
   { key: "updates", label: "更新安装包", description: "已下载的旧版本安装程序", icon: PackageOpen, tone: "amber" },
   { key: "web", label: "网页缓存", description: "页面和图形缓存，不包含平台登录状态", icon: Globe2, tone: "slate" },
   { key: "localModel", label: "本地 AI 模型", description: "本地图像检索所需的模型数据", icon: HardDrive, tone: "violet" },
+  { key: "logs", label: "日志", description: "记录操作过程、任务状态、错误详情与堆栈，凭证自动脱敏", icon: HardDrive, tone: "slate" },
   { key: "platformLogin", label: "平台登录数据", description: "抖音和小红书的本机登录会话", icon: ShieldCheck, tone: "blue" },
 ] as const;
 
 function StorageManagementPanel({ notify }: { notify: (message: string) => void }) {
+  const [logs, setLogs] = useState<StorageLogState | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const exportLogs = async () => {
+    if (!window.desktopBridge?.storageLogExport) return notify("日志导出仅支持桌面版");
+    setExporting(true);
+    try { const result = await window.desktopBridge.storageLogExport(); if (!result.canceled) notify(`日志已导出：${result.path}`); }
+    catch (error) { notify(errorDetails(error, "导出日志失败")); }
+    finally { setExporting(false); }
+  };
+  const saveLogs = async (patch: Partial<StorageLogState["settings"]>) => {
+    try { setLogs(await window.desktopBridge!.storageLogSave(patch)); await refresh(); notify("日志保留设置已保存"); }
+    catch (error) { notify(errorDetails(error, "日志保留设置保存失败")); }
+  };
+  useEffect(() => { void window.desktopBridge?.storageLogGet?.().then(setLogs).catch(error => notify(errorDetails(error, "读取日志设置失败"))); }, []);
   const [state, setState] = useState<StorageManagementState | null>(null);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState<"classifier" | "updates" | "web" | null>(null);
@@ -2599,8 +2654,9 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
     }
     try {
       setState(await bridge.storageManagementGet());
+      if (bridge.storageLogGet) setLogs(await bridge.storageLogGet());
     } catch (error) {
-      notify(error instanceof Error ? error.message : "存储占用读取失败");
+      notify(errorDetails(error, "存储占用读取失败"));
     } finally {
       setLoading(false);
     }
@@ -2614,7 +2670,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
     }
     desktopBridge.storageManagementGet()
       .then(setState)
-      .catch((error) => notify(error instanceof Error ? error.message : "存储占用读取失败"))
+      .catch((error) => notify(errorDetails(error, "存储占用读取失败")))
       .finally(() => setLoading(false));
     return undefined;
   }, []);
@@ -2633,7 +2689,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
       setState(response.state);
       notify(response.result.message);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "清理失败");
+      notify(errorDetails(error, "清理失败"));
     } finally {
       setClearing(null);
     }
@@ -2645,7 +2701,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
       setState(await bridge.storageManagementSave(patch));
       notify("自动清理设置已保存");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "自动清理设置保存失败");
+      notify(errorDetails(error, "自动清理设置保存失败"));
     }
   };
 
@@ -2666,7 +2722,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
   if (loading) return <div className="storage-loading"><RefreshCw size={18} />正在统计本机存储占用…</div>;
   if (!state) return <div className="storage-loading"><AlertTriangle size={18} />网页预览不会读取或清理电脑文件，请在桌面版中使用。</div>;
 
-  const barKeys: Array<keyof StorageManagementState["categories"]> = ["classifier", "video", "voice", "updates", "web", "localModel", "platformLogin"];
+  const barKeys: Array<keyof StorageManagementState["categories"]> = ["classifier", "video", "voice", "updates", "web", "localModel", "platformLogin", "logs"];
   const total = Math.max(1, state.totalBytes);
   return <div className="storage-management-content">
     <section className="storage-summary-card">
@@ -2675,7 +2731,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
         <div className="storage-usage-bar">{barKeys.map((key) => <i key={key} className={`storage-segment ${key}`} style={{ width: `${(state.categories[key].bytes / total) * 100}%` }} />)}</div>
         <p>仅统计 AI媒体库相关目录，不包含用户自行选择的其他输出目录。</p>
       </div>
-      <button type="button" onClick={() => void refresh()}><RefreshCw size={14} />重新统计</button>
+      <div className="storage-summary-actions"><button type="button" onClick={() => void refresh()}><RefreshCw size={14} />重新统计</button><button type="button" disabled={exporting} onClick={() => void exportLogs()}><Download size={14} />{exporting ? "导出中…" : "导出日志"}</button></div>
     </section>
 
     <section className="storage-category-list">
@@ -2693,6 +2749,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
             {key === "web" && <button disabled={clearing !== null} onClick={() => void clearCategory("web")}>{clearing === "web" ? "清理中…" : "清理缓存"}</button>}
             {key === "localModel" && <span>保留</span>}
             {key === "platformLogin" && <span>平台登录中管理</span>}
+            {key === "logs" && <button onClick={() => openDirectory(item.path)}>打开目录</button>}
           </div>
         </article>;
       })}
@@ -2706,6 +2763,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
       </select>
       <button type="button" role="switch" aria-checked={state.settings.autoCleanupClassifierCache} className={`storage-switch ${state.settings.autoCleanupClassifierCache ? "on" : ""}`} onClick={() => void saveAutoCleanup({ autoCleanupClassifierCache: !state.settings.autoCleanupClassifierCache })}><i /></button>
     </section>
+    {logs && <section className="storage-auto-cleanup storage-log-settings"><span className="storage-category-icon slate"><HardDrive size={19} /></span><div><strong>日志保留规则</strong><span>{logs.fileCount} 个日志文件 · 超过时间或容量后自动删除最旧日志{logs.lastWriteError ? ` · 日志写入失败：${logs.lastWriteError}` : ""}</span></div><select aria-label="日志保留时间" value={logs.settings.retentionDays} onChange={event => void saveLogs({ retentionDays: Number(event.target.value) })}>{[7, 14, 30, 90].map(days => <option key={days} value={days}>保留 {days} 天</option>)}</select><select aria-label="日志容量上限" value={logs.settings.maxMegabytes} onChange={event => void saveLogs({ maxMegabytes: Number(event.target.value) })}>{[50, 100, 200, 500].map(mb => <option key={mb} value={mb}>上限 {mb} MB</option>)}</select></section>}
     {state.classifierCleanupBlockedReason && <p className="storage-blocked-note"><AlertTriangle size={14} />{state.classifierCleanupBlockedReason}，相关打标缓存已保留，不会自动清理。</p>}
     <p className="storage-safety-note"><ShieldCheck size={15} />不会清理分类方案、API 配置、授权信息、媒体库索引、原素材、输出结果或正在运行的任务。</p>
   </div>;
@@ -3007,7 +3065,7 @@ function QianchuanIntegrationPanel({ notify }: { notify: (message: string) => vo
 
 function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateState, onUpdateCheck, onOpenSubtitles, initialSection = "api" }: {
   onOpenSubtitles: () => void;
-  initialSection?: "api" | "aliyun";
+  initialSection?: "api" | "aliyun" | "qianchuan" | "models";
   notify: (message: string) => void;
   licenseState: LicenseState;
   onLicenseStateChange: (state: LicenseState) => void;
@@ -3023,6 +3081,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
   const [testingConnection, setTestingConnection] = useState<"classification" | "minimax" | null>(null);
   const [connectionResults, setConnectionResults] = useState<Record<"classification" | "minimax", { ok: boolean; message: string } | null>>({ classification: null, minimax: null });
   const [settingsSection, setSettingsSection] = useState<"api" | "qianchuan" | "storage" | "models" | "aliyun">(initialSection);
+  useEffect(() => setSettingsSection(initialSection), [initialSection]);
 
   useEffect(() => {
     // 只在设置页挂载时读取一次，避免父页面刷新时用已保存值覆盖用户正在输入的 Endpoint ID。
@@ -3033,7 +3092,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
     }
     bridge.apiSettingsGet()
       .then(setSettings)
-      .catch((error) => notify(error instanceof Error ? error.message : "API 设置读取失败"))
+      .catch((error) => notify(errorDetails(error, "API 设置读取失败")))
       .finally(() => setLoading(false));
     return undefined;
   }, []);
@@ -3116,7 +3175,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
       setConnectionResults((current) => ({ ...current, [kind]: { ok: true, message: result.message } }));
       notify(result.message);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "连接测试失败";
+      const message = errorDetails(error, "连接测试失败");
       setConnectionResults((current) => ({ ...current, [kind]: { ok: false, message } }));
       notify(message);
     } finally {
@@ -3139,7 +3198,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
       setMinimaxKey("");
       notify("API 设置已保存并立即生效");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "API 设置保存失败");
+      notify(errorDetails(error, "API 设置保存失败"));
     } finally {
       setSaving(false);
     }
@@ -3156,7 +3215,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
       onLicenseStateChange(next);
       notify(next.authorized ? "离线缓存已重置，联网授权验证成功" : next.message || "离线缓存已清除，请连接网络完成授权验证");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "离线缓存重置失败");
+      notify(errorDetails(error, "离线缓存重置失败"));
       throw error;
     }
   };
@@ -3165,7 +3224,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
     <section className="api-settings-page">
       <header className="api-settings-heading">
         <div className="api-settings-heading-icon workspace-heading-icon"><Settings /></div>
-        <div><div className="feature-title-line"><h1>设置</h1><ContactAuthorButton appName={licenseState.appName} /></div><p>{settingsSection === "storage" ? "管理软件占用、自动清理与本地文件。" : settingsSection === "qianchuan" ? "按顺序连接用户自己的巨量千川开放平台应用与账户。" : settingsSection === "models" ? "由使用者填写自己的模型 API，密钥仅保存在当前电脑。" : settingsSection === "aliyun" ? "阿里云去字幕服务的独立配置入口。" : "管理软件授权、查看版本与检查更新。"}</p></div>
+        <div><div className="feature-title-line"><h1>设置</h1><ContactAuthorButton appName={licenseState.appName} /></div><p>{settingsSection === "storage" ? "管理软件占用、自动清理与本地文件。" : settingsSection === "qianchuan" ? "按顺序连接用户自己的巨量千川开放平台应用与账户。" : settingsSection === "models" ? "由使用者填写自己的模型 API，密钥仅保存在当前电脑。" : settingsSection === "aliyun" ? "管理去字幕服务的连接与密钥。" : "管理软件授权、查看版本与检查更新。"}</p></div>
       </header>
 
       <nav className="settings-section-tabs" aria-label="设置分类">
@@ -3173,7 +3232,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
         <button type="button" className={settingsSection === "qianchuan" ? "active" : ""} onClick={() => setSettingsSection("qianchuan")}><KeyRound size={15} />千川接入</button>
         <button type="button" className={settingsSection === "storage" ? "active" : ""} onClick={() => setSettingsSection("storage")}><HardDrive size={15} />存储管理</button>
         <button type="button" className={settingsSection === "models" ? "active" : ""} onClick={() => setSettingsSection("models")}><Mic2 size={15} />火山引擎与 MiniMax</button>
-        <button type="button" className={settingsSection === "aliyun" ? "active" : ""} onClick={() => setSettingsSection("aliyun")}><Film size={15} />阿里云去字幕</button>
+        <button type="button" className={settingsSection === "aliyun" ? "active" : ""} onClick={() => setSettingsSection("aliyun")}><Film size={15} />去字幕服务</button>
       </nav>
 
       {settingsSection === "storage" && <StorageManagementPanel notify={notify} />}
@@ -3185,7 +3244,7 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
       {settingsSection === "models" && <div className="api-settings-content">
         <section className="api-settings-card classification-api-card">
           <div className="api-settings-card-title">
-            <div><span className="api-settings-kicker">CLASSIFICATION API</span><h2>分类模型</h2><p>{settings.classification.provider === "volcengine" ? "同一个推理接入点同时用于分类方案和素材分类。" : "可分别填写分类方案文本模型与素材分类视觉模型。"}</p></div>
+            <div><span className="api-settings-kicker">CLASSIFICATION & PROMPT API</span><h2>分类与提示词模型</h2><p>{settings.classification.provider === "volcengine" ? "同一个推理接入点用于分类方案、素材分类与提示词库。" : "文本模型用于分类方案和提示词改写；视觉模型用于素材分类及提示词参考图片替换。"}</p></div>
             <span className={`api-config-status ${(settings.classification.provider === "volcengine" ? settings.classification.volcengine.apiKeyConfigured : settings.classification.relay.apiKeyConfigured) ? "ready" : "empty"}`}>{(settings.classification.provider === "volcengine" ? settings.classification.volcengine.apiKeyConfigured : settings.classification.relay.apiKeyConfigured) ? "已配置" : "未配置"}</span>
           </div>
 
@@ -3249,7 +3308,9 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
           </div>
         </footer>
       </div>}
-      {settingsSection === "aliyun" && <AliyunSubtitleSettings notify={notify} onStart={onOpenSubtitles} />}
+      {settingsSection === "aliyun" && (canAccessFeature(featureRegistry, "subtitle-removal", licenseState)
+        ? <AliyunSubtitleSettings notify={notify} onStart={onOpenSubtitles} />
+        : <VipFeatureLockedPage feature={featureRegistry.get("subtitle-removal")!} onRedeem={() => setSettingsSection("api")} onBack={() => setSettingsSection("api")} backLabel="返回授权设置" />)}
     </section>
   );
 }
@@ -3263,7 +3324,7 @@ const applicationModules = featureRegistry.list().map((feature) => feature.id);
 type ApplicationModule = string;
 const featureMenuIcons: Record<string, typeof Images> = {
   media: Images, "qianchuan-videos": Film, "viral-visuals": Images, "viral-copy": FileSpreadsheet, "feigua-trends": Globe2,
-  "subtitle-removal": Film, downloads: Download, schemes: Tag, classifier: Boxes, voice: Mic2, settings: Settings,
+  "subtitle-removal": Film, "prompt-library": FileSpreadsheet, downloads: Download, schemes: Tag, classifier: Boxes, voice: Mic2, settings: Settings,
 };
 
 function formatClassifierProgressLogs(messages: string[], command: ClassifierRunPayload["command"]) {
@@ -3770,7 +3831,7 @@ function ClassifierWorkbench({
       const copiedHint = prepared.methods.copied ? `，其中 ${prepared.methods.copied} 个文件已建立工作副本` : "";
       notify(`${isAppending ? "素材已追加" : "素材已导入"}，当前共 ${prepared.count} 个${copiedHint}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "素材导入失败");
+      notify(errorDetails(error, "素材导入失败"));
     } finally {
       setPreparingInput(false);
       setInputDragActive(false);
@@ -3961,7 +4022,7 @@ function ClassifierWorkbench({
       );
       notify(effectiveOk ? (syncMessage || statusMessage) : statusMessage);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "分类引擎调用失败";
+      const message = errorDetails(error, "分类引擎调用失败");
       appendLog(`处理失败：${message}`, isSplitCommand ? "切割失败" : "不执行", isSplitCommand ? "不执行" : "打标失败");
       notify(message);
     } finally {
@@ -4089,7 +4150,7 @@ function ClassifierWorkbench({
       appendLog(status, "切割完成", "打标完成");
       notify(status);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "分割+打标失败";
+      const message = errorDetails(error, "分割+打标失败");
       appendLog(`处理失败：${message}`, splitCompleted ? "切割完成" : "切割失败", splitCompleted ? "打标失败" : "未开始");
       notify(message);
     } finally {
@@ -4132,7 +4193,7 @@ function ClassifierWorkbench({
       } catch (error) {
         setRetryTaskCount(0);
         setRetryPayload(null);
-        notify(error instanceof Error ? error.message : "失败素材已不存在，无法重试");
+        notify(errorDetails(error, "失败素材已不存在，无法重试"));
       }
       return;
     }
@@ -4148,7 +4209,7 @@ function ClassifierWorkbench({
       setRecentOutput(null);
       notify(`已补同步最近一次分类结果：${count} 个素材`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "最近一次分类结果补同步失败");
+      notify(errorDetails(error, "最近一次分类结果补同步失败"));
     } finally {
       setRecentOutputSyncing(false);
     }
@@ -4315,7 +4376,7 @@ function ClassifierWorkbench({
       const duplicate = result.files.length > documents.length ? `；${result.files.length - documents.length} 个重复文件未再次追加` : "";
       notify(`已读取 ${documents.length || result.files.length} 个产品资料文件${duplicate}${scanned}${warning}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "产品资料读取失败");
+      notify(errorDetails(error, "产品资料读取失败"));
     } finally {
       setSchemeImportingProductFiles(false);
     }
@@ -4340,7 +4401,7 @@ function ClassifierWorkbench({
       const warning = result.warnings.length ? `；${result.warnings.length} 页未能识别` : "";
       notify(`AI 已识别 ${result.files.length} 个扫描型 PDF，并回填产品资料${warning}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "扫描件 AI 识别失败");
+      notify(errorDetails(error, "扫描件 AI 识别失败"));
     } finally {
       setSchemeRecognizingScannedPdfs(false);
     }
@@ -4391,7 +4452,7 @@ function ClassifierWorkbench({
       const repairedMessage = draft.repairedCount ? `，已自动修复 ${draft.repairedCount} 项` : "";
       notify(`AI 已生成分类草案${repairedMessage}${qualityMessage}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "AI 生成草案失败");
+      notify(errorDetails(error, "AI 生成草案失败"));
     } finally {
       setSchemeGenerating(false);
       setSchemeGenerationStage("");
@@ -4421,7 +4482,7 @@ function ClassifierWorkbench({
       window.localStorage.removeItem(classifierTemplateDraftStorageKey);
       notify(schemeDialog === "create" ? "新方案已创建并切换" : "方案已更新");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "方案保存失败");
+      notify(errorDetails(error, "方案保存失败"));
     } finally {
       setSchemeSaving(false);
     }
@@ -4436,7 +4497,7 @@ function ClassifierWorkbench({
       setExpandedSchemeId("");
       notify(`方案“${next.importedName || "导入方案"}”已导入并切换`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "方案导入失败");
+      notify(errorDetails(error, "方案导入失败"));
     }
   };
 
@@ -4449,7 +4510,7 @@ function ClassifierWorkbench({
       const result = await window.desktopBridge.classifierExportTemplate(templateId);
       if (!result.cancelled) notify(result.ok ? "方案已导出" : "方案导出失败");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "方案导出失败");
+      notify(errorDetails(error, "方案导出失败"));
     }
   };
 
@@ -4460,7 +4521,7 @@ function ClassifierWorkbench({
       setExpandedSchemeId(templateId);
       notify("分类方案已切换");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "分类方案切换失败");
+      notify(errorDetails(error, "分类方案切换失败"));
     }
   };
 
@@ -4932,14 +4993,14 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       window.queueMicrotask(() => setState((current) => ({ ...current, ready: true, defaultOutputDirectory: "下载 / 短视频素材" })));
       return;
     }
-    bridge.videoDownloadBootstrap().then((next) => { if (next) setState(next); }).catch((error) => notify(error instanceof Error ? error.message : "下载服务连接失败"));
+    bridge.videoDownloadBootstrap().then((next) => { if (next) setState(next); }).catch((error) => notify(errorDetails(error, "下载服务连接失败")));
     bridge.videoDownloadOnStateChanged?.((next) => setState(next));
   }, []);
 
   useEffect(() => {
     const bridge = window.desktopBridge;
     if (!bridge?.videoDownloadAuthBootstrap) return;
-    bridge.videoDownloadAuthBootstrap().then((next) => { if (next) setAuthState(next); }).catch((error) => notify(error instanceof Error ? error.message : "登录状态读取失败"));
+    bridge.videoDownloadAuthBootstrap().then((next) => { if (next) setAuthState(next); }).catch((error) => notify(errorDetails(error, "登录状态读取失败")));
     bridge.videoDownloadAuthOnStateChanged?.((next) => setAuthState(next));
   }, []);
 
@@ -4952,7 +5013,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       void bridge.mediaImportPaths(task.outputFiles).then((result) => {
         onImport(result.records, result.folders, result.sourceKind);
         return bridge.videoDownloadMarkImported(task.id);
-      }).then(setState).catch((error) => notify(error instanceof Error ? error.message : "下载文件自动入库失败")).finally(() => importingTasks.current.delete(task.id));
+      }).then(setState).catch((error) => notify(errorDetails(error, "下载文件自动入库失败"))).finally(() => importingTasks.current.delete(task.id));
     });
   }, [state.tasks]);
 
@@ -4985,7 +5046,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
         ? `已从 ${result.fileName || "Excel"} 读取前 ${accepted.length} 条链接，另有 ${omitted} 条超出单批限制`
         : `已从 ${result.fileName || "Excel"} 读取 ${result.importedCount} 条链接`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Excel 链接读取失败");
+      notify(errorDetails(error, "Excel 链接读取失败"));
     } finally {
       setImportingSpreadsheet(false);
     }
@@ -5031,7 +5092,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       setInput("");
       notify(`已加入 ${result.added.length} 条下载任务`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "添加下载任务失败");
+      notify(errorDetails(error, "添加下载任务失败"));
     } finally {
       setSubmitting(false);
     }
@@ -5044,7 +5105,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
 
   const retry = async (taskId: string) => {
     if (!window.desktopBridge?.videoDownloadRetry) return notify("网页预览不执行真实下载");
-    try { setState(await window.desktopBridge.videoDownloadRetry(taskId)); } catch (error) { notify(error instanceof Error ? error.message : "重试失败"); }
+    try { setState(await window.desktopBridge.videoDownloadRetry(taskId)); } catch (error) { notify(errorDetails(error, "重试失败")); }
   };
 
   const cancel = async (taskId: string) => {
@@ -5052,7 +5113,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       setState((current) => ({ ...current, tasks: current.tasks.filter((task) => task.id !== taskId) }));
       return;
     }
-    try { setState(await window.desktopBridge.videoDownloadCancel(taskId)); } catch (error) { notify(error instanceof Error ? error.message : "取消失败"); }
+    try { setState(await window.desktopBridge.videoDownloadCancel(taskId)); } catch (error) { notify(errorDetails(error, "取消失败")); }
   };
 
   const openPlatformLogin = async (platform: "douyin" | "xiaohongshu") => {
@@ -5063,7 +5124,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       setAuthState(await bridge.videoDownloadAuthOpen(platform));
       notify(`已打开${platform === "douyin" ? "抖音" : "小红书"}官方登录窗口，请在窗口内完成登录`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "登录窗口打开失败");
+      notify(errorDetails(error, "登录窗口打开失败"));
     } finally {
       setOpeningAuth(null);
     }
@@ -5076,7 +5137,7 @@ function VideoDownloadWorkbench({ notify, appName, input, setInput, onImport }: 
       setAuthState(next);
       notify("登录状态已刷新");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "登录状态刷新失败");
+      notify(errorDetails(error, "登录状态刷新失败"));
     }
   };
 
@@ -5266,7 +5327,7 @@ function qianchuanTopCutoff(items: QianchuanPerformance[], read: (item: Qianchua
 type ViralLibraryFilter = "all" | "high-spend" | "high-roi" | "high-gmv" | "linked" | "unlinked";
 type ViralLibrarySort = "comprehensive" | "spend" | "roi" | "gmv" | "orders" | "newest";
 
-function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onImport, assets, onLocate }: {
+function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onImport, assets, onLocate, onConnect }: {
   bootstrap: QianchuanBootstrap | null;
   loading: boolean;
   error: string;
@@ -5274,6 +5335,7 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
   onImport: (item: QianchuanPerformance, account: QianchuanAccount) => Promise<void>;
   assets: Asset[];
   onLocate: (asset: Asset) => void;
+  onConnect: () => void;
 }) {
   const [advertiserId, setAdvertiserId] = useState("");
   const [items, setItems] = useState<QianchuanPerformance[]>([]);
@@ -5289,6 +5351,9 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
   const [syncing, setSyncing] = useState(false);
   const [importingId, setImportingId] = useState("");
   const [pageError, setPageError] = useState("");
+  const connectionGuidance = classifyUserAction(pageError || error, "qianchuan-bootstrap") || (!loading && !error && !pageError && bootstrap && !bootstrap.accounts.length
+    ? { target: "qianchuan", title: "暂无可用千川账户", message: "请在千川接入中检查账户授权与账户权限，完成后重新读取。", action: "检查千川连接" }
+    : null);
   const [gridPage, setGridPage] = useState(1);
   const [searchText, setSearchText] = useState("");
   const [libraryFilter, setLibraryFilter] = useState<ViralLibraryFilter>("all");
@@ -5635,6 +5700,7 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
       <header className="viral-library-heading">
         <span className="viral-heading-icon"><Film size={22} /></span>
         <div><h1>千川视频库</h1><p>集中查看千川视频与投放表现，并与本地媒体库使用同一份素材关系</p></div>
+        <button type="button" className="qianchuan-connection-link" onClick={onConnect}><KeyRound size={15} />千川连接设置</button>
       </header>
       <div className="viral-toolbar viral-filter-panel">
         <label className="viral-account-field"><span>千川账户</span><select value={activeAdvertiserId} onChange={(event) => setAdvertiserId(event.target.value)} disabled={loading || syncing}>
@@ -5648,7 +5714,11 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
         <div className="viral-sync-actions">{syncing ? <button type="button" className="secondary" onClick={() => void cancelSync()}>取消同步</button> : null}<button type="button" onClick={() => void refresh(activeAdvertiserId)} disabled={loading || syncing || cacheLoading || !activeAdvertiserId}><RefreshCw size={15} className={syncing ? "spin" : ""} />{syncing ? "正在同步" : resumable ? "继续同步" : lastSyncedAt ? "刷新当前结果" : "同步当前范围"}</button></div>
       </div>
       <div className={`viral-cache-status ${queryChanged ? "changed" : ""}`}><div><strong>{cacheLoading ? "正在读取本地缓存…" : lastSyncedAt ? `上次同步：${formatServerDate(lastSyncedAt)}` : "当前账户还没有本地缓存"}</strong><span>{lastSyncedAt ? `已缓存 ${items.length} 条素材 · 扩展分析 ${cachedInsightCount}/${items.length} · 数据周期 ${range || "—"}` : "设置素材范围和数据统计周期后开始同步；以后进入页面会直接显示缓存。"}</span></div>{queryChanged && <em>筛选条件已修改，点击“刷新当前结果”后生效</em>}{resumable && !syncing && <em>检测到未完成同步，可以从上次分页继续</em>}{syncProgress && (syncing || syncProgress.stage === "complete") && <em>{syncProgress.message}</em>}</div>
-      {(error || pageError) && <div className="viral-alert"><AlertTriangle size={16} /><span>{pageError || error}</span><button type="button" onClick={() => void ensureBootstrap(true).then(() => refresh(activeAdvertiserId)).catch(() => {})}>重试</button></div>}
+      {connectionGuidance?.target === "qianchuan" ? <section className="qianchuan-connection-guide" role="status">
+        <KeyRound size={22} /><div><h2>{connectionGuidance.title}</h2><p>{connectionGuidance.message}</p></div>
+        <button type="button" onClick={onConnect}>{connectionGuidance.action}</button>
+        <button type="button" className="secondary" disabled={loading} onClick={() => void ensureBootstrap(true).then(() => refresh(activeAdvertiserId)).catch(() => {})}>已连接，重新读取</button>
+      </section> : (error || pageError) && <div className="viral-alert"><AlertTriangle size={16} /><span>{pageError || error}</span><button type="button" onClick={() => void ensureBootstrap(true).then(() => refresh(activeAdvertiserId)).catch(() => {})}>重试</button></div>}
       <div className="viral-view-toolbar">
         <label className="viral-search-field"><Search size={16} /><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索素材名称、素材 ID…" /></label>
         <div className="viral-performance-filters" role="tablist" aria-label="千川素材筛选">
@@ -6452,10 +6522,11 @@ function ViralCopyLibrary({ assets, searchQuery, onSearchQueryChange, onNavigate
   );
 }
 
-function VipFeatureLockedPage({ feature, onRedeem, onBack }: {
-  feature: { id: string; label: string; description?: string; highlights?: readonly string[] };
+function VipFeatureLockedPage({ feature, onRedeem, onBack, backLabel = "返回媒体库" }: {
+  feature: { id: string; label: string; description?: string; highlights?: readonly string[]; lockedPreview?: string };
   onRedeem: () => void;
   onBack: () => void;
+  backLabel?: string;
 }) {
   const Icon = featureMenuIcons[feature.id] || Sparkles;
   const highlights = feature.highlights?.length
@@ -6469,7 +6540,10 @@ function VipFeatureLockedPage({ feature, onRedeem, onBack }: {
         <em><LockKeyhole size={12} />VIP专属</em>
       </header>
       <div className="vip-feature-locked-content">
-        <div className={`vip-feature-locked-backdrop ${feature.id === "viral-copy" ? "copy" : "visual"}`} aria-hidden="true">
+        <div className={`vip-feature-locked-backdrop ${feature.lockedPreview || (feature.id === "viral-copy" ? "copy" : "visual")}`} aria-hidden="true" inert>
+          {feature.lockedPreview === "subtitle" || feature.lockedPreview === "prompt"
+            ? <VipWorkflowPreview kind={feature.lockedPreview} />
+            : <>
           <div className="vip-lock-preview-toolbar">
             <span className="search">{feature.id === "viral-copy" ? "搜索文案、画面或大分类" : "搜索画面、文案或大分类"}</span>
             <span>全部大分类</span>
@@ -6504,21 +6578,22 @@ function VipFeatureLockedPage({ feature, onRedeem, onBack }: {
               </div>
             </section>
           )}
+          </>}
         </div>
         <div className="vip-feature-locked-veil" aria-hidden="true" />
         <section className="vip-feature-locked-card">
           <div className="vip-feature-lock-icon"><LockKeyhole size={28} /></div>
           <span className="vip-feature-eyebrow">VIP FEATURE</span>
           <h2 id="vip-feature-locked-title">当前基础授权暂未包含此功能</h2>
-          <p>兑换有效的VIP时间码后即可使用；基础授权期限、设备绑定和已有素材不会因此改变。</p>
+          <p>兑换有效的VIP时间码后即可使用；基础授权与VIP权益按各自期限生效，不会改变设备绑定或删除已有素材。</p>
           <div className="vip-feature-highlights">
             {highlights.map((highlight) => <div key={highlight}><ShieldCheck size={16} /><span>{highlight}</span></div>)}
           </div>
           <div className="vip-feature-locked-actions">
             <button type="button" className="primary" onClick={onRedeem}><KeyRound size={15} />前往兑换VIP时间码</button>
-            <button type="button" onClick={onBack}>返回媒体库</button>
+            <button type="button" onClick={onBack}>{backLabel}</button>
           </div>
-          <small>这里只展示功能介绍，不会加载VIP库内容或执行VIP专属操作。</small>
+          <small>这里只展示功能介绍和示意轮廓，不会加载专属内容或执行VIP操作。</small>
         </section>
       </div>
     </section>
@@ -6531,8 +6606,9 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
 }) {
   const [mounted, setMounted] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
-  const [aliyunSettingsRequested, setAliyunSettingsRequested] = useState(false);
+  const [requestedSettingsSection, setRequestedSettingsSection] = useState<"api" | "qianchuan" | "models" | "aliyun">("api");
   const [requestedModule, setActiveModule] = useState<ApplicationModule>("media");
+  const promptLibraryBeforeLeave = useRef<(() => Promise<boolean>) | null>(null);
   const requestedFeature = featureRegistry.get(requestedModule);
   const activeModule = canDiscoverFeature(featureRegistry, requestedModule, licenseState) ? requestedModule : "media";
   const lockedVipFeature = requestedFeature?.group === "vip"
@@ -6659,7 +6735,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       setQianchuanAdvertiserId((current) => current || state.default_advertiser_id || state.accounts[0]?.advertiser_id || "");
       return state;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "千川授权读取失败";
+      const message = errorDetails(error, "千川授权读取失败");
       setQianchuanBootstrapError(message);
       throw new Error(message);
     } finally {
@@ -6684,6 +6760,12 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     qianchuanInsightSerial.current += 1;
     setQianchuanDialog(null);
   };
+  const openGuidedSettings = (target: GuidanceTarget) => {
+    closeQianchuanDialog();
+    window.dispatchEvent(new CustomEvent("user-action-dismiss"));
+    setRequestedSettingsSection(target);
+    setActiveModule("settings");
+  };
 
   const openQianchuanBinding = async (asset: Asset) => {
     qianchuanInsightSerial.current += 1;
@@ -6700,7 +6782,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     try {
       await ensureQianchuanBootstrap();
     } catch (error) {
-      setQianchuanDialogError(error instanceof Error ? error.message : "千川授权读取失败");
+      setQianchuanDialogError(errorDetails(error, "千川授权读取失败"));
     }
   };
 
@@ -6736,7 +6818,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
         qianchuan: { ...item.qianchuan, lastSyncedAt: new Date().toISOString() },
       } : item));
     } catch (error) {
-      setQianchuanDialogError(error instanceof Error ? error.message : "千川数据读取失败");
+      setQianchuanDialogError(errorDetails(error, "千川数据读取失败"));
     } finally {
       setQianchuanDialogBusy(false);
     }
@@ -6791,7 +6873,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       setQianchuanDialogRange(`${report.start_date} 至 ${report.end_date}`);
       notify("已绑定千川素材数据");
     } catch (error) {
-      setQianchuanDialogError(error instanceof Error ? error.message : "千川素材绑定失败");
+      setQianchuanDialogError(errorDetails(error, "千川素材绑定失败"));
     } finally {
       setQianchuanDialogBusy(false);
     }
@@ -6821,7 +6903,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       setAssets((current) => current.map((asset) => asset.localPath === result.record.path ? { ...asset, qianchuan: binding } : asset));
       notify(`已导入媒体库：${result.record.name}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "千川视频导入失败");
+      notify(errorDetails(error, "千川视频导入失败"));
     }
   };
 
@@ -6890,7 +6972,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       setUpdateState(state);
       if (!state.shouldPrompt) notify(state.message);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "检查更新失败");
+      notify(errorDetails(error, "检查更新失败"));
     }
   };
 
@@ -7345,7 +7427,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       const copiedHint = prepared.methods.copied ? `；其中 ${prepared.methods.copied} 个文件已建立工作副本` : "";
       notify(`已发送 ${prepared.count} 个素材到素材工作台${copiedHint}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "发送到素材工作台失败");
+      notify(errorDetails(error, "发送到素材工作台失败"));
     } finally {
       setClassifierPreparing(false);
     }
@@ -8058,7 +8140,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     try {
       await bridge.mediaRevealFile(asset.localPath);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "无法在访达或文件夹中定位该素材");
+      notify(errorDetails(error, "无法在访达或文件夹中定位该素材"));
     }
   };
 
@@ -8077,7 +8159,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       const result = await bridge.openLocalPath(folderSource.path);
       if (result?.error) throw new Error(result.error);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "无法打开原文件夹位置");
+      notify(errorDetails(error, "无法打开原文件夹位置"));
     }
   };
 
@@ -8097,7 +8179,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       );
       if (plan) setFolderRelinkPlan(plan);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "文件夹重新关联失败");
+      notify(errorDetails(error, "文件夹重新关联失败"));
     } finally {
       setFolderRelinkBusyPath(null);
     }
@@ -8208,7 +8290,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
         notify(`已清空文件夹“${target.name}”内的 ${removedCount} 个素材，本地文件已保留`);
       }
     } catch (error) {
-      setFolderDeleteError(error instanceof Error ? error.message : "文件夹删除失败，请稍后重试");
+      setFolderDeleteError(errorDetails(error, "文件夹删除失败，请稍后重试"));
     } finally {
       setFolderDeleteBusy(false);
     }
@@ -8470,14 +8552,14 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     const snapshot = aliyunLibrarySnapshot.current;
     const existing = snapshot.assets.filter((asset) => asset.sourceKind !== "demo");
     const importedPaths = new Set(imported.records.map((record) => record.path));
-    const incoming = imported.records.map((record) => desktopRecordAsset(record, imported.sourceKind, "阿里云去字幕", existing.find((asset) => asset.localPath === record.path)));
+    const incoming = imported.records.map((record) => desktopRecordAsset(record, imported.sourceKind, SUBTITLE_RESULT_COLLECTION, existing.find((asset) => asset.localPath === record.path)));
     const savedAssets = [...incoming, ...existing.filter((asset) => !asset.localPath || !importedPaths.has(asset.localPath))];
     await window.desktopBridge!.mediaSaveLibrary(savedAssets, snapshot.folders);
     aliyunLibrarySnapshot.current = { assets: savedAssets, folders: snapshot.folders };
     installFolderSources(imported.folders);
     setAssets((current) => {
       const latest = current.filter((asset) => asset.sourceKind !== "demo");
-      const additions = imported.records.map((record) => desktopRecordAsset(record, imported.sourceKind, "阿里云去字幕", latest.find((asset) => asset.localPath === record.path)));
+      const additions = imported.records.map((record) => desktopRecordAsset(record, imported.sourceKind, SUBTITLE_RESULT_COLLECTION, latest.find((asset) => asset.localPath === record.path)));
       return [...additions, ...latest.filter((asset) => !asset.localPath || !importedPaths.has(asset.localPath))];
     });
     setLocalStatus("connected");
@@ -8495,6 +8577,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     <main className={`app-shell ${activeModule === "media" || activeModule === "qianchuan-videos" || activeModule === "viral-visuals" || activeModule === "viral-copy" ? "library-light" : activeModule === "downloads" || activeModule === "subtitle-removal" ? "download-light" : activeModule === "voice" ? "voice-light" : "classifier-light"}`}>
       <OfflineLicenseBanner state={licenseState} />
       <AliyunSubtitleAutoSync ready={() => preferencesReady && desktopLibraryReady.current && localStatus !== "error" && canAccessFeature(featureRegistry, "subtitle-removal", licenseState)} onImport={importAliyunResult} notify={notify} />
+      <AliyunSubtitleBackgroundStatus visible={activeModule !== "subtitle-removal"} ready={preferencesReady && canAccessFeature(featureRegistry, "subtitle-removal", licenseState)} notify={notify} onOpen={async () => { if (activeModule === "prompt-library" && promptLibraryBeforeLeave.current && !(await promptLibraryBeforeLeave.current())) return; setActiveModule("subtitle-removal"); }} />
       <div className="workspace">
         <aside className="main-sidebar compact-sidebar">
           <div className="sidebar-window-drag-region" aria-hidden="true" />
@@ -8508,12 +8591,19 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
                 : feature.id === "viral-copy"
                   ? "爆款文案库：管理文案、分类及画面关联"
                   : "";
-              return <button key={feature.id} className={`nav-item ${feature.group === "vip" ? "viral-nav" : ""} ${!accessible ? "locked" : ""} ${activeModule === feature.id ? "active" : ""}`} onClick={() => setActiveModule(feature.id)}>
+              return <button key={feature.id} className={`nav-item ${feature.group === "vip" ? "viral-nav" : ""} ${!accessible ? "locked" : ""} ${activeModule === feature.id ? "active" : ""}`} onClick={async () => {
+                if (activeModule === "prompt-library" && promptLibraryBeforeLeave.current && !(await promptLibraryBeforeLeave.current())) return;
+                setActiveModule(feature.id);
+              }}>
                 <span className={`nav-item-icon ${iconHelp ? "has-help" : ""}`} data-tooltip={iconHelp || undefined} title={iconHelp || undefined} aria-label={iconHelp || undefined}><Icon size={18} /></span><span>{feature.label}</span>{feature.group === "vip" && <small>{!accessible && <LockKeyhole size={9} />}VIP</small>}
               </button>;
             })}
           </div>
         </aside>
+
+        {canAccessFeature(featureRegistry, "prompt-library", licenseState) && <div style={{ display: activeModule === "prompt-library" && !lockedVipFeature ? "contents" : "none" }} aria-hidden={activeModule !== "prompt-library" || !!lockedVipFeature}>
+          <PromptLibrary active={activeModule === "prompt-library"} assets={assets} notify={notify} contactAuthor={<ContactAuthorButton appName={licenseState.appName} />} onConfigure={() => openGuidedSettings("models")} registerBeforeLeave={handler => { promptLibraryBeforeLeave.current = handler; }} />
+        </div>}
 
         {lockedVipFeature ? (
           <VipFeatureLockedPage feature={lockedVipFeature} onRedeem={() => setActiveModule("settings")} onBack={() => setActiveModule("media")} />
@@ -8839,6 +8929,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
             loading={qianchuanBootstrapLoading}
             error={qianchuanBootstrapError}
             ensureBootstrap={ensureQianchuanBootstrap}
+            onConnect={() => openGuidedSettings("qianchuan")}
             onImport={importQianchuanPerformance}
             assets={assets}
             onLocate={(asset) => {
@@ -8859,8 +8950,10 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
           }} />
         ) : activeModule === "viral-copy" ? (
           <ViralCopyLibrary assets={assets} searchQuery={viralSearchQuery} onSearchQueryChange={setViralSearchQuery} onNavigate={setActiveModule} revision={viralLibraryRevision} onUploadVisual={uploadViralVisuals} onImportCsv={importViralCsv} onPreview={openAssetPreview} />
+        ) : activeModule === "prompt-library" ? (
+          null
         ) : activeModule === "subtitle-removal" ? (
-          <AliyunSubtitleWorkbench notify={notify} assets={assets} contactAuthor={<ContactAuthorButton appName={licenseState.appName} />} onConfigure={() => { setAliyunSettingsRequested(true); setActiveModule("settings"); }} onImport={importAliyunResult} />
+          null
         ) : activeModule === "downloads" ? (
           <VideoDownloadWorkbench
             notify={notify}
@@ -8877,7 +8970,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
         ) : activeModule === "voice" ? (
           null
         ) : (
-          <ApiSettingsPage onOpenSubtitles={() => setActiveModule("subtitle-removal")} initialSection={aliyunSettingsRequested ? "aliyun" : "api"} notify={notify} licenseState={licenseState} onLicenseStateChange={onLicenseStateChange} updateState={updateState} onUpdateCheck={() => void checkForUpdates()} />
+          <ApiSettingsPage onOpenSubtitles={() => setActiveModule("subtitle-removal")} initialSection={requestedSettingsSection} notify={notify} licenseState={licenseState} onLicenseStateChange={onLicenseStateChange} updateState={updateState} onUpdateCheck={() => void checkForUpdates()} />
         )}
         <div className="persistent-classifier-host" hidden={activeModule !== "schemes" && activeModule !== "classifier"}>
           <ClassifierWorkbench
@@ -8892,6 +8985,9 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
         <div className="persistent-voice-host" hidden={activeModule !== "voice"}>
           <VoiceCloneWorkbench notify={notify} appName={licenseState.appName} />
         </div>
+        {canAccessFeature(featureRegistry, "subtitle-removal", licenseState) && <div className="persistent-subtitle-host" hidden={activeModule !== "subtitle-removal"}>
+          <AliyunSubtitleWorkbench active={activeModule === "subtitle-removal"} notify={notify} assets={assets} folders={folders} contactAuthor={<ContactAuthorButton appName={licenseState.appName} />} onConfigure={() => openGuidedSettings("aliyun")} onImport={importAliyunResult} />
+        </div>}
       </div>
 
       <input ref={repairInput} type="file" accept="image/*,video/*,audio/*" hidden onChange={repairAsset} />
@@ -9345,6 +9441,8 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
 
       <UpdateDialog key={updateState.targetVersion || "no-update"} state={updateState} notify={notify} />
 
+      <ErrorDetailDialog />
+      <UserActionNotice onConfigure={openGuidedSettings} suppressQianchuan={activeModule === "qianchuan-videos"} />
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
   );

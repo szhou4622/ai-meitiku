@@ -5,6 +5,168 @@ import path from "node:path";
 import test from "node:test";
 import { LicenseSecureStore } from "../electron/license-secure-store.mjs";
 import { LicenseService } from "../electron/license-service.mjs";
+test("re-entering activation recovers partial local proof before contacting activate", async () => {
+  const calls = [];
+  const { store, service } = recoveryFixture(async (url, options) => {
+    calls.push(url.split("/api/license")[1]);
+    if (url.endsWith("/device/refresh")) return jsonResponse(200, { device_session: "fresh-session" });
+    if (url.endsWith("/activate")) {
+      assert.equal(JSON.parse(options.body).device_credential, "long-lived-proof");
+      return jsonResponse(200, { ...activePayload, device_session: "fresh-session", device_credential: "long-lived-proof" });
+    }
+    return jsonResponse(200, withoutDeviceCredentials(activePayload));
+  }, { deviceSession: null });
+  assert.equal((await service.activate("SYNTHETIC-SAME-CODE")).phase, "active");
+  assert.equal(calls[0], "/device/refresh");
+  assert.equal(store.credential.deviceCredential, "long-lived-proof");
+});
+test("re-entering activation while recovery is unavailable never asks to overwrite server binding", async () => {
+  const calls = [];
+  const { store, service } = recoveryFixture(async (url) => {
+    calls.push(url);
+    throw new Error("synthetic offline");
+  }, { deviceSession: null });
+  assert.equal((await service.activate("SYNTHETIC-SAME-CODE")).phase, "network_error");
+  assert.equal(calls.some(url => url.endsWith("/activate")), false);
+  assert.equal(store.credential.deviceCredential, "long-lived-proof");
+});
+for (const missingSession of [false, true]) {
+  test("unbind upgrade requirement preserves proof: missing session=" + missingSession, async () => {
+    const { store, service } = recoveryFixture(async () =>
+      jsonResponse(426, { error_code: "client_upgrade_required" }),
+      missingSession ? { deviceSession: null } : {});
+    assert.equal((await service.unbind()).phase, "update_required");
+    assert.equal(store.clearDeviceCredentialCalls, 0);
+    assert.equal(store.credential.deviceCredential, "long-lived-proof");
+  });
+}
+test("canonical unbind uses the server-issued bound identity", async () => {
+  const canonical = "v3_" + "a".repeat(64);
+  const { service } = recoveryFixture(async (_url, options) => {
+    assert.equal(JSON.parse(options.body).machine_code, canonical);
+    return jsonResponse(200, { ok: true });
+  }, { boundMachineCode: canonical });
+  await service.unbind();
+});
+function recoveryFixture(fetchImpl, changes = {}) {
+  const store = createStore({
+    codeId: "code-1", deviceSession: "stale-session", deviceCredential: "long-lived-proof",
+    bindingStatus: "active", licenseType: "monthly",
+    activatedAt: activePayload.activated_at, expiresAt: activePayload.expires_at,
+    ...changes,
+  });
+  const service = new LicenseService({
+    secureStore: store, machineCode: async () => "v2_machine",
+    clientVersion: "1.1.17", fetchImpl,
+  });
+  return { store, service };
+}
+
+test("runtime refresh restores a missing session without reactivation", async () => {
+  const calls = [];
+  const { store, service } = recoveryFixture(async (url) => {
+    calls.push(url.split("/api/license")[1]);
+    return url.endsWith("/device/refresh")
+      ? jsonResponse(200, { device_session: "fresh-session" })
+      : jsonResponse(200, withoutDeviceCredentials(activePayload));
+  }, { deviceSession: null });
+  assert.equal((await service.refresh()).phase, "active");
+  assert.deepEqual(calls, ["/device/refresh", "/device/status"]);
+  assert.equal(store.credential.deviceCredential, "long-lived-proof");
+  assert.equal(store.credential.deviceSession, "fresh-session");
+});
+
+test("startup recovery retries after a temporary outage without losing long-lived proof", async () => {
+  let available = false;
+  const { store, service } = recoveryFixture(async (url) => {
+    if (!available) throw new Error("synthetic offline");
+    return url.endsWith("/device/refresh")
+      ? jsonResponse(200, { device_session: "fresh-session" })
+      : jsonResponse(200, withoutDeviceCredentials(activePayload));
+  }, { deviceSession: null });
+  assert.equal((await service.initialize()).phase, "network_error");
+  assert.equal(store.credential.deviceCredential, "long-lived-proof");
+  available = true;
+  assert.equal((await service.refresh()).phase, "active");
+});
+
+test("empty rotation response cannot reuse an expired session or rewrite proof", async () => {
+  const { store, service } = recoveryFixture(async () => jsonResponse(200, { ok: true }));
+  const before = structuredClone(store.credential);
+  assert.equal((await service.refreshDeviceSession(store.credential)).ok, false);
+  assert.deepEqual(store.credential, before);
+});
+
+test("session expiry followed by network failure retains valid offline grace", async () => {
+  let online = true;
+  const { store, service } = recoveryFixture(async (url) => {
+    if (online) return jsonResponse(200, withoutDeviceCredentials(activePayload));
+    if (url.endsWith("/device/status")) return jsonResponse(401, { message: "session expired" });
+    throw new Error("synthetic network failure");
+  });
+  await service.refresh();
+  online = false;
+  assert.equal((await service.refresh()).phase, "offline_active");
+  assert.equal(store.clearDeviceCredentialCalls, 0);
+});
+
+for (const body of [{}, { ok: false, binding_status: "active" }]) {
+  test("malformed status cannot refresh the offline deadline: " + JSON.stringify(body), async () => {
+    let reply = withoutDeviceCredentials(activePayload);
+    const { store, service } = recoveryFixture(async () => jsonResponse(200, reply));
+    await service.refresh();
+    const originalGrant = structuredClone(store.offlineGrant);
+    service.now = () => Date.parse(originalGrant.payload.lastValidatedAt) + 60_000;
+    reply = body;
+    assert.equal((await service.refresh()).phase, "offline_active");
+    assert.equal(store.offlineGrant.payload.lastValidatedAt, originalGrant.payload.lastValidatedAt);
+    assert.equal(store.offlineGrant.payload.graceUntil, originalGrant.payload.graceUntil);
+    assert.equal(store.clearDeviceCredentialCalls, 0);
+  });
+}
+
+test("unbind refreshes an expired session once before confirmed unbinding", async () => {
+  let attempts = 0;
+  const { store, service } = recoveryFixture(async (url, options) => {
+    if (url.endsWith("/device/refresh")) return jsonResponse(200, { device_session: "fresh-session" });
+    attempts += 1;
+    if (attempts === 1) return jsonResponse(401, { message: "session expired" });
+    assert.equal(options.headers.Authorization, "Bearer fresh-session");
+    return jsonResponse(200, { ok: true, binding_status: "unbound" });
+  });
+  assert.equal((await service.unbind()).phase, "needs_activation");
+  assert.equal(attempts, 2);
+  assert.equal(store.clearDeviceCredentialCalls, 1);
+});
+
+for (const failure of [
+  { status: 401, body: { message: "session expired" } },
+  { status: 429, body: {} },
+  { status: 503, body: {} },
+  { status: 200, body: { ok: false } },
+  { status: 200, body: {} },
+]) {
+  test("failed unbind preserves credentials: " + JSON.stringify(failure), async () => {
+    const { store, service } = recoveryFixture(async () => jsonResponse(failure.status, failure.body));
+    await service.unbind();
+    assert.equal(store.clearDeviceCredentialCalls, 0);
+    assert.equal(store.credential.deviceCredential, "long-lived-proof");
+    assert.equal(store.credential.deviceSession, "stale-session");
+  });
+}
+
+test("unbind without short session does not destroy a refreshable credential during outage", async () => {
+  const { store, service } = recoveryFixture(async () => { throw new Error("offline"); }, { deviceSession: null });
+  assert.equal((await service.unbind()).phase, "credential_missing");
+  assert.equal(store.clearDeviceCredentialCalls, 0);
+  assert.equal(store.credential.deviceCredential, "long-lived-proof");
+});
+
+test("explicit revocation while unbinding still clears rejected device proof", async () => {
+  const { store, service } = recoveryFixture(async () => jsonResponse(401, { error_code: "device_credential_revoked" }));
+  assert.equal((await service.unbind()).phase, "invalid");
+  assert.equal(store.clearDeviceCredentialCalls, 1);
+});
 
 function createStore(initial = null) {
   return {

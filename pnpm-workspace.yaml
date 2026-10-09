@@ -12,6 +12,7 @@ supportedArchitectures:
   os:
     - current
     - darwin
+    - win32
   cpu:
     - current
     - arm64

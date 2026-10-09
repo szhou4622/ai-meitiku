@@ -20,8 +20,9 @@ export function createAliyunBrowser({ BrowserWindow, shell, session }) {
       const partition = session.fromPartition('persist:aliyun-subtitle');
       partition.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
       partition.setPermissionCheckHandler(() => false);
-      window = new BrowserWindow({ width: 1180, height: 820, title: '阿里云 · 去字幕服务',
+      window = new BrowserWindow({ width: 1180, height: 820, title: '去字幕服务',
         webPreferences: { session: partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
+      window.on('page-title-updated', event => event.preventDefault());
       window.webContents.on('will-navigate', (event, target) => { if (!isAliyunPage(target)) event.preventDefault(); });
       window.webContents.on('will-redirect', (event, target) => { if (!isAliyunPage(target)) event.preventDefault(); });
       window.webContents.setWindowOpenHandler(({ url: target }) => {

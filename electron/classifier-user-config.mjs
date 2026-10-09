@@ -7,6 +7,7 @@ export const CLASSIFIER_LEGACY_MIGRATION_FILE = ".legacy-template-migration-v1.j
 export const CLASSIFIER_TEMPLATE_BACKUP_DIRECTORY = "template-backups";
 const LEGACY_USER_DATA_DIRECTORY_NAMES = Object.freeze(["AI媒体库", "AI媒体库-精简版"]);
 const runtimeReports = new Map();
+const configInitializations = new Map();
 
 export function classifierUserRoot(userDataPath) {
   return path.join(userDataPath, CLASSIFIER_USER_DIRECTORY);
@@ -215,7 +216,7 @@ async function recoverInvalidTemplatesFromBackups(configRoot) {
   return recovered;
 }
 
-export async function ensureClassifierUserConfig({ packageRoot, userDataPath, legacyUserDataPaths = [] }) {
+async function initializeClassifierUserConfig({ packageRoot, userDataPath, legacyUserDataPaths = [] }) {
   const userRoot = classifierUserRoot(userDataPath);
   const sourceConfig = path.join(packageRoot, "config");
   const targetConfig = path.join(userRoot, "config");
@@ -231,6 +232,22 @@ export async function ensureClassifierUserConfig({ packageRoot, userDataPath, le
   const recoveredFromBackup = await recoverInvalidTemplatesFromBackups(targetConfig);
   runtimeReports.set(path.resolve(userRoot), { migration, recoveredFromBackup });
   return userRoot;
+}
+
+export async function ensureClassifierUserConfig(options) {
+  // Several feature bootstraps share this directory. Serialize default copies
+  // and migrations so a fresh installation cannot race on directory creation.
+  const key = path.resolve(classifierUserRoot(options.userDataPath));
+  const previous = configInitializations.get(key);
+  const operation = previous
+    ? previous.catch(() => {}).then(() => initializeClassifierUserConfig(options))
+    : initializeClassifierUserConfig(options);
+  configInitializations.set(key, operation);
+  try {
+    return await operation;
+  } finally {
+    if (configInitializations.get(key) === operation) configInitializations.delete(key);
+  }
 }
 
 export async function loadClassifierTemplateState(userRoot) {

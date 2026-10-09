@@ -74,6 +74,40 @@ async function writePackageConfig(packageRoot) {
   await writeFile(path.join(packageRoot, "config", "settings.json"), "{}", "utf8");
 }
 
+test("concurrent feature bootstraps initialize one complete config and preserve saved settings", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "classifier-concurrent-init-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const packageRoot = path.join(root, "package");
+  const userDataPath = path.join(root, "user-data");
+  await writePackageConfig(packageRoot);
+  await mkdir(path.join(packageRoot, "config", "rule_docs"), { recursive: true });
+  await writeFile(path.join(packageRoot, "config", "rule_docs", "rules.md"), "default rules");
+  const options = { packageRoot, userDataPath };
+  const roots = await Promise.all(Array.from({ length: 16 }, () => ensureClassifierUserConfig(options)));
+  assert.ok(roots.every(value => value === roots[0]));
+  assert.equal(await readFile(path.join(roots[0], "config", "rule_docs", "rules.md"), "utf8"), "default rules");
+  assert.equal((await loadClassifierTemplateState(roots[0])).activeTemplateId, "builtin");
+  const settingsPath = path.join(roots[0], "config", "settings.json");
+  await writeFile(settingsPath, JSON.stringify({ version: "user-saved" }));
+  await Promise.all(Array.from({ length: 16 }, () => ensureClassifierUserConfig(options)));
+  assert.deepEqual(JSON.parse(await readFile(settingsPath, "utf8")), { version: "user-saved" });
+});
+
+test("failed config initialization does not block a queued valid initialization", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "classifier-init-retry-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const packageRoot = path.join(root, "package");
+  const userDataPath = path.join(root, "user-data");
+  await writePackageConfig(packageRoot);
+  const results = await Promise.allSettled([
+    ensureClassifierUserConfig({ packageRoot: path.join(root, "missing-package"), userDataPath }),
+    ensureClassifierUserConfig({ packageRoot, userDataPath }),
+  ]);
+  assert.equal(results[0].status, "rejected");
+  assert.equal(results[1].status, "fulfilled");
+  assert.equal((await loadClassifierTemplateState(results[1].value)).activeTemplateId, "builtin");
+});
+
 test("legacy product-name user data restores custom schemes without replacing current data", async () => {
   const appDataPath = await mkdtemp(path.join(os.tmpdir(), "classifier-legacy-migration-"));
   const packageRoot = path.join(appDataPath, "package");

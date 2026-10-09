@@ -8,10 +8,28 @@ import { EventEmitter } from 'node:events';
 import { AliyunSubtitleService } from '../electron/aliyun-subtitle-service.mjs';
 import { validateRegion, cloudErrorMessage, safeResultUrl, probeVideo, downloadAliyunResult, createAliyunClient } from '../electron/aliyun-subtitle-client.mjs';
 import { createAliyunBrowser, isAliyunPage, aliyunLinks } from '../electron/aliyun-browser.mjs';
+import { subtitleDisplayDirectory, subtitleDisplayText } from '../electron/subtitle-display.mjs';
 
 const region = { BX: 0, BY: .75, BW: 1, BH: .25 };
 const fakeKeys = { accessKeyId: 'testAccessKey12345', accessKeySecret: 'testSecret123456789', browserMode: 'system' };
 const flush = () => new Promise(resolve => setImmediate(resolve));
+
+test('historical status copy is neutral while credentials, task identifiers and saved paths stay unchanged', () => {
+  const service = new AliyunSubtitleService({});
+  const job = { id: 'old', batchId: 'batch', status: 'paused', jobId: 'request-id', credentialFingerprint: 'private', message: '请检查阿里云连接后继续', outputPath: '/Downloads/阿里云去字幕/result.mp4' };
+  service.jobs = [job];
+  const state = service.publicState();
+  assert.doesNotMatch(state.jobs[0].message, /阿里云/);
+  assert.doesNotMatch(state.batch.message, /阿里云/);
+  assert.equal(state.jobs[0].jobId, job.jobId);
+  assert.equal(state.jobs[0].outputPath, job.outputPath);
+  assert.equal(state.jobs[0].credentialFingerprint, undefined);
+  assert.equal(service.jobs[0], job);
+  assert.equal(job.message, '请检查阿里云连接后继续');
+  assert.doesNotMatch(subtitleDisplayDirectory('/Downloads/阿里云去字幕'), /阿里云/);
+  assert.equal(subtitleDisplayDirectory('/Downloads/成片'), '/Downloads/成片');
+  assert.doesNotMatch(subtitleDisplayText('阿里云处理中'), /阿里云/);
+});
 function store() {
   const files = new Map();
   return { files, readEncrypted: async key => files.get(key) || null, writeEncrypted: async (key, text) => { files.set(key, text); } };
@@ -137,6 +155,10 @@ test('both browser routes work and embedded navigation has no preload or Node ac
   await open('guide', 'system'); assert.equal(external, aliyunLinks.guide);
   await open('keys', 'system'); assert.equal(external, 'https://ram.console.aliyun.com/manage/ak');
   await open('keys', 'embedded'); assert.equal(load, 'https://ram.console.aliyun.com/manage/ak'); assert.equal(options.webPreferences.nodeIntegration, false); assert.equal(options.webPreferences.preload, undefined); assert.equal(options.webPreferences.sandbox, true);
+  assert.equal(options.title, '去字幕服务');
+  let titlePrevented = false;
+  Window.latest.emit('page-title-updated', { preventDefault() { titlePrevented = true; } }, '阿里云控制台');
+  assert.equal(titlePrevented, true);
   let prevented = false; Window.latest.webContents.emit('will-navigate', { preventDefault() { prevented = true; } }, 'file:///etc/passwd'); assert.equal(prevented, true); assert.ok(navigation);
   assert.deepEqual(popup({ url: 'javascript:alert(1)' }), { action: 'deny' });
   assert.equal(isAliyunPage('https://help.aliyun.com/path'), true); assert.equal(isAliyunPage('https://aliyun.com.evil.test/'), false);
