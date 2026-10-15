@@ -34,7 +34,11 @@ export class FeiguaBrowser {
     this.detailRequests = [];
   }
 
-  sourceOrigin() { return null; } // Only official Feigua origins are accepted.
+  sourceOrigin() {
+    if (!this.window || this.window.isDestroyed?.()) return null;
+    const url = this.window.webContents.getURL();
+    return isFeiguaDataUrl(url) ? new URL(url).origin : null;
+  }
   isProviderUrl(url) { return isFeiguaDataUrl(url); }
 
   ensureWindow(show = false) {
