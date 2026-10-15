@@ -84,6 +84,12 @@ export class FeiguaBrowser {
   async navigate(url) {
     if (!this.isProviderUrl(url)) throw issue('飞瓜来源地址不受支持');
     const window = this.ensureWindow();
+    // SPA navigation retains the 250-entry resource timing buffer. Reset only
+    // timing diagnostics so each detail lookup can observe its fresh requests.
+    if (this.isProviderUrl(window.webContents.getURL())) {
+      try { await window.webContents.executeJavaScript('performance.clearResourceTimings()'); }
+      catch { /* The old document may already be unloading. */ }
+    }
     try { await window.loadURL(url); }
     catch { throw issue('飞瓜页面加载失败，请检查网络后重试', 'FEIGUA_NETWORK'); }
   }
