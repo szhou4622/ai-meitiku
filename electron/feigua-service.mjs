@@ -2,19 +2,18 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
 import { pendingTopicCheck, settledTopicPeriod } from './feigua-topic-schedule.mjs';
 import { pendingMusicCheck } from './feigua-music-schedule.mjs';
 import { retainProductFields, restoreProductFieldsInState } from './feigua-product-cache.mjs';
 import builtInVideoFilters from './feigua-video-catalog.json' with { type: 'json' };
-import { FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
+import { FEIGUA_HOME, FEIGUA_SOURCES, normalizeKeywords, normalizeMusicTag, normalizeMusicTagOptions, validateMusicTag, validateCapture, normalizeVideoQueries, normalizeVideoOptions, validateVideoQueries } from './feigua-contract.mjs';
 
 const videoFilterDefaults = (cached) => ({
   categoryPath: normalizeVideoOptions(cached?.categoryPath?.length ? cached.categoryPath : builtInVideoFilters.categoryPath),
   tagPath: normalizeVideoOptions(cached?.tagPath?.length ? cached.tagPath : builtInVideoFilters.tagPath),
 });
-const initial = () => ({ version: 1, loginEntryUrl: '', keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
+const initial = () => ({ version: 1, loginEntryUrl: FEIGUA_HOME, keywords: [], videoQueries: [], videoFilterOptions: videoFilterDefaults(), musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, lastHotspotsScheduleDate: null, lastVideosScheduleDate: null, latestResults: [], runs: [] });
 const assertNotCancelled = signal => { if (signal?.aborted) throw Object.assign(new Error('已取消采集'), { code: 'FEIGUA_CANCELLED' }); };
 const detailStopMessages = Object.freeze({
   auth_required: '飞瓜登录已失效，已停止后续采集，请重新登录',
@@ -50,7 +49,6 @@ export class FeiguaService {
   constructor({ userDataPath, browser, storage, retryWait = (ms, signal) => delay(ms, undefined, { signal }) }) {
     this.browser = browser;
     this.retryWait = retryWait;
-    this.browser.onWorkspaceVerified = hint => this.saveWorkspaceHint(hint);
     this.browser.onVideoDetailProgress = ({ index, total }) => {
       const run = this.data.runs[0];
       if (this.controller && run?.status === 'running') run.message = `已取得视频榜单，正在核验补充信息（${index}/${total} 条）`;
@@ -104,7 +102,7 @@ export class FeiguaService {
     const stored = await this.storage.read();
     if (stored.version !== 1 || !Array.isArray(stored.runs)) throw new Error('热点数据格式无法识别，已保留原文件');
     const { data, changed: fieldsRestored } = restoreProductFieldsInState(stored);
-    this.data = { version: 1, loginEntryUrl: normalizeLoginEntryUrl(data.loginEntryUrl ?? ''), keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
+    this.data = { version: 1, loginEntryUrl: FEIGUA_HOME, keywords: normalizeKeywords(data.keywords), musicTag: normalizeMusicTag(data.musicTag),
       videoQueries: normalizeVideoQueries(data.videoQueries ?? normalizeKeywords(data.keywords).map(keyword => ({ keyword }))),
       videoFilterOptions: videoFilterDefaults(data.videoFilterOptions),
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
@@ -119,21 +117,9 @@ export class FeiguaService {
       latestResults: recoverLatestResults(data.runs, data.latestResults),
       videoHistory: recoverVideoHistory(data.runs, data.latestResults || [], Array.isArray(data.videoHistory) ? data.videoHistory : []), runs: data.runs.slice(0, 12) };
     this.data.keywords = this.data.videoQueries.map(query => query.keyword);
-    this.browser.setLoginEntryUrl?.(this.data.loginEntryUrl);
-    // Upgrade existing API results into an untrusted reload hint once. An
-    // explicit null (e.g. after editing the entry) must never resurrect it.
-    let hint = data.workspaceHint;
-    if (!Object.hasOwn(data, 'workspaceHint')) {
-      const result = this.data.latestResults.find(group => group.result?.provenance?.transport === 'provider-api' && group.result.provenance.responseCode === 200)?.result;
-      try {
-        const source = new URL(result?.sourceUrl);
-        if (source.pathname.startsWith('/app/')) hint = { entryUrl: this.data.loginEntryUrl, origin: source.origin };
-      } catch { /* No previously verified provider result. */ }
-    }
-    this.data.workspaceHint = normalizeWorkspaceHint(hint, this.data.loginEntryUrl);
-    this.browser.setWorkspaceHint?.(this.data.workspaceHint);
-    if (!this.data.loginEntryUrl) this.auth = { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-    let recovered = fieldsRestored;
+    // Discard old portal destinations, preserving saved results and filters.
+    // A persisted URL or historical result can never restore a third-party source.
+    let recovered = fieldsRestored || Boolean(data.loginEntryUrl && data.loginEntryUrl !== FEIGUA_HOME) || Object.hasOwn(data, 'workspaceHint');
     for (const run of this.data.runs) {
       if (run.status === 'running') {
         run.status = 'interrupted';
@@ -151,20 +137,9 @@ export class FeiguaService {
     return write;
   }
 
-  async saveWorkspaceHint(input) {
-    const save = this.writeQueue.then(async () => {
-      const workspaceHint = normalizeWorkspaceHint(input, this.data.loginEntryUrl);
-      if (!workspaceHint) throw new Error('工作台复查地址与当前登录入口不一致');
-      await this.storage.write({ ...structuredClone(this.data), workspaceHint });
-      this.data.workspaceHint = workspaceHint;
-    });
-    this.writeQueue = save.catch(() => {});
-    await save;
-  }
-
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), credentialMessage: this.browser.credentialMessage || null, storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
+    return structuredClone({ ...this.data, auth: this.auth, busy: Boolean(this.operation || this.controller), storageMessage: this.storageMessage || null, scheduleMessage: this.scheduleMessage || null, catalogMessage: this.catalogMessage || null });
   }
 
   startDailySchedule(canRun) {
@@ -305,33 +280,9 @@ export class FeiguaService {
     return this.state();
   }
 
-  async saveLoginEntryUrl(input) {
-    const loginEntryUrl = normalizeLoginEntryUrl(input);
-    await this.exclusive(async () => {
-      await this.configQueue;
-      if (loginEntryUrl === this.data.loginEntryUrl) return;
-      const save = this.writeQueue.then(async () => {
-        await this.storage.write({ ...structuredClone(this.data), loginEntryUrl, workspaceHint: null });
-        this.data.loginEntryUrl = loginEntryUrl;
-        this.data.workspaceHint = null;
-      });
-      this.writeQueue = save.catch(() => {});
-      this.configQueue = save.catch(() => {});
-      await save;
-      this.autoCollectRequested = false;
-      this.autoCatalogRequested = false;
-      this.loginSequence++;
-      this.browser.setLoginEntryUrl?.(loginEntryUrl);
-      this.browser.setWorkspaceHint?.(null);
-      this.auth = { status: 'signed_out', message: loginEntryUrl ? '登录入口已保存，请打开入口完成登录并进入飞瓜工作台' : '请先配置并保存登录入口网址' };
-    });
-    return this.state();
-  }
-
   async login({ collectAfterLogin = true } = {}) {
     await this.exclusive(async () => {
       await this.configQueue;
-      if (!this.data.loginEntryUrl) throw new Error('请先配置并保存登录入口网址');
       this.autoCollectRequested = collectAfterLogin === true;
       this.autoCatalogRequested = true;
       this.loginSequence++;

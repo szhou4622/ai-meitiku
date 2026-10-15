@@ -178,9 +178,9 @@ test('cancellation during keyword saving preserves settings but cannot start the
 
 test('a keyword task takes over the login window without stale monitor callbacks closing it', async () => {
   for (const monitorFirst of [true,false]) {
-    const entry='http://192.0.2.10:16888/',origin='http://192.0.2.10:13042';
+    const origin='https://dy.feigua.cn',entry=origin+'/';
     const browser=new FeiguaBrowser({});let closed=false,hidden=0,collects=0;const pending=[];
-    const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>({version:1,loginEntryUrl:entry,workspaceHint:{entryUrl:entry,origin},keywords:[],runs:[]}),write:async()=>{}}});
+    const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>({version:1,loginEntryUrl:entry,keywords:[],runs:[]}),write:async()=>{}}});
     await service.ready;
     browser.window={isDestroyed:()=>closed,webContents:{getURL:()=>origin+'/app/'},hide:()=>{hidden++;},close:()=>{closed=true;browser.window=null;browser.stopLoginWatch();}};
     browser.execute=async()=>new Promise(resolve=>pending.push(resolve));

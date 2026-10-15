@@ -1,10 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
-import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { FEIGUA_ENDPOINTS, observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
-import { normalizeLoginCredentials, loginFormMemory } from './feigua-login-credentials.mjs';
-import { fileURLToPath } from 'node:url';
 import { VIDEO_DETAIL_ENDPOINTS, observeVideoDetailRequest, readVideoDetailsApi, enrichVideoRow, videoPublishedDate } from './feigua-video-details.mjs';
 
 function issue(message, code = 'FEIGUA_PAGE_CHANGED') {
@@ -18,141 +15,27 @@ export function isCollectionLoadingRequest(details, windowId, sourceOrigin) {
   catch { return false; }
 }
 
-export function isFeiguaNavigation(value, loginEntryUrl = '') {
+export function isFeiguaNavigation(value) {
   if (isFeiguaDataUrl(value)) return true;
-  if (isLoginEntryNavigation(value, loginEntryUrl)) return true;
   try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'open.weixin.qq.com' && !url.port && !url.username && !url.password; }
   catch { return false; }
 }
 
 export class FeiguaBrowser {
-  constructor({ BrowserWindow, session, credentialStore, ipcMain }) {
+  constructor({ BrowserWindow, session }) {
     this.BrowserWindow = BrowserWindow; this.session = session;
     this.window = null; this.pending = new Set(); this.lastNetwork = 0;
     this.wasAuthenticated = false;
     this.loginTimer = null; this.loginWatchGeneration = 0;
     this.verificationTimer = null; this.verificationGeneration = 0; this.verificationWindow = null; this.verificationSeen = false;
     this.onAuthChange = null;
-    this.loginEntryUrl = '';
-    this.loginRelayOrigins = new Set();
     this.requestSequence = 0;
     this.rankingRequests = [];
     this.detailRequests = [];
-    this.verifiedSourceOrigin = null;
-    this.workspaceHint = null;
-    this.credentialStore = credentialStore;
-    this.credentialTimer = null;
-    this.credentialContext = null;
-    this.credentialPending = false;
-    this.credentialMessage = null;
-    this.ipcMain = ipcMain;
-    this.credentialListener = (event, payload) => {
-      event.returnValue = false;
-      const window = this.window;
-      if (!window || window.isDestroyed() || !event.senderFrame || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isLoginEntryNavigation(event.senderFrame.url, this.loginEntryUrl)) return;
-      event.returnValue = this.rememberLoginCredentials(payload);
-    };
-    if (credentialStore && ipcMain) ipcMain.on('feigua-private-login-memory', this.credentialListener);
   }
 
-  setLoginEntryUrl(value) {
-    const next = normalizeLoginEntryUrl(value);
-    if (next === this.loginEntryUrl) return;
-    this.stopLoginWatch();
-    this.stopVerificationWatch();
-    this.wasAuthenticated = false;
-    this.loginRelayOrigins.clear();
-    this.verifiedSourceOrigin = null;
-    this.workspaceHint = null;
-    if (this.window && !this.window.isDestroyed()) this.window.close();
-    this.loginEntryUrl = next;
-  }
-
-  sourceOrigin() { return this.verifiedSourceOrigin; }
-
-  stopCredentialMemory() {
-    clearInterval(this.credentialTimer);
-    this.credentialTimer = null;
-    this.credentialContext = null;
-  }
-
-  async runLoginMemory(window, command, credentials) {
-    const entryUrl = this.loginEntryUrl;
-    if (this.window !== window || window.isDestroyed() || !isLoginEntryNavigation(window.webContents.getURL(), entryUrl)) return { installed: false };
-    const argument = { command, origin: new URL(entryUrl).origin, credentials };
-    const result = await window.webContents.executeJavaScriptInIsolatedWorld(47, [{ code: `(() => { try { return (${loginFormMemory.toString()})(${JSON.stringify(argument)}); } catch { return { installed: false, failed: true }; } })()` }]);
-    if (this.window !== window || window.isDestroyed() || this.loginEntryUrl !== entryUrl || !isLoginEntryNavigation(window.webContents.getURL(), entryUrl)) return { installed: false };
-    return result;
-  }
-
-  async installCredentialMemory(window) {
-    this.stopCredentialMemory();
-    if (!this.credentialStore || !isLoginEntryNavigation(window.webContents.getURL(), this.loginEntryUrl)) return;
-    const entryUrl = this.loginEntryUrl;
-    try {
-      let credentials;
-      try { credentials = await this.credentialStore.read(entryUrl); }
-      catch { this.credentialMessage = '已保存的登录信息暂时无法读取，请手动输入'; }
-      if (this.loginEntryUrl !== entryUrl || this.window !== window || window.isDestroyed()) return;
-      const result = await this.runLoginMemory(window, 'install', credentials);
-      if (!result?.installed) return;
-      this.credentialContext = { entryUrl, windowId: window.webContents.id, lastSequence: 0 };
-      const tick = () => void this.captureCredentialChanges(window).catch(() => {
-        this.credentialMessage = '登录信息未能加密保存，请手动输入；当前登录仍可继续';
-      });
-      this.credentialTimer = setInterval(tick, 300);
-      this.credentialTimer.unref?.();
-      tick();
-    } catch { this.credentialMessage = '登录信息自动回填未完成，请手动输入'; }
-  }
-
-  async captureCredentialChanges(window) {
-    if (this.credentialPending || !this.credentialContext) return;
-    this.credentialPending = true;
-    const entryUrl = this.credentialContext.entryUrl;
-    try {
-      const state = await this.runLoginMemory(window, 'take');
-      if (!state?.installed || !state.credentials) return;
-      if (this.credentialContext?.entryUrl === entryUrl) this.rememberLoginCredentials(state);
-    } finally { this.credentialPending = false; }
-  }
-
-  rememberLoginCredentials(payload) {
-    const context = this.credentialContext;
-    if (!context || !this.credentialStore || this.loginEntryUrl !== context.entryUrl || !Number.isSafeInteger(payload?.sequence) || payload.sequence <= context.lastSequence || ![true, false].includes(payload.remember)) return false;
-    const credentials = payload.remember ? normalizeLoginCredentials(payload.credentials) : null;
-    if (payload.remember && !credentials) return false;
-    context.lastSequence = payload.sequence;
-    void this.credentialStore.write(context.entryUrl, credentials).then(() => {
-      if (this.loginEntryUrl === context.entryUrl) this.credentialMessage = null;
-    }).catch(() => { this.credentialMessage = '登录信息未能加密保存，请手动输入；当前登录仍可继续'; });
-    return true;
-  }
-
-  setWorkspaceHint(value) {
-    this.workspaceHint = normalizeWorkspaceHint(value, this.loginEntryUrl);
-    if (this.workspaceHint) this.loginRelayOrigins.add(this.workspaceHint.origin);
-  }
-
-  async verifyWorkspace(auth, window = this.window, isCurrent = () => true) {
-    if (!auth.authenticated) return;
-    const valid = () => isCurrent() && window && this.window === window && !window.isDestroyed?.();
-    if (!valid()) throw issue('登录检查已取消或窗口已关闭', 'FEIGUA_CANCELLED');
-    if (!this.isRelayWorkspace(window.webContents.getURL())) return;
-    const origin = new URL(window.webContents.getURL()).origin;
-    const hint = normalizeWorkspaceHint({ entryUrl: this.loginEntryUrl, origin }, this.loginEntryUrl);
-    if (JSON.stringify(hint) !== JSON.stringify(this.workspaceHint)) await this.onWorkspaceVerified?.(hint);
-    if (!valid()) throw issue('登录检查已取消或窗口已关闭', 'FEIGUA_CANCELLED');
-    this.workspaceHint = hint;
-    this.verifiedSourceOrigin = origin;
-  }
-
-  isProviderUrl(url) { return isFeiguaDataUrl(url, this.verifiedSourceOrigin); }
-
-  isRelayWorkspace(url) {
-    try { return new URL(url).pathname.startsWith('/app/') && [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin)); }
-    catch { return false; }
-  }
+  sourceOrigin() { return null; } // Only official Feigua origins are accepted.
+  isProviderUrl(url) { return isFeiguaDataUrl(url); }
 
   ensureWindow(show = false) {
     if (this.window && !this.window.isDestroyed()) { if (show) { this.window.show(); this.window.focus(); } return this.window; }
@@ -162,11 +45,11 @@ export class FeiguaBrowser {
       this.partition.setPermissionCheckHandler(() => false);
       this.partition.on('will-download', event => event.preventDefault());
       this.partition.webRequest.onBeforeRequest((details, callback) => {
-        if (isCollectionLoadingRequest(details, this.window?.webContents.id, this.verifiedSourceOrigin)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
+        if (isCollectionLoadingRequest(details, this.window?.webContents.id, this.sourceOrigin())) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
         if (this.window && details.webContentsId === this.window.webContents.id) {
-          const request = observeFeiguaRequest(details, this.verifiedSourceOrigin);
+          const request = observeFeiguaRequest(details, this.sourceOrigin());
           if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
-          const detailRequest = observeVideoDetailRequest(details, this.verifiedSourceOrigin);
+          const detailRequest = observeVideoDetailRequest(details, this.sourceOrigin());
           if (detailRequest) this.detailRequests = [...this.detailRequests, { ...detailRequest, sequence: ++this.requestSequence }].slice(-30);
         }
         callback({});
@@ -176,28 +59,21 @@ export class FeiguaBrowser {
       this.partition.webRequest.onErrorOccurred(done);
     }
     const window = new this.BrowserWindow({ width: 1320, height: 900, show, title: '飞瓜 · 热点采集',
-      webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
-        ...(this.credentialStore ? { preload: fileURLToPath(new URL('./feigua-login-preload.cjs', import.meta.url)) } : {}) } });
+      webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
     this.window = window;
-    window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-      if (isMainFrame && !isInPlace) this.stopCredentialMemory();
-    });
-    window.webContents.on('did-finish-load', () => { void this.installCredentialMemory(window); });
-    const allowedNavigation = url => isFeiguaNavigation(url, this.loginEntryUrl) || [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin));
+    const allowedNavigation = url => isFeiguaNavigation(url);
     const guard = (event, url) => { if (!allowedNavigation(url)) event.preventDefault(); };
     window.webContents.on('will-navigate', guard);
     window.webContents.on('will-redirect', guard);
     window.webContents.on('will-attach-webview', event => event.preventDefault());
     window.webContents.setWindowOpenHandler(({ url }) => {
-      const fromPortal = isLoginEntryNavigation(window.webContents.getURL(), this.loginEntryUrl);
-      if (fromPortal && isLoginEntryHandoff(url, this.loginEntryUrl)) this.loginRelayOrigins.add(new URL(url).origin);
       const allowed = allowedNavigation(url);
       try { const parsed = new URL(url); this.lastNavigation = { path: parsed.origin + parsed.pathname, allowed }; } catch { this.lastNavigation = { allowed: false }; }
       if (allowed) void window.loadURL(url).catch(() => {});
-      else this.onAuthChange?.({ status: 'signed_out', message: '入口跳转地址尚不支持，请返回入口重试或核对网址' });
+      else this.onAuthChange?.({ status: 'signed_out', message: '飞瓜登录跳转地址不受支持，请返回官方飞瓜重试' });
       return { action: 'deny' };
     });
-    window.on('closed', () => { this.stopCredentialMemory(); this.stopLoginWatch(); if (this.window === window) { this.stopVerificationWatch(); this.window = null; } this.pending.clear(); this.rankingRequests = []; });
+    window.on('closed', () => { this.stopLoginWatch(); if (this.window === window) { this.stopVerificationWatch(); this.window = null; } this.pending.clear(); this.rankingRequests = []; });
     return window;
   }
 
@@ -213,8 +89,7 @@ export class FeiguaBrowser {
     const window = this.window, generation = this.loginWatchGeneration, verificationGeneration = this.verificationGeneration;
     const isCurrent = () => this.window === window && !window.isDestroyed() && generation === this.loginWatchGeneration && verificationGeneration === this.verificationGeneration;
     const currentUrl = window.webContents.getURL();
-    if (!this.isProviderUrl(currentUrl) && !this.isRelayWorkspace(currentUrl)) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
-    if (!this.isProviderUrl(currentUrl) && !['auth', 'accept-terms'].includes(command)) throw issue('请先核验代理工作台登录', 'FEIGUA_AUTH_REQUIRED');
+    if (!this.isProviderUrl(currentUrl)) throw issue('请先完成飞瓜登录', 'FEIGUA_AUTH_REQUIRED');
     let result;
     try { result = await window.webContents.executeJavaScript(`(${feiguaPage.toString()})(${JSON.stringify(command)}, ${JSON.stringify(argument)})`); }
     catch { if (!isCurrent()) throw issue('页面读取已取消', 'FEIGUA_CANCELLED'); throw issue('飞瓜页面暂不可读取，请检查页面后重试'); }
@@ -267,7 +142,6 @@ export class FeiguaBrowser {
         if (auth.actionRequired === 'verification') this.verificationSeen = true;
         if (auth.actionRequired || auth.loading) return;
         if (auth.authenticated && this.verificationSeen) {
-          await this.verifyWorkspace(auth, window, isCurrent);
           if (!isCurrent()) return;
           this.wasAuthenticated = true;
           window.hide?.(); // Keep the same verified window available for a retry.
@@ -306,7 +180,6 @@ export class FeiguaBrowser {
       assertCurrent();
     }
     if (auth.loading) throw issue('飞瓜工作台尚未加载完成，请稍后重试', 'FEIGUA_NETWORK');
-    await this.verifyWorkspace(auth, window, isCurrent);
     assertCurrent();
     if (auth.actionRequired !== 'terms') return auth;
     this.onAuthChange?.({ status: 'checking', message: '正在自动处理飞瓜声明…' });
@@ -318,7 +191,6 @@ export class FeiguaBrowser {
       auth = await this.execute('auth');
       assertCurrent();
       if (!auth.actionRequired) {
-        await this.verifyWorkspace(auth, window, isCurrent);
         assertCurrent();
         return auth;
       }
@@ -340,13 +212,12 @@ export class FeiguaBrowser {
   }
 
   async openLogin() {
-    if (!this.loginEntryUrl) throw issue('请先配置并保存登录入口网址', 'FEIGUA_ENTRY_REQUIRED');
     this.stopLoginWatch();
     this.stopVerificationWatch();
-    this.onAuthChange?.({ status: 'signed_out', message: '请在登录入口完成登录，并进入飞瓜工作台' });
+    this.onAuthChange?.({ status: 'signed_out', message: '请在官方飞瓜窗口完成登录' });
     this.ensureWindow(true);
-    try { await this.window.loadURL(this.loginEntryUrl); }
-    catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
+    try { await this.window.loadURL(FEIGUA_HOME); }
+    catch { throw issue('官方飞瓜加载失败，请检查网络后重试', 'FEIGUA_NETWORK'); }
     if (isFeiguaDataUrl(this.window.webContents.getURL())) {
       const auth = await this.execute('auth');
       if (!auth.authenticated && !auth.workspaceAvailable && !auth.actionRequired) await this.execute('login');
@@ -372,7 +243,7 @@ export class FeiguaBrowser {
       const loginWindow = this.window;
       const isCurrent = () => generation === this.loginWatchGeneration && this.window === loginWindow && !loginWindow.isDestroyed();
       try {
-        if (!this.isProviderUrl(loginWindow.webContents.getURL()) && !this.isRelayWorkspace(loginWindow.webContents.getURL())) return;
+        if (!this.isProviderUrl(loginWindow.webContents.getURL())) return;
         const auth = await this.resolveAuth(undefined, isCurrent);
         if (!isCurrent()) return;
         if (!auth.authenticated && auth.workspaceAvailable) {
@@ -424,20 +295,17 @@ export class FeiguaBrowser {
   }
 
   async checkLoginSession(isCurrent) {
-    if (!this.loginEntryUrl && (!this.window || this.window.isDestroyed?.())) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
     this.ensureWindow();
     if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
     const currentUrl = this.window.webContents.getURL();
-    if (!currentUrl || this.workspaceHint && isLoginEntryNavigation(currentUrl, this.loginEntryUrl) && !this.isRelayWorkspace(currentUrl)) {
-      if (!this.loginEntryUrl) return { status: 'signed_out', message: '请先配置并保存登录入口网址' };
-      const workspaceOrigin = this.verifiedSourceOrigin || this.workspaceHint?.origin;
-      try { await this.window.loadURL(workspaceOrigin ? `${workspaceOrigin}/app/` : this.loginEntryUrl); }
-      catch { throw issue('登录入口加载失败，请检查网址和网络后重试', 'FEIGUA_NETWORK'); }
+    if (!currentUrl) {
+      try { await this.window.loadURL(FEIGUA_HOME); }
+      catch { throw issue('官方飞瓜加载失败，请检查网络后重试', 'FEIGUA_NETWORK'); }
       if (!isCurrent()) throw issue('登录检查已取消', 'FEIGUA_CANCELLED');
     }
-    if (!this.isProviderUrl(this.window.webContents.getURL()) && !this.isRelayWorkspace(this.window.webContents.getURL())) return this.wasAuthenticated || this.workspaceHint
-      ? { status: 'expired', message: '飞瓜登录已失效，请点击“打开登录入口”重新登录' }
-      : { status: 'signed_out', message: '请点击“打开登录入口”完成登录，并进入飞瓜工作台' };
+    if (!this.isProviderUrl(this.window.webContents.getURL())) return {
+      status: this.wasAuthenticated ? 'expired' : 'signed_out', message: '请点击“登录官方飞瓜”完成登录',
+    };
     let auth = await this.resolveAuth(undefined, isCurrent);
     if (!auth.authenticated && auth.workspaceAvailable) {
       await this.enterWorkspace();
@@ -445,7 +313,7 @@ export class FeiguaBrowser {
       auth = await this.waitForWorkspace(undefined, isCurrent);
     }
     if (auth.authenticated) { this.wasAuthenticated = true; return { status: 'authenticated', message: '已登录飞瓜' }; }
-    return { status: this.wasAuthenticated || this.workspaceHint ? 'expired' : 'signed_out', message: this.wasAuthenticated || this.workspaceHint ? '飞瓜登录已失效，请点击“打开登录入口”重新登录' : '请点击“打开登录入口”完成飞瓜登录' };
+    return { status: this.wasAuthenticated ? 'expired' : 'signed_out', message: this.wasAuthenticated ? '飞瓜登录已失效，请点击“登录官方飞瓜”重新登录' : '请点击“登录官方飞瓜”完成登录' };
   }
 
   async enterWorkspace() {
@@ -501,7 +369,7 @@ export class FeiguaBrowser {
     if (!source) throw issue('未知飞瓜来源');
     if (signal?.aborted) throw issue('已取消采集');
     // Discover routes from the signed-in application's menu; never guess API paths.
-    await this.navigate(this.verifiedSourceOrigin ? `${this.verifiedSourceOrigin}/app/` : FEIGUA_HOME);
+    await this.navigate(FEIGUA_HOME);
     const auth = await this.resolveAuth(signal);
     if (auth.workspaceAvailable) {
       await this.enterWorkspace();
@@ -667,5 +535,5 @@ export class FeiguaBrowser {
   }
 
   stop() { this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.webContents.stop?.(); }
-  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
+  dispose() { this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
 }
