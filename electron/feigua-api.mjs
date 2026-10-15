@@ -10,7 +10,7 @@ export const FEIGUA_ENDPOINTS = Object.freeze({
 });
 const allowedParameters = new Set(['pageIndex', 'pageSize', 'pageType', 'filter.sort', 'sortField', 'order', 'topicRankType', 'period', 'dateCode', 'rankType',
   'q.keyword', 'q.keywordType', 'q.mSearchType', 'q.tagMode', 'q.sort', 'q.searchType', 'q.dateFrom', 'q.dateTo']);
-const categoryParameter = key => /^(?:filter\.|q\.)?(?:[\w]*tag[\w]*|[\w]*category[\w]*)$/i.test(key) && key !== 'q.tagMode';
+const categoryParameter = key => key === 'q.cate0' || /^(?:filter\.|q\.)?(?:[\w]*tag[\w]*|[\w]*category[\w]*)$/i.test(key) && key !== 'q.tagMode';
 const problem = message => Object.assign(new Error(message), { publicMessage: message, code: 'FEIGUA_API_INVALID' });
 
 export function observeFeiguaRequest(details, sourceOrigin = null) {
@@ -60,7 +60,7 @@ export function validateFeiguaRequest(kind, request, context) {
     if (path?.length ? !values.includes(String(id)) : values.length > 0) throw problem('接口分类参数与页面实际分类不一致');
   };
   if (['music', 'topics'].includes(kind)) checkCategory(context.musicTag, context.musicTagId, /tag|category/i);
-  if (kind === 'videos') { checkCategory(context.categoryPath, context.categoryId, /category/i); checkCategory(context.tagPath, context.tagId, /tag/i); }
+  if (kind === 'videos') { checkCategory(context.categoryPath, context.categoryId, /category|^q\.cate0$/i); checkCategory(context.tagPath, context.tagId, /tag/i); }
   return request;
 }
 

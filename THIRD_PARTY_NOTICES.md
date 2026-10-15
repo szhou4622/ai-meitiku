@@ -58,3 +58,9 @@ These SDKs are used by the isolated Aliyun subtitle-removal integration.
 Their package license files accompany the runtime dependencies. Videos are
 uploaded directly to Alibaba Cloud through its official advance SDK method;
 AccessKeys are stored locally using Electron safeStorage.
+
+## Local speech recognition
+
+- whisper.cpp 1.9.1: https://github.com/ggml-org/whisper.cpp, MIT; license bundled at `electron/whisper-LICENSE`. Native binaries and shared libraries are bundled for macOS arm64/x64 and Windows x64, with SHA-256 recorded in `local-asr-manifest.json`.
+- OpenAI Whisper multilingual large-v3-turbo model (GGML Q5_0, `ggml-large-v3-turbo-q5_0.bin`): https://github.com/openai/whisper, MIT. Stored under `bundled-models/whisper`, copied into application resources by the existing model packaging rule.
+- OpenCC Traditional-to-Simplified dictionary: https://github.com/BYVoid/OpenCC, Apache-2.0. Dictionary provenance and commit are embedded in `electron/text-conversion/t2s-map.json`; license bundled beside the dictionary. Conversion runs offline and preserves English, numbers and timestamps.

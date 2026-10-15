@@ -99,6 +99,7 @@ test("old v2 device enrolls an authenticated factor baseline only after online s
     getState: () => license?.state, baselineEnabled: true,
   });
   license = new LicenseService({
+    now: () => Date.parse("2026-09-20T00:00:00Z"),
     secureStore, machineCode: async () => MACHINE, clientVersion: "1.1.6",
     config: { appName: "ai-media-library", softwareName: "AI媒体库", baseUrl: mock.url, protocolVersion: 2, offlineGraceDays: 7 },
     onOnlineValidated: () => { void observer.onlineValidationSucceeded(); },
@@ -179,6 +180,7 @@ test("online validation first, collection later: one local-server POST with only
   let license;
   const observer = coordinator({ baseUrl: mock.url, secureStore, machineIdentity, getState: () => license?.state });
   license = new LicenseService({
+    now: () => Date.parse("2026-09-20T00:00:00Z"),
     secureStore, machineCode: async () => MACHINE, clientVersion: "1.1.6",
     config: { appName: "ai-media-library", softwareName: "AI媒体库", baseUrl: mock.url, protocolVersion: 2, offlineGraceDays: 7 },
     onOnlineValidated: () => { void observer.onlineValidationSucceeded(); },
@@ -214,6 +216,7 @@ test("collection first, authorization later: status success schedules background
   const observer = coordinator({ baseUrl: mock.url, secureStore, machineIdentity, getState: () => license?.state });
   await observer.maybeSend();
   license = new LicenseService({
+    now: () => Date.parse("2026-09-20T00:00:00Z"),
     secureStore, machineCode: async () => MACHINE, clientVersion: "1.1.6",
     config: { appName: "ai-media-library", softwareName: "AI媒体库", baseUrl: mock.url, protocolVersion: 2, offlineGraceDays: 7 },
     onOnlineValidated: () => { void observer.onlineValidationSucceeded(); },
@@ -290,18 +293,21 @@ test("a nominal 200 without an explicit active binding is not online-validation 
   };
   let signals = 0;
   const license = new LicenseService({
+    now: () => Date.parse("2026-09-20T00:00:00Z"),
     secureStore, machineCode: async () => MACHINE, clientVersion: "1.1.6",
     fetchImpl: async () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
     onOnlineValidated: () => { signals += 1; },
   });
   const state = await license.initialize();
-  assert.equal(state.phase, "active");
+  assert.equal(state.phase, "network_error");
+  assert.equal(state.authorized, false);
   assert.equal(signals, 0);
 });
 
 test("a rejected observer callback cannot reject a successful authorization", async () => {
   const secureStore = store();
   const license = new LicenseService({
+    now: () => Date.parse("2026-09-20T00:00:00Z"),
     secureStore, machineCode: async () => MACHINE, clientVersion: "1.1.6",
     fetchImpl: async () => new Response(JSON.stringify(ACTIVE_RESPONSE), { status: 200 }),
     onOnlineValidated: async () => { throw new Error("observer failure"); },

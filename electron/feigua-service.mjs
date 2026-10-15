@@ -56,24 +56,24 @@ export class FeiguaService {
       if (this.controller && run?.status === 'running') run.message = `已取得视频榜单，正在核验补充信息（${index}/${total} 条）`;
     };
     this.data = initial();
-    this.auth = { status: 'unknown', message: '登录飞瓜后将自动开始采集' };
+    this.auth = { status: 'unknown', message: '登录后请设置分类与关键词，再手动开始采集' };
+    this.manualCollectionReady = false;
     this.autoCollectRequested = false;
     this.autoCatalogRequested = false;
     this.loginSequence = 0;
     this.browser.onAuthChange = auth => {
       this.auth = auth;
       if (auth.status !== 'authenticated' || !this.autoCollectRequested && !this.autoCatalogRequested) return;
-      const collectAfterLogin = this.autoCollectRequested;
       this.autoCollectRequested = false;
       this.autoCatalogRequested = false;
       const sequence = this.loginSequence;
       this.autoStart = Promise.resolve(this.operation).then(() => {
-        if (!this.controller && sequence === this.loginSequence) return collectAfterLogin ? this.start({ trigger: 'login' }) : this.prepareCatalogs();
+        if (!this.controller && sequence === this.loginSequence) return this.prepareCatalogs();
       }).catch(error => {
         if (sequence !== this.loginSequence || this.disposed || error.code === 'FEIGUA_CANCELLED') return;
         this.auth = error.code === 'FEIGUA_VERIFICATION_REQUIRED'
           ? { status: 'verification_required', message: error.publicMessage || '飞瓜需要图形验证，完成后请重新采集' }
-          : { status: 'error', message: '自动采集未能启动，请重试采集' };
+          : { status: 'error', message: '分类目录未能加载，请重试登录或手动刷新' };
       });
     };
     this.controller = null;
@@ -182,10 +182,10 @@ export class FeiguaService {
     this.schedulePending = true;
     try {
       await this.ready;
-      if (this.disposed || this.operation || this.controller || !canRun()) return;
+      if (this.disposed || !this.manualCollectionReady || this.operation || this.controller || !canRun()) return;
       await this.exclusive(async () => {
         await this.configQueue;
-        if (this.disposed || !canRun()) return;
+        if (this.disposed || !this.manualCollectionReady || !canRun()) return;
         const videosDate = dueVideosDate(now);
         const hotspotsDate = dueHotspotsDate(now);
         const topicCheck = pendingTopicCheck(this.data, now);
@@ -328,11 +328,12 @@ export class FeiguaService {
     return this.state();
   }
 
-  async login({ collectAfterLogin = true } = {}) {
+  async login() {
     await this.exclusive(async () => {
       await this.configQueue;
       if (!this.data.loginEntryUrl) throw new Error('请先配置并保存登录入口网址');
-      this.autoCollectRequested = collectAfterLogin === true;
+      this.manualCollectionReady = false;
+      this.autoCollectRequested = false;
       this.autoCatalogRequested = true;
       this.loginSequence++;
       try { await this.browser.openLogin(); }
@@ -414,6 +415,7 @@ export class FeiguaService {
       if (cancelled()) return;
       this.auth = auth;
       if (this.auth.status !== 'authenticated') throw new Error(this.auth.message || '请先登录飞瓜');
+      this.manualCollectionReady = true;
       const topicCheck = trigger === 'login' ? pendingTopicCheck({ ...this.data, musicTag }, Date.now(), { ignorePreviousCheck: true }) : null;
       const musicCheck = trigger === 'login' ? pendingMusicCheck({ ...this.data, musicTag }, Date.now(), { ignorePreviousCheck: true }) : null;
       await this.launchRun(musicTag, keywords, { videoQueries, trigger: trigger === 'login' ? 'login' : null, skipTopics: trigger === 'login' && !topicCheck, topicCheck, skipMusic: trigger === 'login' && !musicCheck, musicCheck });

@@ -169,7 +169,7 @@ function browserFixture() {
     constructor() {
       super(); this.url = ''; this.closed = false;
       this.webContents = new EventEmitter();
-      Object.assign(this.webContents, { getURL: () => this.url, setWindowOpenHandler: handler => handlers.set('popup', handler), executeJavaScript: async source => { executed.push(source); return { authenticated: true }; } });
+      Object.assign(this.webContents, { getURL: () => this.url, setWindowOpenHandler: handler => handlers.set('popup', this.webContents.openPopup = ({ url }) => { const response = handler({ url }); if (response.action === 'allow') { const child = new Window(); this.webContents.emit('did-create-window', child); void child.loadURL(url || 'about:blank'); } return response; }), executeJavaScript: async source => { executed.push(source); return { authenticated: true }; } });
     }
     isDestroyed() { return this.closed; }
     show() {}
@@ -205,7 +205,7 @@ test('login always opens the saved portal, never runs provider scripts on it, an
   let blocked = false;
   window.webContents.emit('will-redirect', { preventDefault: () => { blocked = true; } }, 'https://foreign.example/');
   assert.equal(blocked, true);
-  assert.deepEqual(handlers.get('popup')({ url: 'https://dy.feigua.cn/app/' }), { action: 'deny' });
+  assert.equal(handlers.get('popup')({ url: 'https://dy.feigua.cn/app/' }).action, 'allow');
   assert.equal((await browser.checkLogin()).status, 'authenticated');
   assert.equal(loaded[0], entry);
   assert.ok(executed.length > 0);
@@ -216,4 +216,87 @@ test('login always opens the saved portal, never runs provider scripts on it, an
   await browser.openLogin();
   assert.equal(loaded.at(-1), 'https://new-portal.example/');
   browser.stopLoginWatch();
+});
+
+test('portal navigations and redirects authorize only the selected same-host gateway', async () => {
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    const { browser } = browserFixture(); browser.setLoginEntryUrl(entry); await browser.openLogin();
+    let blocked = false;
+    const gateway = 'http://192.0.2.10:13042/app/';
+    browser.window.webContents.emit(eventName, { preventDefault() { blocked = true; } }, gateway);
+    assert.equal(blocked, false); assert.equal(browser.sourceOrigin(), null);
+    await browser.window.loadURL(gateway);
+    browser.window.webContents.emit(eventName, { preventDefault() { blocked = true; } }, 'http://192.0.2.10:13045/app/');
+    assert.equal(blocked, true); assert.equal(browser.loginRelayOrigins.has('http://192.0.2.10:13045'), false);
+    browser.dispose();
+  }
+});
+
+test('blank popup retains a child window and only inherits the portal handoff', async () => {
+  const { browser, handlers } = browserFixture(); browser.setLoginEntryUrl(entry); await browser.openLogin();
+  const parent = browser.window;
+  const response = handlers.get('popup')({ url: 'about:blank' });
+  assert.equal(response.action, 'allow');
+  assert.equal(response.overrideBrowserWindowOptions.webPreferences.nodeIntegration, false);
+  assert.equal(response.overrideBrowserWindowOptions.webPreferences.sandbox, true);
+  const child = browser.window; assert.notEqual(parent, child);
+  let blocked = false;
+  child.webContents.emit('will-navigate', { preventDefault() { blocked = true; } }, 'http://192.0.2.10:13042/app/');
+  assert.equal(blocked, false);
+  child.webContents.emit('will-navigate', { preventDefault() { blocked = true; } }, 'http://unrelated.example/app/');
+  assert.equal(blocked, true);
+  browser.setLoginEntryUrl('https://new-portal.example/');
+  assert.equal(parent.closed, true); assert.equal(child.closed, true); assert.equal(browser.loginWindows.size, 0);
+  assert.equal(browser.loginRelayOrigins.size, 0); assert.equal(browser.loginTimer, null);
+});
+
+test('closing a child restores the portal and a late parent close cannot stop the child monitor', async () => {
+  const { browser, handlers } = browserFixture(); browser.setLoginEntryUrl(entry); await browser.openLogin();
+  const parent = browser.window; handlers.get('popup')({ url: 'about:blank' }); const child = browser.window;
+  child.close(); assert.equal(browser.window, parent); assert.ok(browser.loginTimer);
+  parent.webContents.openPopup({ url: 'about:blank' }); const second = browser.window;
+  parent.close(); assert.equal(browser.window, second); assert.ok(browser.loginTimer);
+  browser.dispose(); assert.equal(second.closed, true); assert.equal(browser.loginTimer, null);
+});
+
+test('blocked navigation and failed main-frame loads expose a safe error without signed URLs', async () => {
+  const { browser } = browserFixture(); browser.setLoginEntryUrl(entry); await browser.openLogin();
+  const messages = []; browser.onAuthChange = auth => messages.push(auth);
+  browser.window.webContents.emit('will-navigate', { preventDefault() {} }, 'https://foreign.example/?token=secret');
+  assert.match(messages.at(-1).message, /跳转地址/);
+  browser.window.webContents.emit('did-fail-load', {}, -105, 'secret', 'https://foreign.example/?token=secret', true);
+  assert.match(messages.at(-1).message, /通道加载失败/); assert.ok(!JSON.stringify(messages).includes('secret'));
+  const count = messages.length;
+  browser.window.webContents.emit('did-fail-load', {}, -3, 'cancelled', entry, true);
+  browser.window.webContents.emit('did-fail-load', {}, -105, 'iframe', entry, false);
+  assert.equal(messages.length, count); browser.dispose();
+});
+
+
+test('the observed portal channel gateway is bound to its exact portal and origin', () => {
+  const portal = 'http://121.40.180.3/';
+  assert.equal(isLoginEntryHandoff('http://120.26.165.88/app/', portal), true);
+  assert.deepEqual(normalizeWorkspaceHint({ entryUrl: portal, origin: 'http://120.26.165.88' }, portal), { entryUrl: portal, origin: 'http://120.26.165.88' });
+  for (const target of ['http://120.26.165.89/app/', 'http://120.26.165.88:12345/app/', 'https://120.26.165.88/app/', 'http://user:password@120.26.165.88/app/']) assert.equal(isLoginEntryHandoff(target, portal), false);
+  for (const differentPortal of [entry, 'http://121.40.180.3:12345/', 'https://121.40.180.3/']) assert.equal(isLoginEntryHandoff('http://120.26.165.88/app/', differentPortal), false);
+});
+
+test('the logged failing domain channel is allowed only from the observed portal', () => {
+  const portal = 'http://121.40.180.3/';
+  assert.equal(isLoginEntryHandoff('http://sdy.73le.com/app/?login=synthetic', portal), true);
+  assert.deepEqual(normalizeWorkspaceHint({ entryUrl: portal, origin: 'http://sdy.73le.com' }, portal), { entryUrl: portal, origin: 'http://sdy.73le.com' });
+  for (const target of ['http://sdy.73le.com.evil.example/app/', 'http://evil.sdy.73le.com/app/', 'http://sdy.73le.com:12345/app/', 'https://sdy.73le.com/app/', 'http://user:password@sdy.73le.com/app/']) assert.equal(isLoginEntryHandoff(target, portal), false);
+  assert.equal(isLoginEntryHandoff('http://sdy.73le.com/app/', entry), false);
+  assert.equal(isLoginEntryHandoff('http://unrelated.example/app/', portal), false);
+});
+
+test('blocked channel origin survives diagnostic redaction without a signed URL', async () => {
+  const { redact } = await import('../electron/application-log.mjs');
+  const { browser } = browserFixture(); browser.setLoginEntryUrl(entry); await browser.openLogin();
+  let auth; browser.onAuthChange = value => { auth = value; };
+  browser.window.webContents.emit('will-navigate', { preventDefault() {} }, 'http://unrelated.example/app/?token=synthetic-private');
+  const diagnostic = redact(auth);
+  assert.match(diagnostic.message, /http:\/\/unrelated\.example/);
+  assert.doesNotMatch(JSON.stringify(diagnostic), /synthetic-private|xn--/);
+  browser.dispose();
 });

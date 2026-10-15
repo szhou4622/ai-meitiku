@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { request as httpRequest } from "node:http";
 import { createServer as createNetServer } from "node:net";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, rename, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { featureRegistry, requireFeatureAccess } from "../electron/feature-registry.mjs";
@@ -174,4 +174,71 @@ test("第二端口没有公开例外，未知、API 和用户文件路径都默�
   assert.equal(backend.isProtectedBusinessPath("/api/dreamina/status"), true);
   assert.equal(backend.isProtectedBusinessPath("/outputs/voices/a.mp3"), true);
   assert.equal(backend.isProtectedBusinessPath("/uploads/voices/a.wav"), true);
+});
+
+test('the direct voice port enforces the personal API switch before provider calls and retains saved configuration', async () => {
+  currentState = licenseState(); providerCalls = 0;
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'platform_api', usesSoftwarePoints: true }));
+  const before = await request(port, '/api/config');
+  for (const path of ['/api/voice-clone/create', '/api/config/test-minimax']) {
+    const response = await request(port, path, { method: 'POST', body: { attemptId: 'synthetic-points-blocked' } });
+    assert.equal(response.status, 409);
+    assert.equal(response.json.error, 'PLATFORM_API_UNAVAILABLE');
+  }
+  assert.equal(providerCalls, 0);
+  assert.deepEqual((await request(port, '/api/config')).json, before.json);
+  assert.equal((await request(port, '/api/voices')).status, 200);
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'customer_api', usesSoftwarePoints: false }));
+  const own = await request(port, '/api/voice-clone/create', { method: 'POST', body: { attemptId: 'synthetic-own-mode-restored' } });
+  assert.equal(own.json.error, 'minimax_api_missing');
+  assert.equal(providerCalls, 0);
+});
+
+test("replaying a completed personal voice attempt after switching off returns its original result without another API call", async () => {
+  currentState = licenseState(); providerCalls = 0;
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'customer_api', usesSoftwarePoints: false }));
+  const body = { attemptId: 'synthetic-fixed-mode-replay' };
+  const original = await request(port, '/api/voice-clone/create', { method: 'POST', body });
+  assert.equal(original.json.error, 'minimax_api_missing');
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'platform_api', usesSoftwarePoints: true }));
+  const replay = await request(port, '/api/voice-clone/create', { method: 'POST', body });
+  assert.deepEqual(replay.json, original.json);
+  assert.equal(replay.status, original.status);
+  assert.equal(providerCalls, 0);
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'customer_api', usesSoftwarePoints: false }));
+});
+
+test('a downloaded preview survives a later voice-index failure and replay does not charge again', async () => {
+  currentState = licenseState();
+  const primary = join(dataDirectory, 'data', 'voices.json');
+  const backup = join(dataDirectory, 'data', 'voices.backup.json');
+  const moved = [];
+  for (const file of [primary, backup]) {
+    try { await rename(file, file + '.test-original'); moved.push(file); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  await mkdir(primary);
+  let calls = 0;
+  backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'platform_api', usesSoftwarePoints: true }));
+  backend.configureVoicePlatformExecution(async () => { calls++; return { quoteId: 'synthetic-voice', result: { demo_audio: '49443373796e746865746963' } }; });
+  const body = { attemptId: 'synthetic-preview-index-failure', name: '隔离试听', previewText: '隔离测试音频', consent: true,
+    audio: { name: 'sample.mp3', duration: 12, dataUrl: 'data:audio/mpeg;base64,c2FtcGxl' } };
+  try {
+    const response = await request(port, '/api/voice-clone/create', { method: 'POST', body });
+    assert.equal(response.status, 200);
+    assert.equal(response.json.ok, true);
+    assert.match(response.json.warning, /已生成并保留/);
+    assert.equal(response.json.voice.status, '试听已生成');
+    const output = join(dataDirectory, response.json.audio.audioUrl);
+    assert.equal((await readFile(output)).toString(), 'ID3synthetic');
+    const receipt = JSON.parse(await readFile(join(dataDirectory, 'outputs', 'voices', response.json.voice.id, 'preview-result.json'), 'utf8'));
+    assert.equal(receipt.audio.audioUrl, response.json.audio.audioUrl);
+    const replay = await request(port, '/api/voice-clone/create', { method: 'POST', body });
+    assert.deepEqual(replay.json, response.json);
+    assert.equal(calls, 1);
+  } finally {
+    await rm(primary, { recursive: true });
+    for (const file of moved) await rename(file + '.test-original', file);
+    backend.configureVoiceApiUsage(async () => ({ provider: 'minimax', apiMode: 'customer_api', usesSoftwarePoints: false }));
+  }
 });

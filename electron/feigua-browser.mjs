@@ -25,10 +25,15 @@ export function isFeiguaNavigation(value, loginEntryUrl = '') {
   catch { return false; }
 }
 
+function navigationOrigin(value) {
+  try { const url = new URL(value); return url.origin === 'null' ? url.protocol : url.origin; }
+  catch { return '无效地址'; }
+}
+
 export class FeiguaBrowser {
   constructor({ BrowserWindow, session, credentialStore, ipcMain }) {
     this.BrowserWindow = BrowserWindow; this.session = session;
-    this.window = null; this.pending = new Set(); this.lastNetwork = 0;
+    this.window = null; this.loginWindows = new Set(); this.pending = new Set(); this.lastNetwork = 0;
     this.wasAuthenticated = false;
     this.loginTimer = null; this.loginWatchGeneration = 0;
     this.verificationTimer = null; this.verificationGeneration = 0; this.verificationWindow = null; this.verificationSeen = false;
@@ -64,7 +69,7 @@ export class FeiguaBrowser {
     this.loginRelayOrigins.clear();
     this.verifiedSourceOrigin = null;
     this.workspaceHint = null;
-    if (this.window && !this.window.isDestroyed()) this.window.close();
+    this.closeLoginWindows();
     this.loginEntryUrl = next;
   }
 
@@ -178,27 +183,109 @@ export class FeiguaBrowser {
     const window = new this.BrowserWindow({ width: 1320, height: 900, show, title: '飞瓜 · 热点采集',
       webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
         ...(this.credentialStore ? { preload: fileURLToPath(new URL('./feigua-login-preload.cjs', import.meta.url)) } : {}) } });
+    this.attachLoginWindow(window);
+    return window;
+  }
+
+  closeLoginWindows() {
+    this.stopCredentialMemory();
+    this.stopLoginWatch();
+    this.stopVerificationWatch();
+    if (this.window) this.loginWindows.add(this.window);
+    this.window = null;
+    for (const window of [...this.loginWindows]) if (!window.isDestroyed()) window.close();
+    this.loginWindows.clear();
+    this.pending.clear();
+    this.rankingRequests = [];
+    this.detailRequests = [];
+  }
+
+  attachLoginWindow(window, fromPortal = false) {
+    this.loginWindows.add(window);
     this.window = window;
+    const entryUrl = this.loginEntryUrl;
+    const current = () => !window.isDestroyed() && this.loginEntryUrl === entryUrl && this.loginWindows.has(window);
+    const portalSource = () => isLoginEntryNavigation(window.webContents.getURL(), entryUrl)
+      || fromPortal && ['about:blank', ''].includes(window.webContents.getURL());
+    const allowedNavigation = url => isFeiguaNavigation(url, entryUrl)
+      || [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin));
+    const authorize = url => {
+      if (!current()) return false;
+      // The portal can hand off through a normal navigation, redirect or popup.
+      // A selected gateway cannot grant itself further ports or other hosts.
+      if (portalSource() && isLoginEntryHandoff(url, entryUrl)) this.loginRelayOrigins.add(new URL(url).origin);
+      return allowedNavigation(url);
+    };
+    const report = message => {
+      if (!current()) return;
+      this.onAuthChange?.({ status: 'error', message });
+      if (!['about:blank', ''].includes(window.webContents.getURL())) return;
+      window.setTitle?.('飞瓜 · 登录通道未打开');
+      // A blocked blank-then-navigate popup must not cover the portal with an
+      // empty window. Render only in the blank document, with no signed URL.
+      const showError = message => {
+        if (!['about:blank', ''].includes(location.href)) return;
+        document.title = '飞瓜 · 登录通道未打开';
+        const main = document.createElement('main');
+        main.style.cssText = 'max-width:600px;margin:15vh auto;padding:32px;font:16px/1.8 system-ui;color:#334e52';
+        const title = document.createElement('h2'); title.textContent = '登录通道未打开';
+        const detail = document.createElement('p'); detail.textContent = message;
+        const button = document.createElement('button'); button.textContent = '关闭窗口，返回登录入口';
+        button.style.cssText = 'padding:10px 18px;border:0;border-radius:6px;background:#258c84;color:white;font:inherit;cursor:pointer';
+        button.addEventListener('click', () => window.close());
+        main.append(title, detail, button); document.body.replaceChildren(main);
+      };
+      void Promise.resolve().then(() => {
+        if (!current() || !['about:blank', ''].includes(window.webContents.getURL())) return;
+        return window.webContents.executeJavaScript(`(${showError.toString()})(${JSON.stringify(message)})`);
+      }).catch(() => {});
+    };
     window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-      if (isMainFrame && !isInPlace) this.stopCredentialMemory();
+      if (this.window === window && isMainFrame && !isInPlace) this.stopCredentialMemory();
     });
-    window.webContents.on('did-finish-load', () => { void this.installCredentialMemory(window); });
-    const allowedNavigation = url => isFeiguaNavigation(url, this.loginEntryUrl) || [...this.loginRelayOrigins].some(origin => isLoginEntryNavigation(url, origin));
-    const guard = (event, url) => { if (!allowedNavigation(url)) event.preventDefault(); };
+    window.webContents.on('did-finish-load', () => { if (this.window === window) void this.installCredentialMemory(window); });
+    const guard = (event, url) => {
+      if (!authorize(url)) {
+        event.preventDefault();
+        report(`入口跳转地址尚不支持（ ${navigationOrigin(url)} ），请返回入口重试或核对通道网址`);
+      }
+    };
     window.webContents.on('will-navigate', guard);
-    window.webContents.on('will-redirect', guard);
+    window.webContents.on('will-redirect', (event, url, _inPlace, isMainFrame) => { if (isMainFrame !== false) guard(event, url); });
+    window.webContents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+      if (isMainFrame && code !== -3) report('登录通道加载失败，请检查网络或在入口选择其他通道重试');
+    });
     window.webContents.on('will-attach-webview', event => event.preventDefault());
     window.webContents.setWindowOpenHandler(({ url }) => {
-      const fromPortal = isLoginEntryNavigation(window.webContents.getURL(), this.loginEntryUrl);
-      if (fromPortal && isLoginEntryHandoff(url, this.loginEntryUrl)) this.loginRelayOrigins.add(new URL(url).origin);
-      const allowed = allowedNavigation(url);
-      try { const parsed = new URL(url); this.lastNavigation = { path: parsed.origin + parsed.pathname, allowed }; } catch { this.lastNavigation = { allowed: false }; }
-      if (allowed) void window.loadURL(url).catch(() => {});
-      else this.onAuthChange?.({ status: 'signed_out', message: '入口跳转地址尚不支持，请返回入口重试或核对网址' });
-      return { action: 'deny' };
+      const blank = url === 'about:blank' || url === '';
+      const allowed = this.loginWindows.size < 8 && (blank ? current() && portalSource() : authorize(url));
+      // Preserve the browser's popup object, including blank-then-navigate flows.
+      // Every child uses the same isolated session and receives navigation guards.
+      if (!allowed) {
+        report(`入口跳转地址尚不支持（ ${navigationOrigin(url)} ），请返回入口重试或核对通道网址`);
+        return { action: 'deny' };
+      }
+      return { action: 'allow', overrideBrowserWindowOptions: {
+        width: 1320, height: 900, show: window.isVisible?.() ?? true, title: '飞瓜 · 登录通道',
+        webPreferences: { session: this.partition, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true },
+      } };
     });
-    window.on('closed', () => { this.stopCredentialMemory(); this.stopLoginWatch(); if (this.window === window) { this.stopVerificationWatch(); this.window = null; } this.pending.clear(); this.rankingRequests = []; });
-    return window;
+    window.webContents.on('did-create-window', child => {
+      if (!current()) { child.close(); return; }
+      const watching = Boolean(this.loginTimer);
+      this.stopCredentialMemory();
+      this.attachLoginWindow(child, portalSource());
+      if (watching) this.startLoginWatch();
+    });
+    window.on('closed', () => {
+      this.loginWindows.delete(window);
+      if (this.window !== window) return;
+      const watching = Boolean(this.loginTimer);
+      this.stopCredentialMemory(); this.stopLoginWatch(); this.stopVerificationWatch();
+      this.window = [...this.loginWindows].find(candidate => !candidate.isDestroyed()) || null;
+      this.pending.clear(); this.rankingRequests = []; this.detailRequests = [];
+      if (this.window && watching) this.startLoginWatch();
+    });
   }
 
   async navigate(url) {
@@ -387,11 +474,11 @@ export class FeiguaBrowser {
         this.wasAuthenticated = true;
         this.onAuthChange?.({ status: 'authenticated', message: '已登录飞瓜' });
         this.stopLoginWatch();
-        loginWindow.close(); // Session is persistent; closing only dismisses the login UI.
+        this.closeLoginWindows(); // Keep the persistent session, dismiss all login windows.
       } catch (error) {
-        if (isCurrent() && error.code === 'FEIGUA_NOTICE_FAILED') {
-          this.stopLoginWatch();
-          this.onAuthChange?.({ status: 'error', message: error.publicMessage });
+        if (isCurrent() && error.code !== 'FEIGUA_CANCELLED') {
+          if (error.code === 'FEIGUA_NOTICE_FAILED') this.stopLoginWatch();
+          this.onAuthChange?.({ status: 'error', message: error.publicMessage || '工作台登录核验失败，请返回入口重试或选择其他通道' });
         }
       }
       finally { pending = false; }
@@ -667,5 +754,5 @@ export class FeiguaBrowser {
   }
 
   stop() { this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.webContents.stop?.(); }
-  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.stopVerificationWatch(); this.window?.destroy(); this.window = null; this.rankingRequests = []; }
+  dispose() { this.ipcMain?.removeListener('feigua-private-login-memory', this.credentialListener); this.stopCredentialMemory(); this.stopLoginWatch(); this.stopVerificationWatch(); this.closeLoginWindows(); }
 }

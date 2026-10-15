@@ -1,6 +1,6 @@
 [project]
 name = "xhs-api"
-version = "3.0.0"
+version = "3.0.1"
 description = "xhs-downloader HTTP API 应用"
 requires-python = ">=3.12"
 dependencies = [

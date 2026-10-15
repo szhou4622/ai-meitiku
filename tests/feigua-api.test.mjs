@@ -208,3 +208,18 @@ test('transport failures preserve error class without exporting raw request or c
     }
   }finally{globalThis.document=old;}
 });
+
+
+test('observed gateway cate0 is a category filter and must match the selected category', () => {
+  const original = request('videos');
+  original.params['q.cate0'] = '100';
+  const url = `http://120.26.165.88${FEIGUA_ENDPOINTS.videos}?${new URLSearchParams(original.params)}`;
+  const observed = observeFeiguaRequest({ method: 'GET', url }, 'http://120.26.165.88');
+  assert.deepEqual(observed, original);
+  const context = { ...contexts.videos, categoryPath: ['合成品类'], categoryId: '100' };
+  assert.equal(validateFeiguaRequest('videos', observed, context), observed);
+  assert.throws(() => validateFeiguaRequest('videos', observed, { ...context, categoryId: '200' }), /分类参数/);
+  assert.throws(() => validateFeiguaRequest('videos', observed, contexts.videos), /分类参数/);
+  assert.equal(observeFeiguaRequest({ method: 'GET', url: url + '&q.cate999=100' }, 'http://120.26.165.88').invalid, true);
+  assert.equal(observeFeiguaRequest({ method: 'GET', url: url + '&token=secret' }, 'http://120.26.165.88').invalid, true);
+});

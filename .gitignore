@@ -20,7 +20,6 @@
 /.download-runtime/
 /.build/
 /coverage/
-/.coverage
 /.vercel/
 *.tsbuildinfo
 next-env.d.ts
@@ -82,14 +81,6 @@ license-offline-grant.*
 *.sqlite
 *.sqlite3
 *.db
-*.db-*
-
-# Packaged installers and archives do not belong in the public source repo
-*.dmg
-*.exe
-*.zip
-*.tar
-*.tar.gz
 
 # Logs
 *.log
@@ -101,11 +92,14 @@ pnpm-debug.log*
 
 # Temporary and operating-system files
 .DS_Store
-._*
 Thumbs.db
-.idea/
-.vscode/
 *.tmp
 *.temp
 *.swp
 *~
+
+# Isolated acceptance records and production operation receipts
+/.codex-tmp/
+/artifacts/
+/server-integration/**/*.json
+/server-integration/**/__pycache__/

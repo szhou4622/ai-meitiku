@@ -21,14 +21,19 @@ export function validateRegion(region) {
 }
 
 // SDK errors can include signed URLs and credentials. Never forward their raw text.
-export function cloudErrorMessage(error) {
+export function cloudErrorMessage(error, { platform = false } = {}) {
   const code = String(error?.code || '').split(':')[0];
+  if (platform) {
+    if (code === 'INSUFFICIENT_POINTS') return '可用积分不足，请充值后重试';
+    if (/Throttl|LimitExceeded/.test(code)) return '处理服务繁忙，请稍后查看原任务';
+    return '任务暂未完成，请稍后查看原任务状态';
+  }
   if (/InvalidAccessKey|SignatureDoesNotMatch|InvalidSecurityToken/.test(code)) return '密钥无效或签名失败，请检查 AccessKey ID 和 Secret';
-  if (/Forbidden|Unauthorized|NoPermission/.test(code)) return '阿里云拒绝访问，请确认已开通视频生产服务并授予视觉智能平台权限';
-  if (/Balance|Arrearage|Pay|Quota/.test(code)) return '阿里云余额或额度不足，请在控制台检查';
-  if (/Throttl|LimitExceeded/.test(code)) return '阿里云请求限流，请稍后再试';
-  if (/InvalidParameter|InvalidFile|InvalidImage|InvalidVideo/.test(code)) return '阿里云不接受该文件或区域参数，请检查视频格式与字幕区域';
-  return '阿里云请求未完成，请检查网络、服务开通状态和账户权限';
+  if (/Forbidden|Unauthorized|NoPermission/.test(code)) return '云服务拒绝访问，请确认已开通视频生产服务并授予视觉智能平台权限';
+  if (/Balance|Arrearage|Pay|Quota/.test(code)) return '云服务余额或额度不足，请在控制台检查';
+  if (/Throttl|LimitExceeded/.test(code)) return '云服务请求限流，请稍后再试';
+  if (/InvalidParameter|InvalidFile|InvalidImage|InvalidVideo/.test(code)) return '云服务不接受该文件或区域参数，请检查视频格式与字幕区域';
+  return '云服务请求未完成，请检查网络、服务开通状态和账户权限';
 }
 
 export function createAliyunClient(credentials) {
@@ -88,13 +93,15 @@ export async function probeVideo(filePath, ffmpeg, { input = true } = {}) {
 
 export function safeResultUrl(value) {
   const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || !url.hostname.endsWith('.aliyuncs.com')) throw new Error('阿里云返回了无法识别的下载地址');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port || !url.hostname.endsWith('.aliyuncs.com')) throw new Error('云服务返回了无法识别的下载地址');
   // OSS signatures do not bind the protocol. Always transport the signed URL over TLS.
   url.protocol = 'https:';
   return url.href;
 }
 
-export async function downloadAliyunResult(url, destination, { fetchImpl = fetch, probe, signal } = {}) {
+export async function downloadAliyunResult(url, destination, { fetchImpl = fetch, probe, signal, expectedSize, expectedSha256 } = {}) {
+  if (Number.isSafeInteger(expectedSize) && expectedSize > 0 && /^[a-f0-9]{64}$/.test(expectedSha256 || ''))
+    return downloadRetainedResult(url, destination, { fetchImpl, probe, signal, expectedSize, expectedSha256 });
   let current = safeResultUrl(url), response;
   for (let count = 0; count < 5; count++) {
     response = await fetchImpl(current, { redirect: 'manual', signal });
@@ -115,8 +122,47 @@ export async function downloadAliyunResult(url, destination, { fetchImpl = fetch
     await pipeline(Readable.fromWeb(response.body), meter, createWriteStream(temp, { flags: 'wx' }), { signal });
     const length = Number(response.headers.get('content-length'));
     if (!size || (length > 0 && length !== size)) throw new Error('成片下载不完整');
+    const sha256 = hash.digest('hex');
+    if ((expectedSize != null && size !== expectedSize) || (expectedSha256 && sha256 !== expectedSha256))
+      throw new Error('成片完整性校验失败，请继续下载原任务');
     await probe(temp, { input: false });
     await rename(temp, destination);
-    return { sizeBytes: size, sha256: hash.digest('hex') };
+    return { sizeBytes: size, sha256 };
   } finally { await unlink(temp).catch(() => {}); }
+}
+
+// Stable verified-object identity allows partial bytes to survive a refreshed URL.
+async function downloadRetainedResult(url, destination, { fetchImpl, probe, signal, expectedSize, expectedSha256 }) {
+  const temp = `${destination}.download.part.mp4`;
+  let size = await stat(temp).then(info => info.size).catch(() => 0);
+  if (size > expectedSize) { await unlink(temp); size = 0; }
+  if (size < expectedSize) {
+    let current = safeResultUrl(url), response;
+    for (let count = 0; count < 5; count++) {
+      response = await fetchImpl(current, { redirect: 'manual', signal, headers: size ? { Range: `bytes=${size}-` } : {} });
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+      await response.body?.cancel();
+      current = safeResultUrl(new URL(response.headers.get('location'), current).href);
+    }
+    if (!response?.ok || !response.body) throw new Error('成片下载中断，请刷新下载地址后继续');
+    if (size && response.status === 206) {
+      const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') || '');
+      if (!range || Number(range[1]) !== size || Number(range[3]) !== expectedSize) {
+        await response.body.cancel(); throw new Error('成片续传范围不匹配，请重新下载');
+      }
+    } else size = 0;
+    const meter = new Transform({ transform(chunk, _encoding, callback) {
+      size += chunk.length;
+      callback(size > expectedSize ? new Error('成片下载大小不匹配') : null, chunk);
+    } });
+    await pipeline(Readable.fromWeb(response.body), meter, createWriteStream(temp, { flags: size ? 'a' : 'w', mode: 0o600 }), { signal });
+  }
+  if (size !== expectedSize) throw new Error('成片尚未下载完整，可继续下载');
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(temp)) hash.update(chunk);
+  const sha256 = hash.digest('hex');
+  if (sha256 !== expectedSha256) { await unlink(temp); throw new Error('成片完整性校验失败，请重新下载'); }
+  await probe(temp, { input: false });
+  await rename(temp, destination);
+  return { sizeBytes: size, sha256 };
 }

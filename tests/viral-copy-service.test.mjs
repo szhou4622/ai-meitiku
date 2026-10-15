@@ -10,7 +10,23 @@ import {
   parseWhisperTranscript,
   viralCopyKey,
   viralCopyReferenceKey,
+  whisperTranscribeArguments,
 } from "../electron/viral-copy-service.mjs";
+
+test("Whisper preserves English and timestamps while converting Chinese offline to simplified", () => {
+  const result = parseWhisperTranscript({ result: { language: "zh" }, transcription: [
+    { text: "這個軟體支援 English API，價格 12.5 元", offsets: { from: 100, to: 2500 } },
+  ] });
+  assert.equal(result[0].text, "这个软体支援 English API，价格 12.5 元");
+  assert.deepEqual([result[0].start, result[0].end], [0.1, 2.5]);
+  assert.equal(parseWhisperTranscript({ language: "en", segments: [{ text: "Hello, world!", start: 0, end: 1 }] })[0].text, "Hello, world!");
+  assert.throws(() => parseWhisperTranscript({ result: { language: "ja" }, transcription: [] }), { code: "ASR_UNSUPPORTED_LANGUAGE" });
+  assert.throws(() => parseWhisperTranscript({ language: "zh", segments: [{ text: "こんにちは" }] }), { code: "ASR_UNSUPPORTED_LANGUAGE" });
+  const args = whisperTranscribeArguments("model", "audio", "output");
+  assert.equal(args[args.indexOf("-l") + 1], "auto");
+  assert.ok(!args.includes("--translate") && !args.includes("-tr"));
+  assert.ok(!args.includes("--prompt"));
+});
 
 const binding = { advertiserId: "account-1", materialId: "material-2", source: "qianchuan" };
 

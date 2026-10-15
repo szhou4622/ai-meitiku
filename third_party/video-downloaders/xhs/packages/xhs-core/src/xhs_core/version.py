@@ -1,6 +1,6 @@
 """项目版本与浏览器扩展协作协议版本。"""
 
-VERSION = "3.0.0"
+VERSION = "3.0.1"
 
 # 本机服务当前实现的扩展协作协议版本。
 # 必须与 packages/xhs-contracts/src/index.ts 的同名常量一致。

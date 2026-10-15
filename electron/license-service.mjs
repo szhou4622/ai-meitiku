@@ -1,5 +1,6 @@
 import { assertMachineIdentityUsable } from "./machine-code.mjs";
 import { LICENSE_CONFIG } from "./license-config.mjs";
+import { POINTS_APP_NAME, pointsPayload, pointsError, decodePointsResponse } from "./points-client.mjs";
 import { secureStorageErrorMessage } from "./license-secure-store.mjs";
 import { createOfflineGrant, verifyAndAdvanceOfflineGrant } from "./license-offline-grace.mjs";
 import { featureRegistry, requireFeatureAccess, resolveEntitlements } from "./feature-registry.mjs";
@@ -524,7 +525,7 @@ export class LicenseService {
     }
   }
 
-  async request(pathname, options = {}) {
+  async request(pathname, options = {}, attempt = 0) {
     const startedAt = this.now();
     const method = String(options.method || "GET").toUpperCase();
     this.diagnostic("info", "network", `开始请求 ${method} ${pathname}`, { endpoint: pathname, method });
@@ -543,11 +544,23 @@ export class LicenseService {
         signal: AbortSignal.timeout(12000),
       });
     } catch (error) {
+      const errorCode = error?.code || error?.cause?.code || "";
+      // Retry only the read-only status query. Never replay activation, renewal,
+      // unbind, or points mutations after an ambiguous transport failure.
+      if (method === "GET" && pathname === "/device/status" && attempt === 0
+        && ["ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT"].includes(errorCode)) {
+        this.diagnostic("warning", "network", "授权状态查询连接中断，正在重试一次", { endpoint: pathname, method, errorCode, attempt: 1, cause: error?.cause });
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return this.request(pathname, options, attempt + 1);
+      }
       this.diagnostic("error", "network", `请求失败 ${method} ${pathname}`, {
         endpoint: pathname,
         method,
         durationMs: Math.max(0, this.now() - startedAt),
         errorType: error?.name || "network_error",
+        errorCode: error?.code || error?.cause?.code || "",
+        stack: error?.stack || "",
+        cause: error?.cause,
         message: error?.message || "",
       });
       const wrapped = new Error(NETWORK_ERROR_MESSAGE);
@@ -568,6 +581,9 @@ export class LicenseService {
       httpStatus: response.status,
       durationMs: Math.max(0, this.now() - startedAt),
       errorCode: responseErrorCode(body) || "",
+      serverMessage: serverMessage(body, ""),
+      bindingStatus: String(firstDefined(responseSources(body), ["binding_status"], "")),
+      licenseStatus: String(firstDefined(responseSources(body), ["license_status"], "")),
       action: String(firstDefined(responseSources(body), ["action"], "")),
     });
     return { response, body };
@@ -601,6 +617,13 @@ export class LicenseService {
       return { ok: false, credential, body: {}, response: null, error };
     }
     if (!result.response.ok) return { ok: false, credential, ...result };
+    // Require an explicitly issued session; an empty reply must not inherit
+    // the expired session from the previous record.
+    const issuedSession = firstDefined(responseSources(result.body), ["device_session"], null);
+    if (typeof issuedSession !== "string" || !issuedSession.trim()
+      || result.body?.ok === false || result.body?.success === false) {
+      return { ok: false, credential, ...result };
+    }
     const refreshed = normalizedLicenseRecord(result.body, credential);
     if (firstPresent(responseSources(result.body), ["entitlement_schema_version"], undefined) === undefined) {
       // A session-rotation response may omit rights. They remain provisional
@@ -638,16 +661,6 @@ export class LicenseService {
       const identityFailure = await this.localIdentityFailureState();
       if (identityFailure) return identityFailure;
     }
-    if (!this.hasCredential && hasRefreshableCredential(credential)) {
-      const recovered = await this.refreshDeviceSession(credential);
-      if (recovered.ok) return this.refresh(recovered.credential);
-      if (responseSaysExpired(recovered.body, credential, this.now())) {
-        return this.setState({ phase: "expired", authorized: false, message: serverMessage(recovered.body, "授权已到期"), license: publicLicense(credential) });
-      }
-    }
-    if (!this.hasCredential) {
-      return this.setState({ phase: "needs_activation", authorized: false, message: "请输入激活码以继续使用", license: null });
-    }
     return this.refresh(credential);
   }
 
@@ -671,6 +684,17 @@ export class LicenseService {
     }
     const identityFailure = await this.localIdentityFailureState();
     if (identityFailure) return identityFailure;
+    if (existingCredential?.deviceCredential && !hasCompleteCredential(existingCredential)) {
+      // A partially readable record is not a new installation. Recover the
+      // short session before submitting activation with existing device proof.
+      // On failure, keep the record and stop instead of requesting a blind
+      // overwrite of the server's existing binding.
+      const recoveryState = await this.refresh(existingCredential);
+      existingCredential = await this.secureStore.readCredential();
+      if (!hasCompleteCredential(existingCredential) || recoveryState.phase === "update_required") {
+        return recoveryState;
+      }
+    }
     const hasExistingProof = hasCompleteCredential(existingCredential);
     this.diagnostic("info", "activation", "本地授权证明检查完成", { hasExistingProof });
     await this.waitForActivationIdentity();
@@ -902,6 +926,47 @@ export class LicenseService {
 
   // Enabled only after a compatible server explicitly advertises atomic
   // two-deadline redemption. An old /time/renew must never consume a VIP code.
+  async requestPoints(action, input = {}) {
+    if (this.config.appName !== POINTS_APP_NAME) throw pointsError("APP_SCOPE_MISMATCH");
+    const payload = pointsPayload(action, input);
+    if (action === "redeem" && this.previewAllFeatures) {
+      throw pointsError("POINTS_PREVIEW_REDEMPTION_DISABLED", "源码预览不提交真实积分码，请使用正式客户端兑换。");
+    }
+    let credential = await this.secureStore.readCredential();
+    if (!hasRefreshableCredential(credential)) {
+      throw pointsError("POINTS_CREDENTIAL_REQUIRED", "本机缺少设备凭证，请先完成设备授权验证。");
+    }
+    const rotate = async () => {
+      if (!this.pointsSessionRefreshPromise) {
+        this.pointsSessionRefreshPromise = this.refreshDeviceSession(credential)
+          .finally(() => { this.pointsSessionRefreshPromise = null; });
+      }
+      const refresh = await this.pointsSessionRefreshPromise;
+      if (!refresh.ok || !hasCompleteCredential(refresh.credential)) {
+        throw pointsError("DEVICE_AUTH_FAILED", "设备会话恢复未完成，请检查网络后重新验证。");
+      }
+      credential = refresh.credential;
+    };
+    if (!hasCompleteCredential(credential)) await rotate();
+    const accountId = credential.codeId;
+    if (action === "redeem") {
+      payload.request_id = createHash("sha256").update(`aiml-points-redeem-v1\0${accountId}\0${payload.code}`).digest("hex");
+    }
+    const send = () => this.request(`/ai-media-library/points/${action}`, {
+      method: "POST", headers: this.credentialHeaders(credential), body: JSON.stringify(payload),
+    });
+    let result = await send();
+    if (result.response.status === 401) {
+      await rotate();
+      if (credential.codeId !== accountId) throw pointsError("DEVICE_CHANGED");
+      result = await send();
+    }
+    if (!result.response.ok || result.body?.ok !== true) {
+      throw pointsError(String(result.body?.error_code || "POINTS_REQUEST_FAILED"));
+    }
+    return decodePointsResponse(result.body, action);
+  }
+
   async redeemTimeCode(activationCode, { allowExpired = false, credential: suppliedCredential = null } = {}) {
     if (!allowExpired) {
       this.assertAuthorized();
@@ -959,6 +1024,23 @@ export class LicenseService {
     this.hasCredential = hasCompleteCredential(credential);
     this.hasActivationCode = Boolean(credential?.activationCode);
     if (!this.hasCredential) {
+      if (hasRefreshableCredential(credential) && allowSessionRefresh) {
+        const recovered = await this.refreshDeviceSession(credential);
+        if (serverRequiresUpgrade(recovered)) {
+          await this.clearOfflineGrant();
+          return this.setState({ phase: "update_required", authorized: false, message: serverMessage(recovered.body, "当前版本需要更新后恢复设备会话"), license: publicLicense(credential) });
+        }
+        if (recovered.ok) return this.refresh(recovered.credential, false);
+        if (CREDENTIAL_REVOCATION_CODES.has(responseErrorCode(recovered.body))) {
+          await this.clearDeviceCredential();
+          this.hasCredential = false;
+          return this.setState({ phase: "invalid", authorized: false, message: INVALID_MESSAGE, license: publicLicense(credential) });
+        }
+        if (responseSaysExpired(recovered.body, credential, this.now())) {
+          return this.setState({ phase: "expired", authorized: false, message: "授权已到期，设备凭证已保留。", license: publicLicense(credential) });
+        }
+        return this.setState({ phase: "network_error", authorized: false, message: "设备会话暂未恢复，长期凭证已保留，将自动重试。", license: publicLicense(credential) });
+      }
       return this.setState({ phase: "needs_activation", authorized: false, message: "请输入激活码以继续使用", license: null });
     }
 
@@ -1016,6 +1098,11 @@ export class LicenseService {
         this.hasActivationCode = Boolean(credential?.activationCode);
         return this.setState({ phase: "invalid", authorized: false, message: INVALID_MESSAGE, license: publicLicense(credential) });
       }
+      if (!responseSaysExpired(result.body, credential, this.now())
+        && (recovered.error?.kind === "network"
+          || (recovered.response && isTemporaryAvailabilityFailure(recovered.response)))) {
+        return this.offlineStateOrNetworkError(credential);
+      }
       await this.clearOfflineGrant();
       if (responseSaysExpired(result.body, credential, this.now()) || responseSaysExpired(recovered.body, credential, this.now())) {
         return this.setState({ phase: "expired", authorized: false, message: "授权已到期，设备凭证已保留。可使用新的月卡或年卡恢复授权。", license: publicLicense(credential) });
@@ -1045,6 +1132,12 @@ export class LicenseService {
       return this.setState({ phase: "invalid", authorized: false, message: serverMessage(result.body, "授权验证失败，请重试"), license: publicLicense(credential) });
     }
 
+    if (result.body?.ok === false || result.body?.success === false
+      || firstDefined(responseSources(result.body), ["binding_status"], null) !== "active") {
+      // A malformed status reply must neither overwrite local proof nor
+      // extend the offline grace period as if online validation succeeded.
+      return this.offlineStateOrNetworkError(credential);
+    }
     const record = normalizedLicenseRecord(result.body, credential);
     // A status response may update entitlement metadata, but it is not a
     // credential-rotation endpoint. Keep both local device secrets unchanged.
@@ -1076,13 +1169,26 @@ export class LicenseService {
     return state;
   }
 
-  async unbind() {
+  async unbind(existingCredential = null, allowSessionRefresh = true) {
     this.diagnostic("warning", "unbind", "用户开始解绑当前设备");
-    const credential = await this.secureStore.readCredential();
+    const credential = existingCredential ?? await this.secureStore.readCredential();
     this.hasCredential = hasCompleteCredential(credential);
     this.hasActivationCode = Boolean(credential?.activationCode);
     if (!this.hasCredential) {
-      await this.clearDeviceCredential();
+      if (hasRefreshableCredential(credential) && allowSessionRefresh) {
+        const recovered = await this.refreshDeviceSession(credential);
+        if (recovered.ok) return this.unbind(recovered.credential, false);
+        if (serverRequiresUpgrade(recovered)) {
+          await this.clearOfflineGrant();
+          return this.setState({ phase: "update_required", authorized: false, message: serverMessage(recovered.body, "当前版本需要更新后解绑"), license: publicLicense(credential) });
+        }
+        if (CREDENTIAL_REVOCATION_CODES.has(responseErrorCode(recovered.body))) {
+          await this.clearDeviceCredential();
+          this.hasCredential = false;
+          return this.setState({ phase: "invalid", authorized: false, message: INVALID_MESSAGE, license: publicLicense(credential) });
+        }
+        return this.setState({ phase: "credential_missing", authorized: false, message: "设备会话暂未恢复，未完成解绑，原凭证已保留。请恢复授权验证后重试。", license: publicLicense(credential) });
+      }
       this.hasActivationCode = Boolean(credential?.activationCode);
       return this.setState({ phase: "needs_activation", authorized: false, message: "当前设备没有可用的本地授权凭证", license: null });
     }
@@ -1097,7 +1203,7 @@ export class LicenseService {
         headers: this.credentialHeaders(credential),
         body: JSON.stringify({
           app_name: this.config.appName,
-          machine_code: await this.machineCode(),
+          machine_code: this.effectiveMachineCode(credential) || await this.machineCode(),
           client_version: this.clientVersion,
           license_protocol_version: this.config.protocolVersion,
         }),
@@ -1109,17 +1215,36 @@ export class LicenseService {
       throw error;
     }
 
+    if (serverRequiresUpgrade(result)) {
+      await this.clearOfflineGrant();
+      return this.setState({ phase: "update_required", authorized: false, message: serverMessage(result.body, "当前版本需要更新后解绑"), license: publicLicense(credential) });
+    }
     if (await this.bindingMismatch(result.body, credential)) return this.bindingMismatchState(credential);
     if (result.response.status === 401) {
-      await this.clearDeviceCredential();
-      this.hasCredential = false;
-      this.hasActivationCode = Boolean(credential?.activationCode);
-      return this.setState({ phase: "invalid", authorized: false, message: INVALID_MESSAGE, license: null });
+      if (CREDENTIAL_REVOCATION_CODES.has(responseErrorCode(result.body))) {
+        await this.clearDeviceCredential();
+        this.hasCredential = false;
+        return this.setState({ phase: "invalid", authorized: false, message: INVALID_MESSAGE, license: publicLicense(credential) });
+      }
+      if (allowSessionRefresh) {
+        const recovered = await this.refreshDeviceSession(credential);
+        if (recovered.ok) return this.unbind(recovered.credential, false);
+        if (serverRequiresUpgrade(recovered)) {
+          await this.clearOfflineGrant();
+          return this.setState({ phase: "update_required", authorized: false, message: serverMessage(recovered.body, "当前版本需要更新后解绑"), license: publicLicense(credential) });
+        }
+        if (CREDENTIAL_REVOCATION_CODES.has(responseErrorCode(recovered.body))) {
+          await this.clearDeviceCredential();
+          this.hasCredential = false;
+        }
+      }
+      return this.setState({ phase: "invalid", authorized: false, message: "解绑验证未完成，请重新验证授权后重试。", license: publicLicense(credential) });
     }
     if (result.response.status === 409) {
       return this.setState({ phase: "invalid", authorized: false, message: serverMessage(result.body, "设备解绑失败"), license: publicLicense(credential) });
     }
-    if (!result.response.ok) {
+    if (!result.response.ok || result.body?.ok === false || result.body?.success === false
+      || (result.body?.ok !== true && result.body?.success !== true)) {
       return this.setState({ phase: "invalid", authorized: false, message: serverMessage(result.body, "设备解绑失败"), license: publicLicense(credential) });
     }
 

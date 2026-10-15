@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import {
   canAccessFeature,
   canDiscoverFeature,
@@ -23,6 +24,11 @@ const state = (baseDays, vipDays = null, phase = "active", offlineDays = null) =
     baseExpiresAt: later(baseDays),
     vipExpiresAt: vipDays === null ? null : later(vipDays),
   },
+});
+
+test("subtitle removal appears immediately above the prompt library", () => {
+  const ids = featureRegistry.list().map(feature => feature.id);
+  assert.equal(ids.indexOf("subtitle-removal"), ids.indexOf("prompt-library") - 1);
 });
 
 test("published VIP features inherit one registered group without per-user grants", () => {
@@ -97,4 +103,35 @@ test("every declared production IPC route resolves to exactly one feature", () =
   assert.equal(featureRegistry.forIpc("viral-library-authorize-write")?.id, "viral-visuals");
   assert.equal(featureRegistry.forIpc("viral-copy-save")?.id, "viral-copy");
   assert.equal(featureRegistry.forIpc("media-save-library")?.id, "media");
+});
+
+test("subtitle and prompt workflows inherit VIP across every actual protected IPC operation", async () => {
+  const main = await readFile(new URL("../electron/main.mjs", import.meta.url), "utf8");
+  const channels = [...main.matchAll(/registerProtectedHandle\("((?:aliyun-subtitle-|prompt-library-)[^"]+)"/g)].map(match => match[1]);
+  assert.ok(channels.length >= 30, "actual workflow IPC routes must be inspected");
+  for (const channel of channels) {
+    const feature = featureRegistry.forIpc(channel);
+    assert.equal(feature.group, "vip", channel);
+    assert.equal(canDiscoverFeature(featureRegistry, feature.id, state(300), now), true, channel);
+    let current = state(300);
+    let executions = 0;
+    const handler = protectedIpcHandler(featureRegistry, channel, () => ({
+      assertFeature(id) { requireFeatureAccess(featureRegistry, id, current, now); },
+    }), () => { executions++; });
+    await assert.rejects(handler(null, { featureId: "media", isVip: true }), /无权/, channel);
+    assert.equal(executions, 0);
+    current = state(300, 30);
+    await handler();
+    assert.equal(executions, 1);
+    for (const denied of [state(300, 0), state(300), state(300, 30, "offline_active", 0), { ...state(300, 30), authorized: false }]) {
+      current = denied;
+      await assert.rejects(handler(), /无权/);
+    }
+    current = state(300, 30, "offline_active", 7);
+    await handler();
+    assert.equal(executions, 2);
+  }
+  for (const id of ["media", "qianchuan-videos", "downloads", "voice", "schemes", "classifier", "settings"]) {
+    assert.equal(canAccessFeature(featureRegistry, id, state(300, 0), now), true, id);
+  }
 });

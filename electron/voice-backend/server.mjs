@@ -64,6 +64,16 @@ const voiceAttemptInFlight = new Map();
 const voiceAttemptResults = new Map();
 const voiceAttemptResultLimit = 1000;
 let assertVoiceFeatureAccess = null;
+let executeVoicePlatform = null;
+export function configureVoicePlatformExecution(execute) {
+  if (typeof execute !== "function") throw new TypeError("声音积分执行器必须是函数");
+  executeVoicePlatform = execute;
+}
+let selectVoiceApi = async () => ({ provider: "minimax", apiMode: "customer_api", usesSoftwarePoints: false });
+export function configureVoiceApiUsage(select) {
+  if (typeof select !== "function") throw new TypeError("声音 API 使用方式检查器必须是函数");
+  selectVoiceApi = select;
+}
 
 export function configureVoiceAuthorization(assertAccess) {
   if (typeof assertAccess !== "function") throw new TypeError("声音服务授权检查器必须是函数");
@@ -270,6 +280,8 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/config/test-minimax") {
+    const selection = await selectVoiceApi();
+    if (selection?.apiMode !== "customer_api") throw Object.assign(new Error("请开启使用自己的 API 后再测试个人密钥"), { status: 409, code: "PLATFORM_API_UNAVAILABLE" });
     const body = await readJson(req, 64 * 1024);
     const baseUrl = normalizeMinimaxApiBaseUrl(body.minimaxBaseUrl || config.minimaxApiBaseUrl);
     const apiKey = String(body.minimaxApiKey || config.minimaxApiKey || "").trim();
@@ -389,10 +401,11 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     try {
       const result = await runVoiceAttempt({
+        selectApi: selectVoiceApi,
         operation: "voice_clone",
         attemptId: requireVoiceAttemptId(body.attemptId),
         title: "生成声音试听",
-        execute: () => createMinimaxVoiceClone(body),
+        execute: selection => createMinimaxVoiceClone(body, selection),
       });
       sendJson(res, result.status, result.payload);
     } catch (error) {
@@ -409,7 +422,7 @@ async function handleApi(req, res, url) {
     sendJson(res, 410, {
       ok: false,
       error: "voice_synthesis_disabled",
-      message: "当前为只生成试听模式，不会正式启用或继续合成 MiniMax 音色。",
+      message: "当前仅生成试听音频，不正式启用音色。",
     });
     return;
   }
@@ -1448,8 +1461,9 @@ async function handleApi(req, res, url) {
   sendJson(res, 404, { error: "not_found" });
 }
 
-async function createMinimaxVoiceClone(body = {}) {
-  requireMinimaxApiKey();
+async function createMinimaxVoiceClone(body = {}, selection = { apiMode: "customer_api" }) {
+  const platform = selection.apiMode === "platform_api";
+  if (!platform) requireMinimaxApiKey();
   const name = normalizeVoiceName(body.name);
   const previewText = normalizeVoiceText(body.previewText);
   if (!body.consent) {
@@ -1493,7 +1507,17 @@ async function createMinimaxVoiceClone(body = {}) {
     audios: [],
   };
 
+  let generatedPreview = null;
   try {
+    let cloneResult;
+    if (platform) {
+      if (!executeVoicePlatform) throw Object.assign(new Error("声音积分接口尚未开放"), { code: "PLATFORM_API_UNAVAILABLE" });
+      const completed = await executeVoicePlatform({ feature: "voice", provider: "minimax", requestId: `voice:${body.attemptId}`,
+        payload: { audio: file.dataUrl, previewText, model: config.minimaxTtsModel || "speech-2.8-turbo", consent: true } });
+      cloneResult = completed.result;
+      baseVoice.platformQuoteId = completed.quoteId;
+      baseVoice.billingPending = completed.billingPending === true;
+    } else {
     const uploaded = await uploadMinimaxVoiceFile({
       buffer: parsed.buffer,
       mimeType: parsed.mimeType,
@@ -1503,10 +1527,11 @@ async function createMinimaxVoiceClone(body = {}) {
     if (!providerFileId) {
       throw new Error("MiniMax 没有返回文件 ID，请重新上传音频样本。");
     }
-    const cloneResult = await cloneMinimaxVoice({ providerFileId, providerVoiceId, previewText });
+    cloneResult = await cloneMinimaxVoice({ providerFileId, providerVoiceId, previewText });
+    }
     const previewBuffer = await extractMinimaxAudioBuffer(cloneResult);
     if (!previewBuffer?.length) {
-      const error = new Error("MiniMax 没有返回可下载的试听音频，未发起正式语音合成。");
+      const error = new Error("未返回可下载的试听音频，请查看原任务状态。");
       error.status = 502;
       error.code = "minimax_preview_missing";
       throw error;
@@ -1530,9 +1555,19 @@ async function createMinimaxVoiceClone(body = {}) {
       lastUsedAt: completedAt,
       audios: [audioRecord],
     };
+    generatedPreview = { voice, audio: audioRecord };
+    // Keep a recovery receipt beside the finished audio before updating the index.
+    // A later index-write failure must never delete a paid, downloaded preview.
+    await writeFile(join(voiceDir, 'preview-result.json'), JSON.stringify(generatedPreview), { mode: 0o600 });
     await upsertVoiceItem(voice);
     return { ok: true, voice: publicVoiceItem(voice), audio: audioRecord };
   } catch (error) {
+    if (generatedPreview) {
+      const warning = '试听音频已生成并保留，但记录保存未完成。请先下载音频，不要重复提交生成。';
+      const voice = { ...generatedPreview.voice, errorMessage: warning };
+      await Promise.allSettled([upsertVoiceItem(voice)]);
+      return { ok: true, voice: publicVoiceItem(voice), audio: generatedPreview.audio, warning };
+    }
     // 临时目录一律清掉，但失败痕迹要留在试听记录里，方便用户自查和客服定位。
     await Promise.allSettled([
       rm(voiceDir, { recursive: true, force: true }),
@@ -1548,7 +1583,7 @@ async function createMinimaxVoiceClone(body = {}) {
       providerFileId: "",
       status: "生成失败",
       failedAt: new Date().toISOString(),
-      errorMessage: normalizePublicError(error, "MiniMax 试听生成失败，请检查音频样本后重试。"),
+      errorMessage: platform ? "试听生成未完成，请查看原任务状态或联系支持。" : normalizePublicError(error, "试听生成失败，请检查音频样本后重试。"),
     };
     // 写记录失败不应该掩盖真正的错误，因此单独兜住。
     await Promise.allSettled([upsertVoiceItem(failedVoice)]);
@@ -2181,7 +2216,7 @@ async function markVoiceAttemptCompleted(key, result) {
   });
 }
 
-async function runVoiceAttempt({ operation, attemptId, title, voiceId = "", execute }) {
+async function runVoiceAttempt({ operation, attemptId, title, voiceId = "", execute, selectApi }) {
   const startedAt = new Date().toISOString();
   const attemptKey = buildVoiceAttemptKey({ operation, attemptId, voiceId });
   const completedAttempt = voiceAttemptResults.get(attemptKey);
@@ -2221,11 +2256,17 @@ async function runVoiceAttempt({ operation, attemptId, title, voiceId = "", exec
         message: "该声音任务上次提交后状态未确认。为避免重复调用 API，已停止自动重发；请重新点击操作按钮创建新任务。",
       });
     }
+    if (selectApi) {
+      identity.apiSelection = await selectApi();
+      if (identity.apiSelection?.apiMode !== "customer_api" && !executeVoicePlatform) throw Object.assign(new Error("声音积分服务暂不可用，本次未扣积分。"), { code: "PLATFORM_API_UNAVAILABLE", status: 409 });
+    }
     await markVoiceAttemptProcessing(attemptKey, identity);
   } catch (error) {
     const result = {
-      status: 500,
-      payload: { error: "voice_attempt_journal_failed", message: "声音任务审计记录失败，已停止提交以避免重复调用 API。" },
+      status: error?.code === "PLATFORM_API_UNAVAILABLE" ? 409 : 500,
+      payload: error?.code === "PLATFORM_API_UNAVAILABLE"
+        ? { error: error.code, message: error.message }
+        : { error: "voice_attempt_journal_failed", message: "声音任务审计记录失败，已停止提交以避免重复调用 API。" },
     };
     voiceAttemptInFlight.delete(attemptKey);
     resolveInFlightAttempt(result);
@@ -2234,12 +2275,14 @@ async function runVoiceAttempt({ operation, attemptId, title, voiceId = "", exec
 
   let output;
   try {
-    output = await execute();
+    output = await execute(identity.apiSelection);
   } catch (error) {
     return finish(Number(error?.status || 502), {
       ok: false,
       error: error?.code || `${operation}_failed`,
-      message: normalizePublicError(error, operation === "voice_clone" ? "声音复刻失败，请检查音频样本后重试。" : "试听音频生成失败，请稍后重试。"),
+      message: identity.apiSelection?.apiMode === 'platform_api'
+        ? error?.code === 'INSUFFICIENT_POINTS' ? '可用积分不足，请充值后重试。' : '声音生成未完成，请查看原任务状态或联系支持。'
+        : normalizePublicError(error, operation === "voice_clone" ? "声音复刻失败，请检查音频样本后重试。" : "试听音频生成失败，请稍后重试。"),
     });
   }
 

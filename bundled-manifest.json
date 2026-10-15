@@ -30,14 +30,15 @@
     },
     {
       "name": "bundled-tools",
-      "version": "ffmpeg-7.1-macos+ffmpeg-N-92722-gf22fcd4483-windows",
+      "version": "ffmpeg-7.1-macos+ffmpeg-N-92722-gf22fcd4483-windows+whisper.cpp-1.9.1",
       "source_url": "https://pypi.org/project/imageio-ffmpeg/0.6.0/",
-      "sha256": "bafb732c5128c0b25f960c2384067a3e3a442d96a8bfa042c700fbe9e72bb913",
+      "sha256": "4a696147d8d483676b571682444ebc38254fe97f0bc98fbb66af97f8271b3852",
       "sha256_kind": "tree",
-      "file_count": 3,
-      "size_bytes": 189819168,
+      "file_count": 62,
+      "size_bytes": 223780448,
       "extract_path": "bundled-tools/",
-      "restore": "public-fetch-for-macos-private-backup-for-windows"
+      "restore": "public-fetch-for-macos-private-backup-for-windows",
+      "notes": "Whisper native binaries/model are verified by local-asr-manifest.json and the beforePack hook; restore those assets together."
     }
   ],
   "runtimes": [
@@ -153,5 +154,6 @@
       "automatic": false,
       "notes": "The exact historical binary source is not documented; restore it from the private backup instead of silently substituting another build."
     }
-  ]
+  ],
+  "local_asr_manifest": "local-asr-manifest.json"
 }

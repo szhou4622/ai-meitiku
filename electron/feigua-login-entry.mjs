@@ -1,3 +1,9 @@
+// Confirmed by the user's portal channel selection on 2026-10-09. Keep this
+// cross-host exception bound to this exact portal and gateway origin.
+const observedPortalGateways = new Map([
+  ['http://121.40.180.3', new Set(['http://120.26.165.88', 'http://sdy.73le.com'])],
+]);
+
 export function normalizeLoginEntryUrl(value) {
   if (typeof value !== 'string' || value.length > 2048 || /[\s\u0000-\u001f\u007f]/.test(value.trim())) throw new Error('请输入有效的登录入口网址');
   if (!value.trim()) return '';
@@ -15,13 +21,14 @@ export function isLoginEntryNavigation(value, entryUrl) {
 }
 
 // Some login portals open their provider gateway on another port of the same
-// server. Permit that handoff only when processing a popup from the portal.
+// server. Permit that handoff only when it originates from the configured portal.
 export function isLoginEntryHandoff(value, entryUrl) {
   if (!entryUrl) return false;
   try {
     const target = new URL(normalizeLoginEntryUrl(value));
     const entry = new URL(normalizeLoginEntryUrl(entryUrl));
-    return target.protocol === entry.protocol && target.hostname === entry.hostname;
+    return target.protocol === entry.protocol && target.hostname === entry.hostname
+      || observedPortalGateways.get(entry.origin)?.has(target.origin) === true;
   } catch { return false; }
 }
 

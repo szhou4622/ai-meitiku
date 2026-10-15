@@ -351,13 +351,14 @@ function downloadTableCsv(records) {
 }
 
 export class VideoDownloadService {
-  constructor({ userDataPath, appRoot, resourcesPath, isPackaged = false, maxConcurrency = 2, onStateChange = () => {}, runner = null, authProvider = null, fallbackRunner = null }) {
+  constructor({ userDataPath, appRoot, resourcesPath, isPackaged = false, maxConcurrency = 2, onStateChange = () => {}, onDiagnostic = () => {}, runner = null, authProvider = null, fallbackRunner = null }) {
     this.userDataPath = userDataPath;
     this.appRoot = appRoot;
     this.resourcesPath = resourcesPath;
     this.isPackaged = isPackaged;
     this.maxConcurrency = Math.max(1, Math.min(4, maxConcurrency));
     this.onStateChange = onStateChange;
+    this.onDiagnostic = onDiagnostic;
     this.runner = runner;
     this.authProvider = authProvider;
     this.fallbackRunner = fallbackRunner;
@@ -662,6 +663,7 @@ export class VideoDownloadService {
       let recentError = "";
       const outputFiles = new Set();
       const consume = (chunk, isError = false) => {
+        this.onDiagnostic({ taskId: task.id, platform: task.platform, stream: isError ? "stderr" : "stdout", text: String(chunk) });
         const text = String(chunk).trim();
         if (!text) return;
         for (const line of text.split(/\r?\n/)) {
@@ -680,6 +682,7 @@ export class VideoDownloadService {
       child.stderr?.on("data", (chunk) => consume(chunk, true));
       child.once("error", (error) => reject(new Error(`无法启动下载后端：${error.message}`)));
       child.once("close", (code, signal) => {
+        this.onDiagnostic({ taskId: task.id, phase: "exit", code, signal });
         task.process = null;
         if (task.status === "cancelled" || signal) return resolve({ outputFiles: [] });
         if (code === 0) resolve({ outputFiles: [...outputFiles] });

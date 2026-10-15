@@ -1,3 +1,13 @@
+export function recoverClassifierDraft(text) {
+  let value = {};
+  try { value = JSON.parse(String(text).trim().replace(/^```(?:json)?\s*|\s*```$/gi, '')); } catch { /* Raw output remains available below. */ }
+  const taxonomy = value?.taxonomy && typeof value.taxonomy === 'object' && !Array.isArray(value.taxonomy)
+    ? Object.fromEntries(Object.entries(value.taxonomy).filter(([, entries]) => Array.isArray(entries)).map(([key, entries]) => [key, entries.filter(entry => typeof entry === 'string')])) : {};
+  const scalar = key => typeof value?.[key] === 'string' ? value[key] : '';
+  return { name: scalar('name'), product_name: scalar('product_name'), taxonomy, rules: scalar('rules'), naming_rule: scalar('naming_rule'), rawDraftText: text, repairedCount: 0,
+    quality: { passed: false, issues: [{ code: 'partial_draft', severity: 'warning', message: '本次已返回内容已保存，分类草案部分内容尚待完善。可查看或复制原始内容，并决定是否继续生成。' }] } };
+}
+
 const ruleLabels = {
   principles: "分类原则",
   classification_principles: "分类原则",
