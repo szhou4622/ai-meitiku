@@ -1,4 +1,5 @@
 import { feiguaProductLink } from './feigua-links.mjs';
+import { feiguaCommissionRate } from './feigua-video-details.mjs';
 
 const list = value => Array.isArray(value) ? value : [];
 const groupsIn = data => [
@@ -8,7 +9,6 @@ const groupsIn = data => [
 const productsIn = row => list(row?.products).slice(0, 30).filter(product => product && typeof product === 'object');
 const productId = value => typeof value === 'string' && value.trim() === value && value.length <= 160 && value !== '0' ? value : '';
 const videoId = value => typeof value === 'string' && /^\d{6,25}$/.test(value) ? value : '';
-const commissionRate = value => typeof value === 'string' && /^\d+(?:\.\d+)?%$/.test(value) && Number(value.slice(0,-1)) <= 100 ? value : null;
 const verifiedAt = (value, fallback) => Number.isFinite(Date.parse(value)) && Date.parse(value) <= fallback ? Date.parse(value) : fallback;
 function scope(result) {
   if (result?.provenance?.transport !== 'provider-api' || result.provenance.responseCode !== 200
@@ -30,7 +30,7 @@ function productIndex(data) {
     const source = scope(group.result);
     if (!source) continue;
     for (const row of group.result.rows.slice(0, 5)) for (const product of productsIn(row)) {
-      const key = keyFor(source.origin, row, product), url = feiguaProductLink(product.url), commission = commissionRate(product.commission);
+      const key = keyFor(source.origin, row, product), url = feiguaProductLink(product.url), commission = feiguaCommissionRate(product.commission, product.hasCommission);
       if (!key || !url && !commission) continue;
       if (!index.has(key)) index.set(key, []);
       index.get(key).push({ url, at: source.at, urlVerifiedAt: verifiedAt(product.urlVerifiedAt, source.at), destination: url ? new URL(url).searchParams.get('id') : null,
@@ -56,7 +56,7 @@ function fillMissing(result, index) {
       restored++;
     }
     const rates = candidates.filter(item => item.commission);
-    if ([null, undefined, '', '--', '-'].includes(product.commission) && rates.length) {
+    if (product.hasCommission !== false && [null, undefined, '', '--', '-'].includes(product.commission) && rates.length) {
       const latest = Math.max(...rates.map(item => item.commissionVerifiedAt));
       const known = rates.filter(item => item.commissionVerifiedAt === latest);
       if (new Set(known.map(item => Number(item.commission.slice(0,-1)))).size === 1) {
@@ -75,15 +75,33 @@ function fillMissing(result, index) {
 // Current titles, rankings, sales metrics and collection dates are unchanged.
 export function retainProductFields(result, previousState) {
   const retained = structuredClone(result);
+  clearUnavailableCommissions(retained);
   fillMissing(retained, productIndex(previousState));
   return retained;
+}
+
+function clearUnavailableCommissions(result) {
+  let changed = 0;
+  for (const row of list(result?.rows)) for (const product of productsIn(row)) {
+    if (product.hasCommission !== false || product.commission == null) continue;
+    product.commission = null;
+    delete product.commissionVerifiedAt;
+    row.fieldAvailability = { ...row.fieldAvailability, commission: 'source_unavailable' };
+    if (Array.isArray(row.missingFields) && !row.missingFields.includes('products')) row.missingFields.push('products');
+    changed++;
+  }
+  return changed;
 }
 
 // Repair earlier partial captures before the service exposes its loaded state.
 // The caller must persist this copy successfully before publishing it.
 export function restoreProductFieldsInState(stored) {
-  const data = structuredClone(stored), index = productIndex(stored);
+  const data = structuredClone(stored);
   let restored = 0;
+  for (const group of groupsIn(data)) {
+    if (group.kind === 'videos' && group.status === 'completed') restored += clearUnavailableCommissions(group.result);
+  }
+  const index = productIndex(data);
   for (const group of groupsIn(data)) {
     if (group.kind === 'videos' && group.status === 'completed') restored += fillMissing(group.result, index);
   }

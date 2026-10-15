@@ -1,219 +1,143 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { normalizeLoginEntryUrl, isLoginEntryHandoff, normalizeWorkspaceHint } from '../electron/feigua-login-entry.mjs';
+import { FEIGUA_HOME } from '../electron/feigua-contract.mjs';
 import { FeiguaBrowser, isFeiguaNavigation } from '../electron/feigua-browser.mjs';
 import { FeiguaService } from '../electron/feigua-service.mjs';
 
-const entry = 'http://192.0.2.10:16888/'; // Documentation-only address, never contacted.
-function fixture({ stored = { version: 1, keywords: ['保留词'], runs: [] }, failWrite = false, providerBrowser } = {}) {
-  let disk = structuredClone(stored);
-  const calls = [];
-  const browser = providerBrowser || { setLoginEntryUrl: url => calls.push(['configure', url]), openLogin: async () => calls.push(['login']), stopLoginWatch() {} };
-  const service = new FeiguaService({ userDataPath: '/unused', browser, storage: {
+const portal = 'http://192.0.2.10:16888/';
+const flush = async () => { for (let n = 0; n < 10; n++) await new Promise(resolve => setImmediate(resolve)); };
+function serviceFixture(stored = { version: 1, keywords: [], runs: [] }, failWrite = false) {
+  let disk = structuredClone(stored), writes = 0, logins = 0;
+  const service = new FeiguaService({ userDataPath: '/unused', browser: { openLogin: async () => { logins++; } }, storage: {
     read: async () => structuredClone(disk),
-    write: async data => { if (failWrite) throw new Error('磁盘不可写'); disk = structuredClone(data); },
+    write: async data => { if (failWrite) throw new Error('磁盘不可写'); disk = structuredClone(data); writes++; },
   } });
-  return { service, browser, calls, disk: () => disk };
+  return { service, disk: () => disk, writes: () => writes, logins: () => logins };
 }
-
-test('entry supports HTTP with a port and HTTPS, and limits navigation to the exact configured origin', () => {
-  assert.equal(normalizeLoginEntryUrl('  http://192.0.2.10:16888  '), entry);
-  assert.equal(normalizeLoginEntryUrl('https://portal.example/login?next=workspace'), 'https://portal.example/login?next=workspace');
-  assert.equal(normalizeLoginEntryUrl(''), '');
-  for (const value of ['http:portal.example', 'file:///tmp/test', 'javascript:alert(1)', 'ftp://portal.example/', 'https://user:password@portal.example/', 'https://portal.example/a\nb', null]) assert.throws(() => normalizeLoginEntryUrl(value));
-  assert.equal(isFeiguaNavigation(`${entry}admin/workspace`, entry), true);
-  for (const value of ['http://192.0.2.10:16889/', 'https://192.0.2.10:16888/', 'http://192.0.2.11:16888/', `${entry.slice(0, -1)}.evil/`, 'http://user:pass@192.0.2.10:16888/']) assert.equal(isFeiguaNavigation(value, entry), false);
-  assert.equal(isFeiguaNavigation('https://dy.feigua.cn/app/', entry), true);
-  assert.equal(isFeiguaNavigation('https://open.weixin.qq.com/connect/qrconnect', entry), true);
-});
-
-test('old data has no implicit direct login; saving and reloading preserves entry, keywords and results', async () => {
-  const stored = { version: 1, keywords: ['保留词'], runs: [{ id: 'history', status: 'completed', groups: [] }] };
-  const { service, calls, disk } = fixture({ stored });
-  assert.equal((await service.state()).loginEntryUrl, '');
-  await assert.rejects(service.login(), /先配置/);
-  assert.equal(calls.some(([kind]) => kind === 'login'), false);
-  await service.saveLoginEntryUrl(entry);
-  assert.equal((await service.state()).auth.status, 'signed_out');
-  await service.login({ collectAfterLogin: false });
-  assert.equal(calls.at(-1)[0], 'login');
-  const restored = fixture({ stored: disk() });
-  const state = await restored.service.state();
-  assert.equal(state.loginEntryUrl, entry);
-  assert.deepEqual(state.keywords, ['保留词']);
-  assert.equal(state.runs[0].id, 'history');
-  assert.deepEqual(restored.calls[0], ['configure', entry]);
-  await service.saveLoginEntryUrl('https://new-portal.example/');
-  assert.equal(service.autoCollectRequested, false);
-  assert.equal(service.autoCatalogRequested, false);
-  await service.saveLoginEntryUrl('');
-  await assert.rejects(service.login(), /先配置/);
-});
-
-test('a failed save keeps the previous entry and browser session active', async () => {
-  const { service, calls } = fixture({ stored: { version: 1, loginEntryUrl: entry, keywords: [], runs: [] }, failWrite: true });
-  await service.ready;
-  service.auth = { status: 'authenticated', message: '已登录' };
-  await assert.rejects(service.saveLoginEntryUrl('https://new-portal.example/'), /磁盘/);
-  assert.equal((await service.state()).loginEntryUrl, entry);
-  assert.equal((await service.state()).auth.status, 'authenticated');
-  assert.deepEqual(calls, [['configure', entry]]);
-});
-
-test('a reload hint is bound to the saved entry and cannot contain credentials or signed paths', () => {
-  const hint = {entryUrl:entry,origin:'http://192.0.2.10:13042'};
-  assert.deepEqual(normalizeWorkspaceHint(hint,entry),hint);
-  assert.equal(normalizeWorkspaceHint(hint,`${entry}different-entry`),null);
-  for (const origin of ['http://foreign.example:13042','https://192.0.2.10:13042','http://user:password@192.0.2.10:13042','http://192.0.2.10:13042/?token=synthetic','http://192.0.2.10:13042/login']) assert.equal(normalizeWorkspaceHint({...hint,origin},entry),null);
-});
-
-test('restart rechecks the saved workspace session before trusting it, without reopening the portal', async () => {
-  const hint = {entryUrl:entry,origin:'http://192.0.2.10:13042'};
-  const {browser,loaded}=browserFixture();
-  const {service,disk}=fixture({providerBrowser:browser,stored:{version:1,loginEntryUrl:entry,workspaceHint:hint,keywords:[],runs:[]}});
-  await service.ready;
-  assert.equal(browser.sourceOrigin(),null);
-  const state=await service.checkLogin();
-  assert.equal(state.auth.status,'authenticated');
-  assert.deepEqual(loaded,[`${hint.origin}/app/`]);
-  assert.equal(browser.sourceOrigin(),hint.origin);
-  await browser.onWorkspaceVerified(hint);
-  assert.deepEqual(disk().workspaceHint,hint);
-  await service.saveLoginEntryUrl(`${entry}new-entry`);
-  assert.equal(disk().workspaceHint,null);
-  assert.equal(browser.workspaceHint,null);
-});
-
-test('an expired saved session gives a relogin prompt and never enables collection scripts', async () => {
-  const {browser,loaded}=browserFixture();
-  browser.setLoginEntryUrl(entry);
-  browser.setWorkspaceHint({entryUrl:entry,origin:'http://192.0.2.10:13042'});
-  browser.ensureWindow();
-  browser.window.webContents.executeJavaScript=async()=>({authenticated:false,loginVisible:true});
-  const auth=await browser.checkLogin();
-  assert.equal(auth.status,'expired');
-  assert.match(auth.message,/打开登录入口.*重新登录/);
-  assert.deepEqual(loaded,['http://192.0.2.10:13042/app/']);
-  assert.equal(browser.sourceOrigin(),null);
-  await assert.rejects(browser.execute('capture-context'),/先核验/);
-});
-
-test('a saved gateway redirecting to its login page prompts relogin without executing provider code', async () => {
-  const {browser,executed}=browserFixture();
-  browser.setLoginEntryUrl(entry);
-  browser.setWorkspaceHint({entryUrl:entry,origin:'http://192.0.2.10:13042'});
-  browser.ensureWindow();
-  browser.window.loadURL=async()=>{browser.window.url='http://192.0.2.10:13042/login';};
-  const auth=await browser.checkLogin();
-  assert.equal(auth.status,'expired');
-  assert.match(auth.message,/重新登录/);
-  assert.equal(browser.sourceOrigin(),null);
-  assert.deepEqual(executed,[]);
-});
-
-test('legacy verified API results provide a recheck hint, but an explicit reset cannot resurrect it', async () => {
-  const result={sourceUrl:'http://192.0.2.10:13042/app/#/music/index',rows:[],provenance:{transport:'provider-api',responseCode:200}};
-  const base={version:1,loginEntryUrl:entry,keywords:[],runs:[],latestResults:[{kind:'music',keyword:null,result}]};
-  const migrated=fixture({stored:base});
-  assert.deepEqual((await migrated.service.state()).workspaceHint,{entryUrl:entry,origin:'http://192.0.2.10:13042'});
-  assert.equal((await fixture({stored:{...base,workspaceHint:null}}).service.state()).workspaceHint,null);
-  assert.equal((await fixture({stored:{...base,loginEntryUrl:'http://other.example/'}}).service.state()).workspaceHint,null);
-});
-
-test('a portal may open its same-server gateway on another port without trusting unrelated hosts', async () => {
-  const { browser, loaded, handlers } = browserFixture();
-  browser.setLoginEntryUrl(entry);
-  await browser.openLogin();
-  const gateway = 'http://192.0.2.10:13042/login?session=synthetic';
-  assert.equal(isFeiguaNavigation(gateway, entry), false);
-  assert.equal(isLoginEntryHandoff(gateway, entry), true);
-  for (const url of ['http://foreign.example:13042/', 'http://user:password@192.0.2.10:13042/', 'https://192.0.2.10:13042/']) assert.equal(isLoginEntryHandoff(url, entry), false);
-  handlers.get('popup')({ url: gateway });
-  assert.equal(loaded.at(-1), gateway);
-  let prevented = false;
-  browser.window.webContents.emit('will-redirect', { preventDefault: () => { prevented = true; } }, 'http://192.0.2.10:13042/workspace');
-  assert.equal(prevented, false);
-  browser.window.webContents.emit('will-redirect', { preventDefault: () => { prevented = true; } }, 'http://192.0.2.10:13045/workspace');
-  assert.equal(prevented, true);
-  handlers.get('popup')({ url: 'http://192.0.2.10:13045/' });
-  assert.equal(loaded.at(-1), gateway); // A gateway cannot grant itself new ports.
-  browser.setLoginEntryUrl('https://new-portal.example/');
-  assert.equal(browser.loginRelayOrigins.size, 0);
-  browser.stopLoginWatch();
-});
-
-test('only a selected gateway workspace passing auth may become the collection source', async () => {
-  const { browser, loaded, handlers } = browserFixture();
-  browser.setLoginEntryUrl(entry);
-  await browser.openLogin();
-  assert.equal(browser.sourceOrigin(), null);
-  const gateway = 'http://192.0.2.10:13042/app/#/brand-compare/index';
-  handlers.get('popup')({ url: gateway });
-  await assert.rejects(browser.execute('capture-context'), /先核验/);
-  assert.equal((await browser.checkLogin()).status, 'authenticated');
-  assert.equal(browser.sourceOrigin(), 'http://192.0.2.10:13042');
-  await browser.navigate('http://192.0.2.10:13042/app/#/music/index');
-  assert.equal(loaded.at(-1), 'http://192.0.2.10:13042/app/#/music/index');
-  await assert.rejects(browser.navigate('http://192.0.2.10:13045/app/'), /来源地址/);
-  browser.setLoginEntryUrl('https://new-portal.example/');
-  assert.equal(browser.sourceOrigin(), null);
-  browser.stopLoginWatch();
-});
-
-function browserFixture() {
-  const loaded = [], executed = [], handlers = new Map();
+function browserFixture(t) {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const loaded = [], windows = [], notifications = [], partitions = [];
   const partition = new EventEmitter();
-  Object.assign(partition, { setPermissionRequestHandler() {}, setPermissionCheckHandler() {}, webRequest: { onBeforeRequest() {}, onCompleted() {}, onErrorOccurred() {} } });
+  Object.assign(partition, { setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
+    webRequest: { onBeforeRequest() {}, onCompleted() {}, onErrorOccurred() {} } });
+  const state = { authenticated: false, loginVisible: true };
   class Window extends EventEmitter {
-    constructor() {
-      super(); this.url = ''; this.closed = false;
+    constructor(options) {
+      super(); windows.push(this); this.options = options; this.url = ''; this.closed = false;
       this.webContents = new EventEmitter();
-      Object.assign(this.webContents, { getURL: () => this.url, setWindowOpenHandler: handler => handlers.set('popup', handler), executeJavaScript: async source => { executed.push(source); return { authenticated: true }; } });
+      Object.assign(this.webContents, { getURL: () => this.url, setWindowOpenHandler: handler => { this.popup = handler; },
+        executeJavaScript: async () => ({ ...state }) });
     }
     isDestroyed() { return this.closed; }
     show() {}
     focus() {}
     async loadURL(url) { loaded.push(url); this.url = url; }
     close() { this.closed = true; this.emit('closed'); }
+    destroy() { this.close(); }
   }
-  return { browser: new FeiguaBrowser({ BrowserWindow: Window, session: { fromPartition: () => partition } }), loaded, executed, handlers };
+  const browser = new FeiguaBrowser({ BrowserWindow: Window, session: {
+    fromPartition: name => { partitions.push(name); return partition; },
+  } });
+  browser.onAuthChange = auth => notifications.push(auth);
+  t.after(() => browser.dispose());
+  return { browser, state, loaded, windows, partition, partitions, notifications };
 }
-
-test('a mounting workspace is awaited rather than misreported as an expired login', async () => {
-  const { browser } = browserFixture();
-  let calls = 0;
-  browser.ensureWindow();
-  browser.window.url = 'https://dy.feigua.cn/app/';
-  browser.execute = async () => ++calls === 1 ? {loading:true,authenticated:false} : {loading:false,authenticated:true};
-  assert.equal((await browser.resolveAuth()).authenticated, true);
-  assert.equal(calls, 2);
+test('new installs can log in to official Feigua without entry configuration', async () => {
+  const f = serviceFixture();
+  assert.equal((await f.service.state()).loginEntryUrl, FEIGUA_HOME);
+  await f.service.login({ collectAfterLogin: false });
+  assert.equal(f.logins(), 1);
+  assert.equal(f.service.autoCollectRequested, false);
+  assert.equal(typeof f.service.saveLoginEntryUrl, 'undefined');
 });
-
-test('login always opens the saved portal, never runs provider scripts on it, and follows its allowed popup', async () => {
-  const { browser, loaded, executed, handlers } = browserFixture();
-  await assert.rejects(browser.openLogin(), /先配置/);
-  assert.deepEqual(loaded, []);
-  assert.equal((await browser.checkLogin()).status, 'signed_out');
-  assert.deepEqual(loaded, []);
-  browser.setLoginEntryUrl(entry);
-  await browser.openLogin();
-  assert.deepEqual(loaded, [entry]);
-  assert.deepEqual(executed, []);
-  assert.equal((await browser.checkLogin()).status, 'signed_out');
-  const window = browser.window;
-  let blocked = false;
-  window.webContents.emit('will-redirect', { preventDefault: () => { blocked = true; } }, 'https://foreign.example/');
-  assert.equal(blocked, true);
-  assert.deepEqual(handlers.get('popup')({ url: 'https://dy.feigua.cn/app/' }), { action: 'deny' });
-  assert.equal((await browser.checkLogin()).status, 'authenticated');
-  assert.equal(loaded[0], entry);
-  assert.ok(executed.length > 0);
-  browser.setLoginEntryUrl('https://new-portal.example/');
-  assert.equal(window.closed, true);
-  assert.equal(browser.wasAuthenticated, false);
-  assert.equal(browser.loginTimer, null);
-  await browser.openLogin();
-  assert.equal(loaded.at(-1), 'https://new-portal.example/');
-  browser.stopLoginWatch();
+test('portal migration preserves results, filters and schedule markers and never restores a gateway', async () => {
+  const oldResult = { kind: 'music', keyword: null, status: 'completed', result: {
+    sourceUrl: 'http://192.0.2.10:13042/app/', collectedAt: '2026-10-14T01:00:00Z', rows: [],
+    provenance: { transport: 'provider-api', responseCode: 200 },
+  } };
+  const stored = { version: 1, loginEntryUrl: portal, workspaceHint: { entryUrl: portal, origin: 'http://192.0.2.10:13042' },
+    keywords: ['保留词'], videoQueries: [{ keyword: '保留词', categoryPath: ['自定义分类'], tagPath: [] }],
+    musicTag: ['自定义标签'], lastHotspotsScheduleDate: '2026-10-14', lastVideosScheduleDate: '2026-10-12',
+    runs: [{ id: 'history', status: 'completed', groups: [oldResult] }], latestResults: [oldResult] };
+  const f = serviceFixture(stored);
+  const next = await f.service.state();
+  assert.equal(next.loginEntryUrl, FEIGUA_HOME);
+  assert.equal(Object.hasOwn(next, 'workspaceHint'), false);
+  assert.deepEqual(next.videoQueries, stored.videoQueries);
+  assert.deepEqual(next.musicTag, stored.musicTag);
+  assert.equal(next.runs[0].id, 'history');
+  assert.equal(next.latestResults[0].result.sourceUrl, oldResult.result.sourceUrl);
+  assert.equal(next.lastHotspotsScheduleDate, stored.lastHotspotsScheduleDate);
+  assert.equal(next.lastVideosScheduleDate, stored.lastVideosScheduleDate);
+  assert.equal(f.writes(), 1);
+  const restarted = serviceFixture(f.disk());
+  assert.equal((await restarted.service.state()).loginEntryUrl, FEIGUA_HOME);
+  assert.equal(restarted.writes(), 0);
+});
+test('failed migration preserves old on-disk data and does not open a login window', async () => {
+  const stored = { version: 1, loginEntryUrl: portal, keywords: ['保留词'], runs: [] };
+  const f = serviceFixture(stored, true);
+  await assert.rejects(f.service.login(), /磁盘/);
+  assert.deepEqual(f.disk(), stored);
+  assert.equal(f.logins(), 0);
+});
+test('navigation ignores legacy entry trust and accepts only official Feigua and WeChat login', () => {
+  for (const url of [FEIGUA_HOME, 'https://dy3.feigua.cn/app/', 'https://open.weixin.qq.com/connect/qrconnect']) assert.equal(isFeiguaNavigation(url, portal), true);
+  for (const url of [portal, 'http://192.0.2.10:13042/app/', 'https://dy.feigua.cn.evil.example/',
+    'http://dy.feigua.cn/', 'https://dy.feigua.cn:444/', 'https://user:password@dy.feigua.cn/']) assert.equal(isFeiguaNavigation(url, portal), false);
+});
+test('login opens the official page and waits for the user instead of authenticating a login form', async t => {
+  const f = browserFixture(t);
+  await f.browser.openLogin(); await flush();
+  assert.deepEqual(f.loaded, [FEIGUA_HOME]);
+  assert.equal(f.windows[0].closed, false);
+  assert.equal(f.notifications.some(auth => auth.status === 'authenticated'), false);
+  f.state.authenticated = true; f.state.loginVisible = false;
+  t.mock.timers.tick(1000); await flush();
+  assert.equal(f.windows[0].closed, true);
+  assert.equal(f.notifications.at(-1).status, 'authenticated');
+});
+test('subsequent checks reuse the persistent official session without a credential preload', async t => {
+  const f = browserFixture(t);
+  f.state.authenticated = true; f.state.loginVisible = false;
+  await f.browser.openLogin(); await flush();
+  assert.equal(f.windows[0].closed, true);
+  assert.equal((await f.browser.checkLogin()).status, 'authenticated');
+  assert.deepEqual(f.partitions, ['persist:feigua-trends']);
+  assert.equal(f.windows.length, 2);
+  for (const window of f.windows) {
+    assert.equal(window.options.webPreferences.session, f.partition);
+    assert.equal(window.options.webPreferences.preload, undefined);
+    assert.equal(window.options.webPreferences.nodeIntegration, false);
+    assert.equal(window.options.webPreferences.sandbox, true);
+  }
+});
+test('expired official sessions prompt manual login and do not report authenticated', async t => {
+  const f = browserFixture(t);
+  f.browser.wasAuthenticated = true;
+  const auth = await f.browser.checkLogin();
+  assert.equal(auth.status, 'expired');
+  assert.match(auth.message, /登录官方飞瓜.*重新登录/);
+  assert.deepEqual(f.loaded, [FEIGUA_HOME]);
+});
+test('official login cannot hand off to an old gateway or execute collection scripts there', async t => {
+  const f = browserFixture(t);
+  await f.browser.openLogin(); await flush();
+  const window = f.windows[0];
+  let prevented = false;
+  window.webContents.emit('will-redirect', { preventDefault: () => { prevented = true; } }, portal);
+  assert.equal(prevented, true);
+  assert.deepEqual(window.popup({ url: 'http://192.0.2.10:13042/app/' }), { action: 'deny' });
+  assert.deepEqual(f.loaded, [FEIGUA_HOME]);
+  window.url = portal;
+  await assert.rejects(f.browser.execute('capture-context'), /先完成飞瓜登录/);
+});
+test('a mounting official workspace is awaited rather than reported as expired', async t => {
+  const f = browserFixture(t);
+  f.browser.ensureWindow(); f.browser.window.url = 'https://dy.feigua.cn/app/';
+  let calls = 0;
+  f.browser.execute = async () => ++calls === 1 ? { loading: true, authenticated: false } : { authenticated: true };
+  assert.equal((await f.browser.resolveAuth()).authenticated, true);
+  assert.equal(calls, 2);
 });

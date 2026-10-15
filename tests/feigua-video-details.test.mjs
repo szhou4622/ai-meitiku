@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { VIDEO_DETAIL_ENDPOINTS, videoPublishedDate, observeVideoDetailRequest, readVideoDetailsApi, enrichVideoRow } from '../electron/feigua-video-details.mjs';
 import { validateCapture, FEIGUA_SOURCES } from '../electron/feigua-contract.mjs';
 import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
@@ -7,7 +8,55 @@ import { FeiguaBrowser } from '../electron/feigua-browser.mjs';
 
 const origin='https://dy.feigua.cn',id='synthetic-video',dateCode='20261002';
 const row={id,url:`${origin}/app/#/synthetic/detail`,title:'合成视频',author:'合成达人',followers:'100',plays:null,likes:'166',comments:'0',shares:'2',collects:'3',sales:'10w~25w',salesCount:'2500-5000',publishedAt:'2026/10/02 12:11',products:[{id:'synthetic-goods',title:'合成商品',commission:null}],productCount:1};
-const detail={state:'verified',videoId:id,dateCode,playsCount:0,playsText:null,products:[{id:'synthetic-goods',title:'合成商品',commission:'0.00%',hasCommission:false}]};
+const detail={state:'verified',videoId:id,dateCode,playsCount:0,playsText:null,products:[{id:'synthetic-goods',title:'合成商品',commission:'0.00%',hasCommission:true}]};
+
+test('official detail requests are observed before a verified commission is published', async t => {
+  let beforeRequest, currentUrl = `${origin}/app/`;
+  const partition = new EventEmitter();
+  Object.assign(partition, { setPermissionRequestHandler() {}, setPermissionCheckHandler() {}, webRequest: {
+    onBeforeRequest: handler => { beforeRequest = handler; }, onCompleted() {}, onErrorOccurred() {},
+  } });
+  class Window extends EventEmitter {
+    constructor() {
+      super(); this.webContents = new EventEmitter();
+      Object.assign(this.webContents, { id: 77, getURL: () => currentUrl, setWindowOpenHandler() {},
+        executeJavaScript: async () => {
+          for (const endpoint of Object.values(VIDEO_DETAIL_ENDPOINTS)) beforeRequest({
+            id: endpoint, webContentsId: 77, resourceType: 'xhr', method: 'GET',
+            url: `${origin}${endpoint}?awemeId=${id}&dateCode=${dateCode}`,
+          }, () => {});
+          return structuredClone(detail);
+        } });
+    }
+    isDestroyed() { return false; }
+    destroy() {}
+  }
+  const browser = new FeiguaBrowser({ BrowserWindow: Window, session: { fromPartition: () => partition } });
+  t.after(() => browser.dispose());
+  browser.ensureWindow();
+  browser.navigate = async url => { currentUrl = url; };
+  browser.resolveAuth = async () => ({ authenticated: true });
+  browser.settle = async () => {};
+  const capture = { url: `${origin}/app/`, rows: [structuredClone(row)] };
+  await browser.enrichVideoFields(capture);
+  assert.equal(browser.detailRequests.length, 2);
+  assert.equal(capture.rows[0].products[0].commission, '0.00%');
+  assert.equal(capture.rows[0].products[0].hasCommission, true);
+  assert.equal(capture.rows[0].fieldAvailability.commission, undefined);
+  assert.deepEqual(capture.rows[0].detailProvenance.endpoints, Object.values(VIDEO_DETAIL_ENDPOINTS));
+});
+
+test('detail request source follows the current official window without restoring gateway trust', () => {
+  const browser = new FeiguaBrowser({});
+  assert.equal(browser.sourceOrigin(), null);
+  let currentUrl;
+  browser.window = { webContents: { getURL: () => currentUrl } };
+  for (const [url, expected] of [
+    [`${origin}/app/`, origin], ['https://dy3.feigua.cn/app/', 'https://dy3.feigua.cn'],
+    ['http://192.0.2.10:13042/app/', null], ['https://dy.feigua.cn.evil.example/', null],
+    ['https://dy.feigua.cn:444/app/', null], ['about:blank', null],
+  ]) { currentUrl = url; assert.equal(browser.sourceOrigin(), expected); }
+});
 
 test('public video links require matching source identity and drop tracking or signed parameters', () => {
   const videoId = '7000000000000000001';
@@ -44,11 +93,33 @@ test('already verified links and commission avoid extra detail navigation even w
   assert.equal(progress, 0);
 });
 
-test('source-provided 0.00% is displayed while raw zero playback placeholders remain unavailable',()=>{
+test('an explicit available zero rate is displayed while raw zero playback remains unavailable',()=>{
   const enriched=enrichVideoRow(row,detail);
-  assert.equal(enriched.products[0].commission,'0.00%');assert.equal(enriched.products[0].hasCommission,false);
+  assert.equal(enriched.products[0].commission,'0.00%');assert.equal(enriched.products[0].hasCommission,true);
   assert.equal(enriched.plays,null);assert.equal(enriched.fieldAvailability.plays,'source_unavailable');
   assert.equal(row.products[0].commission,null);
+});
+
+test('unavailable promotion flags prevent placeholder zeroes from becoming commission rates', () => {
+  for (const previousRate of [null, '0.00%', '27.00%']) {
+    const sourceRow = { ...row, products: [{ ...row.products[0], commission: previousRate }] };
+    const unavailable = { ...detail, products: [{ ...detail.products[0], hasCommission: false }] };
+    const enriched = enrichVideoRow(sourceRow, unavailable);
+    assert.equal(enriched.products[0].commission, null);
+    assert.equal(enriched.products[0].hasCommission, false);
+    assert.equal(enriched.fieldAvailability.commission, 'source_unavailable');
+  }
+});
+
+test('detail navigation clears the bounded timing buffer before collecting fresh requests', async () => {
+  const calls = [];
+  const browser = new FeiguaBrowser({});
+  browser.window = { isDestroyed: () => false, webContents: {
+    getURL: () => `${origin}/app/`,
+    executeJavaScript: async source => { assert.match(source, /performance\.clearResourceTimings\(\)/); calls.push('clear'); },
+  }, loadURL: async url => { assert.equal(url, row.url); calls.push('navigate'); } };
+  await browser.navigate(row.url);
+  assert.deepEqual(calls, ['clear', 'navigate']);
 });
 test('commission placeholders never become invented zero percentages',()=>{
   for(const ratio of [null,'--','-',0,'private-unknown'])assert.equal(enrichVideoRow(row,{...detail,products:[{...detail.products[0],commission:ratio}]}).products[0].commission,null);
@@ -105,6 +176,6 @@ test('detail verification halts before product lookup and cannot publish a parti
 test('saved video rows retain availability, supplemental engagement, zero commission and safe provenance',()=>{
   const enriched=enrichVideoRow(row,detail);
   const clean=validateCapture('videos','合成词',{url:`${origin}/app/#/synthetic/list`,keyword:'合成词',period:'近7天',sort:FEIGUA_SOURCES.videos.sort,direction:'desc',filtersVerified:true,categoryPath:[],tagPath:[],dateRange:'2026-10-01 - 2026-10-07',rows:[enriched]});
-  assert.equal(clean.rows[0].products[0].commission,'0.00%');assert.equal(clean.rows[0].products[0].hasCommission,false);assert.equal(clean.rows[0].salesCount,'2500-5000');assert.deepEqual(clean.rows[0].missingFields,[]);
+  assert.equal(clean.rows[0].products[0].commission,'0.00%');assert.equal(clean.rows[0].products[0].hasCommission,true);assert.equal(clean.rows[0].salesCount,'2500-5000');assert.deepEqual(clean.rows[0].missingFields,[]);
   assert.deepEqual(clean.rows[0].detailProvenance.endpoints,Object.values(VIDEO_DETAIL_ENDPOINTS));
 });

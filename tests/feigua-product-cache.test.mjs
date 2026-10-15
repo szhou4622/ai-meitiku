@@ -57,12 +57,37 @@ test('fresh links win, empty current results stay empty and retained links keep 
 });
 
 test('verified zero commission is recovered with its original date and promotion flag',()=>{
-  const old=result(url,earlier);Object.assign(product(old),{commission:'0.00%',hasCommission:false});
+  const old=result(url,earlier);Object.assign(product(old),{commission:'0.00%',hasCommission:true});
   const fresh=result(url);product(fresh).commission=null;fresh.rows[0].missingFields=['products'];fresh.rows[0].fieldAvailability={commission:'restricted'};
   const recovered=retainProductFields(fresh,{latestResults:[group(old)]});
-  assert.equal(product(recovered).commission,'0.00%');assert.equal(product(recovered).commissionVerifiedAt,earlier);assert.equal(product(recovered).hasCommission,false);
+  assert.equal(product(recovered).commission,'0.00%');assert.equal(product(recovered).commissionVerifiedAt,earlier);assert.equal(product(recovered).hasCommission,true);
   assert.deepEqual(recovered.rows[0].missingFields,['products']);assert.deepEqual(recovered.rows[0].fieldAvailability,{commission:'restricted'});assert.equal(recovered.collectedAt,later);
   assert.equal(product(fresh).commission,null);
+});
+
+test('unavailable commission placeholders are not recovered from history or over a current negative flag', () => {
+  const old = result(url, earlier);
+  Object.assign(product(old), { commission: '0.00%', hasCommission: false });
+  const fresh = result(url); product(fresh).commission = null;
+  assert.equal(product(retainProductFields(fresh, { latestResults: [group(old)] })).commission, null);
+  Object.assign(product(fresh), { commission: '0.00%', hasCommission: false });
+  assert.equal(product(retainProductFields(fresh, previous())).commission, null);
+});
+
+test('restart removes unavailable placeholder zeroes in all saved views and persists the repair once', async () => {
+  const stored = storedPartial();
+  for (const g of [...stored.runs.flatMap(r => r.groups), ...stored.latestResults, ...stored.videoHistory]) {
+    Object.assign(product(g.result), { commission: '0.00%', hasCommission: false, commissionVerifiedAt: earlier });
+  }
+  const f = fixture(stored), state = await f.service.state();
+  assert.equal(f.writes(), 1);
+  for (const g of [...state.runs.flatMap(r => r.groups), ...state.latestResults, ...state.videoHistory]) {
+    assert.equal(product(g.result).commission, null);
+    assert.equal(product(g.result).commissionVerifiedAt, undefined);
+    assert.equal(g.result.rows[0].fieldAvailability.commission, 'source_unavailable');
+    assert.ok(g.result.rows[0].missingFields.includes('products'));
+  }
+  const reloaded = fixture(f.disk()); await reloaded.service.state(); assert.equal(reloaded.writes(), 0);
 });
 
 test('fresh rates including zero take priority, while absent or invalid history never invents a commission',()=>{

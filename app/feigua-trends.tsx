@@ -15,10 +15,9 @@ type Run = { id: string; startedAt: string; finishedAt: string | null; status: s
 type MusicTagOption = { label: string; children: { label: string }[] };
 type VideoQuery = { keyword: string; categoryPath: string[]; tagPath: string[] };
 type CategoryOption = { label: string; children: CategoryOption[] };
-type State = { loginEntryUrl?: string; keywords: string[]; videoQueries?: VideoQuery[]; videoHistory?: Group[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; credentialMessage?: string | null; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
+type State = { keywords: string[]; videoQueries?: VideoQuery[]; videoHistory?: Group[]; videoFilterOptions: { categoryPath: CategoryOption[]; tagPath: CategoryOption[] }; musicTag: string[]; musicTagOptions: MusicTagOption[]; musicTagOptionsLoadedAt: string | null; musicTagRestricted: boolean; latestResults: Group[]; runs: Run[]; auth: { status: string; message: string }; busy: boolean; storageMessage?: string | null; scheduleMessage?: string | null; catalogMessage?: string | null };
 export type FeiguaBridge = {
   state: () => Promise<State>;
-  saveLoginEntryUrl: (url: string) => Promise<State>;
   saveKeywords: (keywords: string[]) => Promise<State>;
   saveAndRefreshVideoQueries: (queries: VideoQuery[], options?: { changedOnly: boolean }) => Promise<State>;
   saveMusicTag: (path: string[]) => Promise<State>;
@@ -68,7 +67,7 @@ function ResultBody({ group, kind }: { group?: Group; kind: Kind }) {
       <div className={styles.rowContent}>
         <h4 title={row.title}>{feiguaVideoLink(row.videoUrl, row.id) ? <a className={styles.contentLink} href={feiguaVideoLink(row.videoUrl, row.id)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开抖音视频">{row.title}</a> : row.title}</h4>
         {kind === 'videos' && <>
-          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.commissionVerifiedAt ? `沿用 ${date(product.commissionVerifiedAt)} 采集的佣金率；本次未能更新` : product.hasCommission === false ? '飞瓜详情显示值，来源未标记有推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}{product.commissionVerifiedAt && '（上次采集）'}</small></p>) : <p>关联商品未取得</p>}</div>
+          <div className={styles.products}>{row.products?.length ? row.products.map((product, index) => <p key={index}>{feiguaProductLink(product.url) ? <a className={styles.contentLink} href={feiguaProductLink(product.url)!} target="_blank" rel="noopener noreferrer" title="在浏览器中打开对应商品">{product.title}</a> : product.title}<small title={product.commissionVerifiedAt ? `沿用 ${date(product.commissionVerifiedAt)} 采集的佣金率；本次未能更新` : product.hasCommission === false ? '飞瓜未提供可核验的推广佣金' : undefined}>佣金率 {product.commission || unavailable(row.fieldAvailability?.commission)}{product.commissionVerifiedAt && '（上次采集）'}</small></p>) : <p>关联商品未取得</p>}</div>
           <p>{display(row.author)} · 粉丝 {display(row.followers)}</p>
           <dl><div><dt>视频销售额</dt><dd>{display(row.sales)}</dd></div><div><dt>视频销量</dt><dd>{display(row.salesCount)}</dd></div><div><dt>点赞</dt><dd>{display(row.likes)}</dd></div></dl>
           {row.publishedAt && <small>发布时间 {row.publishedAt}</small>}
@@ -116,7 +115,6 @@ function CategorySelect({ label, options, path, disabled, onChange }: { label: s
 
 export function FeiguaTrends() {
   const [state, setState] = useState<State>(emptyState);
-  const [loginEntryUrl, setLoginEntryUrl] = useState('');
   const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
   const [videoPeriod, setVideoPeriod] = useState('');
   const keywords = videoQueries.map(query => query.keyword);
@@ -134,7 +132,6 @@ export function FeiguaTrends() {
   const settingsPanel = useRef<HTMLDetailsElement>(null);
   const dirty = JSON.stringify(videoQueries) !== JSON.stringify(savedVideoQueries(state));
   const musicDirty = JSON.stringify(musicTag) !== JSON.stringify(state.musicTag);
-  const loginEntryDirty = loginEntryUrl.trim() !== (state.loginEntryUrl || '');
   const editorDirty = !!input.trim() || editing !== null || !!inputCategoryPath.length || !!inputTagPath.length;
   const firstTag = state.musicTagOptions.find(option => option.label === musicTag[0]);
   const secondTags = firstTag?.children || [];
@@ -157,7 +154,7 @@ export function FeiguaTrends() {
         if (!alive) return;
         setDesktop(true); setState({ ...emptyState, ...next }); setLoaded(true);
         if (!next.busy) setCancelling(false);
-        if (!initialized.current) { setLoginEntryUrl(next.loginEntryUrl || ''); setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
+        if (!initialized.current) { setVideoQueries(savedVideoQueries(next)); setMusicTag(next.musicTag || []); initialized.current = true; }
       } catch { if (alive) { setError('热点数据读取失败，请重试；原有数据不会被覆盖。'); setLoaded(true); } }
       finally { pending = false; }
     };
@@ -181,7 +178,6 @@ export function FeiguaTrends() {
     try {
       const next = await operation(api); setState({ ...emptyState, ...next });
       if (!next.busy) setCancelling(false);
-      if (name === 'entry-save') setLoginEntryUrl(next.loginEntryUrl || '');
       if (name === 'video-save' || name === 'video-change') {
         setVideoPeriod('');
         setVideoQueries(savedVideoQueries(next));
@@ -218,25 +214,18 @@ export function FeiguaTrends() {
   const disabled = !desktop || !loaded || !!action;
   return <section className={styles.page}>
     <header className={styles.heading}>
-      <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
+      <div><h1>热点采集</h1><p>官方飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
-        <button disabled={disabled || state.busy || loginEntryDirty || !state.loginEntryUrl} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />打开登录入口</button>
+        <button disabled={disabled || state.busy} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />登录官方飞瓜</button>
         {state.busy ? <button disabled={!desktop || !loaded || cancelling} onClick={() => void cancelCollection()}><Square size={14} />{cancelling ? '正在停止…' : '停止采集'}</button>
-          : <button className={styles.primary} disabled={disabled || loginEntryDirty || dirty || musicDirty || editorDirty || !['authenticated','verification_required'].includes(state.auth.status)} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : state.auth.status === 'verification_required' ? '验证后重新采集' : '开始采集'}</button>}
+          : <button className={styles.primary} disabled={disabled || dirty || musicDirty || editorDirty || !['authenticated','verification_required'].includes(state.auth.status)} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : state.auth.status === 'verification_required' ? '验证后重新采集' : '开始采集'}</button>}
       </div>
     </header>
-    <form className={styles.loginEntry} onSubmit={event => { event.preventDefault(); void perform('entry-save', api => api.saveLoginEntryUrl(loginEntryUrl)); }}>
-      <label htmlFor="feigua-login-entry">登录入口网址</label>
-      <input id="feigua-login-entry" type="url" value={loginEntryUrl} onChange={event => setLoginEntryUrl(event.target.value)} placeholder="输入你的登录入口（http:// 或 https://）" maxLength={2048} disabled={disabled || state.busy} autoComplete="off" spellCheck={false} />
-      <button type="submit" disabled={disabled || state.busy || !loginEntryDirty}>{action === 'entry-save' ? '保存中…' : '保存网址'}</button>
-      <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
-    </form>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>由你在官网完成登录 · 本机保留登录态和采集数据</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
-    {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
     <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
 
     <details ref={settingsPanel} className={styles.settings}>

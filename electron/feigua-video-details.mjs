@@ -63,7 +63,9 @@ const count = value => {
   const text = value.trim();
   return /^(?:\d+(?:\.\d+)?)(?:[,\d]*)(?:万|亿|[wW])?$/.test(text) ? text : null;
 };
-const commission = value => typeof value === 'string' && /^\d+(?:\.\d+)?%$/.test(value.trim()) && Number(value.trim().slice(0, -1)) <= 100 ? value.trim() : null;
+// Official product details show '--' for HasCos=false products, even though
+// the video association endpoint returns a formatted zero as a placeholder.
+export const feiguaCommissionRate = (value, hasCommission) => hasCommission !== false && typeof value === 'string' && /^\d+(?:\.\d+)?%$/.test(value.trim()) && Number(value.trim().slice(0, -1)) <= 100 ? value.trim() : null;
 
 export function enrichVideoRow(row, detail) {
   const clean = structuredClone(row);
@@ -87,12 +89,11 @@ export function enrichVideoRow(row, detail) {
   if (enough && (!knownIds.length || knownIds.every(id => products.some(product => product.id === id)))) {
     clean.products = products.map(product => {
       const previous = (row.products || []).find(item => item.id === product.id);
-      // Display a source-provided 0.00% verbatim, including when HasCos is false.
-      // Preserve that flag so the UI doesn't imply an available promotion.
-      const ratio = commission(product.commission);
-      return { id: product.id, title: product.title, commission: previous?.commission || ratio, url: feiguaProductLink(product.url) || feiguaProductLink(previous?.url),
-        hasCommission: previous?.commission ? previous.hasCommission : product.hasCommission,
-        commissionAvailability: previous?.commission || ratio ? product.hasCommission === false ? 'source_display_only' : 'available' : 'source_unavailable' };
+      const ratio = feiguaCommissionRate(product.commission, product.hasCommission);
+      const previousRatio = product.hasCommission === false ? null : feiguaCommissionRate(previous?.commission, previous?.hasCommission);
+      return { id: product.id, title: product.title, commission: previousRatio || ratio, url: feiguaProductLink(product.url) || feiguaProductLink(previous?.url),
+        hasCommission: previousRatio ? previous.hasCommission : product.hasCommission,
+        commissionAvailability: previousRatio || ratio ? 'available' : 'source_unavailable' };
     });
     clean.productsIncomplete = false;
     if (clean.products.some(product => !product.commission)) clean.fieldAvailability.commission = 'source_unavailable';
