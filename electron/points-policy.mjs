@@ -15,6 +15,8 @@ export const POINTS_POLICY = Object.freeze({
   platformApiAvailable: false,
   rechargePointsPerCny: 100,
   platformCostPointsPerCny: 200,
+  billingBasis: "supplier_debit_with_zero_fallback",
+  providerFreeAllowanceReducesPoints: false,
   fractionalPointPrecision: 6,
 });
 

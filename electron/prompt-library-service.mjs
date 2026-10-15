@@ -1,8 +1,10 @@
+import { apiTaskSelection, requireCustomerApi } from "./api-usage.mjs";
 import { userActionError } from "./user-action-errors.mjs";
 import { promptBaseline } from "./prompt-baseline.mjs";
 import { generateReplacement, replacementMethod } from "./prompt-replacement.mjs";
 import { createPromptTaskQueue } from "./prompt-task-queue.mjs";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { createPromptPlatformRequests } from "./prompt-platform-requests.mjs";
 import {
   copyFile,
   mkdir,
@@ -20,6 +22,8 @@ import {
 } from "./prompt-shots.mjs";
 import { assertPromptDuration } from "./prompt-timing.mjs";
 import { formatPromptTimeline } from "./prompt-format.mjs";
+import { partialQuality, retainPartial } from './prompt-partial.mjs';
+import { createGeneratedResults } from './generated-results.mjs';
 
 const LIMIT = 100_000;
 const imageTypes = new Map([
@@ -65,6 +69,8 @@ export function normalizePrompt(input, previous = null) {
     materials: previous?.materials || [],
     source: previous?.source || null,
     reverse: previous?.reverse || null,
+    reverseHistory: previous?.reverseHistory || [],
+    generatedDraft: previous?.generatedDraft || null,
   };
 }
 
@@ -73,6 +79,7 @@ export function promptConnection(profiles, withImages = false) {
   if (!["volcengine", "relay"].includes(provider))
     throw userActionError("MODEL_API_SETUP_REQUIRED", "请先在设置中选择火山引擎或中转 API");
   const selected = profiles[provider] || {};
+  requireCustomerApi(apiTaskSelection(provider, selected.useOwnApi ?? true));
   const baseUrl =
     provider === "volcengine"
       ? "https://ark.cn-beijing.volces.com/api/v3"
@@ -101,6 +108,9 @@ export function promptConnection(profiles, withImages = false) {
 export function createPromptLibraryService({
   userDataPath,
   getProfiles,
+  platformExecute,
+  createOperation,
+  getPlatformStatus = async () => ({ ready: false, reason: "积分生成服务尚未开放。" }),
   fetchImpl = fetch,
   reverseMedia,
   onTaskChange = () => {},
@@ -109,8 +119,25 @@ export function createPromptLibraryService({
 }) {
   const root = path.join(userDataPath, "prompt-library");
   const store = path.join(root, "library.json");
+  const generatedResults = createGeneratedResults(userDataPath);
   let queue = Promise.resolve();
   const generationQueue = createPromptTaskQueue({ ...taskQueueOptions, onChange: onTaskChange });
+  function platformRequests(operation, config, id) {
+    const digest = createHash('sha256').update(JSON.stringify(operation)).digest('hex');
+    return createPromptPlatformRequests({ operation, config, platformExecute, assertAccess, budget: createOperation?.(),
+      readJournal: async () => {
+        try { return JSON.parse(await readFile(path.join(root, 'billing', digest + '.json'), 'utf8')); }
+        catch (error) { if (error.code === 'ENOENT') return { tasks: [] }; throw error; }
+      },
+      progress: message => generationQueue.progress(id, message), journal: async billing => {
+        const directory = path.join(root, 'billing');
+        await mkdir(directory, { recursive: true });
+        const target = path.join(directory, digest + '.json');
+        const temporary = target + '.' + randomUUID() + '.tmp';
+        await writeFile(temporary, JSON.stringify({ ...billing, updatedAt: new Date().toISOString() }), { mode: 0o600 });
+        await rename(temporary, target);
+      } });
+  }
   async function read() {
     try {
       const data = JSON.parse(await readFile(store, "utf8"));
@@ -146,7 +173,7 @@ export function createPromptLibraryService({
     if (revision !== item.revision)
       throw new Error("提示词已发生变化，请重新打开后再保存");
   }
-  async function generate(payload) {
+  async function generate(payload, apiProfiles) {
     assertAccess();
     const { action, mode, view } = payload || {};
     if (
@@ -196,7 +223,26 @@ export function createPromptLibraryService({
     }
     if (action === "apply-dialogue" && !dialogue.trim())
       throw new Error("请先填写新台词");
-    const config = promptConnection(await getProfiles(), images.length > 0);
+    const platformMode = apiProfiles?.provider === "volcengine" && apiProfiles?.volcengine?.useOwnApi === false;
+    if (platformMode && !platformExecute)
+      throw Object.assign(new Error("提示词库积分接口尚未开放。"), { code: "PLATFORM_FEATURE_UNAVAILABLE" });
+    if (platformMode && (await getPlatformStatus()).ready !== true)
+      throw Object.assign(new Error("此功能的积分生成服务尚未开放或状态无法确认，本次未提交任务，也未扣积分。"), { code: "PLATFORM_API_UNAVAILABLE" });
+    const config = platformMode ? { provider: "volcengine", model: "平台文本模型" } : promptConnection(apiProfiles, images.length > 0);
+    let billing = null;
+    const platform = platformMode ? platformRequests({ id: payload.id, action, mode, view }, config, payload.id) : null;
+    platform?.prepare(action === 'replace' ? 3 : 1);
+    let lastGenerated = null;
+    const saveDraft = async draft => {
+      lastGenerated = draft;
+      await mutate(items => {
+        const item = find(items, payload.id);
+        item.generatedDraft = { ...draft, action, mode, view, recordId: item.id, dialogue, generatedAt: new Date().toISOString() };
+        return item;
+      });
+      return draft;
+    };
+    try {
     const rules = {
       refine:
         "精修提示词，补全具体镜头语言、光影、动作与一致性约束；遵守用户填写的修改要求。",
@@ -240,7 +286,12 @@ export function createPromptLibraryService({
         },
       });
     }
-    async function request(messages) {
+    async function requestRaw(messages) {
+      if (platformMode) {
+        const result = await platform.request(messages);
+        billing = platform.summary();
+        return result;
+      }
       let response;
       try {
         response = await generationQueue.request(payload.id, () => {
@@ -273,8 +324,16 @@ export function createPromptLibraryService({
         throw new Error(
           `所选 API 请求失败（HTTP ${response.status}），请检查模型、密钥和额度`,
         );
-      if (result?.choices?.[0]?.finish_reason === "length")
-        throw new Error("模型输出被截断，原提示词已保留；请缩短输入后重试");
+      return result;
+    }
+    async function request(messages) {
+      const result = await requestRaw(messages);
+      const raw = result?.choices?.[0]?.message?.content;
+      const text = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map(part => part.text || '').join('\n') : '';
+      if (text.trim()) await generatedResults.save({ feature: 'prompt-library', stage: String(messages[0]?.content || '').startsWith('你是替换结果核查员') ? '替换结果复核（非生成稿）' : action === 'replace' ? '素材替换阶段返回' : '提示词生成返回', text, billing: platform ? platform.summary() : null });
+      const reviewing = String(messages[0]?.content || '').startsWith('你是替换结果核查员');
+      if (text.trim() && !reviewing) await saveDraft({ text, provider: config.provider, model: config.model, ...(platform ? { billing: platform.summary() } : {}), usage: null,
+        quality: partialQuality([{ part: 'stage', message: result?.choices?.[0]?.finish_reason === 'length' ? '输出达到长度限制，已保留已返回内容。' : '该阶段内容已保存，完整性待核对。' }]) });
       return result;
     }
     const result = action === "replace"
@@ -334,10 +393,12 @@ export function createPromptLibraryService({
       text = formatPromptTimeline(text);
     }
     const usage = result.usage;
-    return {
+    return await saveDraft({
       text,
       provider: config.provider,
       model: config.model,
+      quality: partialQuality([...(result.quality?.issues || []), ...(result.choices?.[0]?.finish_reason === 'length' ? [{ part: 'output', message: '输出达到长度限制，已保留已返回内容。' }] : [])]),
+      ...(platform ? { billing: platform.summary() } : billing ? { billing } : {}),
       usage: usage
         ? {
             input: usage.prompt_tokens ?? null,
@@ -345,7 +406,12 @@ export function createPromptLibraryService({
             total: usage.total_tokens ?? null,
           }
         : null,
-    };
+    });
+    } catch (error) {
+      if (!lastGenerated || error?.code === 'FEATURE_NOT_ENTITLED') throw error;
+      const message = /分镜|光影|时长|时间|结构|截断/.test(error.message || '') ? error.message.replace(/，原提示词已保留|，原结果已保留|，请重新生成/g, '') : '后续步骤未完成，已保留本次已返回的生成内容。';
+      return await saveDraft({ ...retainPartial(lastGenerated, message), ...(platform ? { billing: platform.summary() } : {}) });
+    } finally { await platform?.finish(); }
   }
   return {
     list: async () => {
@@ -354,11 +420,16 @@ export function createPromptLibraryService({
     },
     status: async () => {
       const profiles = await getProfiles();
+      const platformMode = profiles.provider === "volcengine" && profiles.volcengine.useOwnApi === false;
+      const platform = platformMode ? await getPlatformStatus() : null;
       return {
         provider: profiles.provider,
         concurrency: generationQueue.concurrency,
+        apiMode: profiles.provider === "volcengine" && profiles.volcengine.useOwnApi === false ? "platform_api" : "customer_api",
+        reason: platform?.reason || null,
         ready: (() => {
           try {
+            if (platformMode) return typeof platformExecute === "function" && platform?.ready === true;
             promptConnection(profiles);
             promptConnection(profiles, true);
             return true;
@@ -426,30 +497,59 @@ export function createPromptLibraryService({
       if (!item.source) throw new Error("请先上传原素材");
       return path.join(root, "sources", item.source.file);
     },
-    reverse: (id, revision, transcript = "", progress = () => {}) => generationQueue.enqueue(id, async () => {
+    reverse: (id, revision, transcript = "", progress = () => {}, repairOnly = false) => {
+      const apiProfiles = Promise.resolve(getProfiles()).then(profiles => structuredClone(profiles));
+      apiProfiles.catch(() => {});
+      return generationQueue.enqueue(id, async () => {
       await queue;
       assertAccess();
       const snapshot = find(await read(), id);
       checkRevision(snapshot, revision);
       if (!snapshot.source || !reverseMedia) throw new Error("请先上传原素材");
       bounded(transcript, 20000, "补充台词");
-      const config = promptConnection(await getProfiles(), true);
+      const profiles = await apiProfiles;
+      const platformMode = profiles.provider === 'volcengine' && profiles.volcengine?.useOwnApi === false;
+      if (platformMode && (!platformExecute || (await getPlatformStatus()).ready !== true))
+        throw Object.assign(new Error('提示词库积分生成服务暂不可用，本次未提交任务，也未扣积分。'), { code: 'PLATFORM_API_UNAVAILABLE' });
+      const config = platformMode ? { provider: 'volcengine', model: '平台视觉模型', apiMode: 'platform_api' } : promptConnection(profiles, true);
+      const resume = repairOnly && snapshot.reverse?.sourceId === snapshot.source.id && snapshot.reverse?.quality?.status === 'partial' ? snapshot.reverse : null;
+      if (repairOnly && !resume) throw new Error('当前没有需要补生成的反推内容');
+      const platform = platformMode ? platformRequests({ id, action: repairOnly ? 'reverse-repair' : 'reverse', sourceId: snapshot.source.id, transcript,
+        ...(resume ? { previousOutput: createHash('sha256').update(JSON.stringify(resume.rawOutput || resume.full)).digest('hex') } : {}) }, config, id) : null;
+      let savedHistory = false;
+      const saveReverseCheckpoint = async output => {
+        const text = output.rawRepairOutput || output.rawOutput || output.full || output.shots;
+        if (text) await generatedResults.save({ id: createHash('sha256').update(id + ':' + output.resume?.phase + ':' + text).digest('hex'), feature: 'prompt-library', stage: '反推阶段返回（质量状态以提示词页面为准）', text, billing: platform ? platform.summary() : null });
+        return mutate(items => {
+        const item = find(items, id);
+        checkRevision(item, revision);
+        if (!savedHistory && snapshot.reverse) { item.reverseHistory = [...(item.reverseHistory || []), snapshot.reverse]; savedHistory = true; }
+        item.reverse = { ...output, ...(platform ? { billing: platform.summary() } : {}), sourceId: snapshot.source.id, generatedAt: new Date().toISOString() };
+        item.variants.restore = { full: output.full || '', shots: output.shots || '' };
+        return item;
+        });
+      };
+      try {
       const output = await reverseMedia({
         file: path.join(root, "sources", snapshot.source.file),
         source: snapshot.source,
         config,
+        ...(platform ? { requestModel: platform.request, prepareModel: platform.prepare } : {}),
         fetchImpl: (url, options) => generationQueue.request(id, () => {
           assertAccess();
           return fetchImpl(url, { ...options, signal: AbortSignal.timeout(120000) });
         }),
         transcript,
+        resume,
+        onCheckpoint: saveReverseCheckpoint,
         progress: message => { generationQueue.progress(id, message); progress(message); },
       });
-      return mutate((items) => {
+      return await mutate((items) => {
         const item = find(items, id);
         checkRevision(item, revision);
         item.reverse = {
           ...output,
+          ...(platform ? { billing: platform.summary() } : {}),
           shots: item.source.kind === "image" ? "" : output.shots,
           generatedAt: new Date().toISOString(),
           sourceId: snapshot.source.id,
@@ -463,7 +563,9 @@ export function createPromptLibraryService({
         item.updatedAt = new Date().toISOString();
         return item;
       });
-    }),
+      } finally { await platform?.finish(); }
+    });
+    },
     migrate: (id, revision) =>
       mutate((items) => {
         const item = find(items, id);
@@ -540,6 +642,10 @@ export function createPromptLibraryService({
       if (!material) throw new Error("参考图片不存在");
       return path.join(root, "materials", material.file);
     },
-    generate: payload => generationQueue.enqueue(payload?.id, () => generate(payload)),
+    generate: payload => {
+      const apiProfiles = Promise.resolve(getProfiles()).then(profiles => structuredClone(profiles));
+      apiProfiles.catch(() => {});
+      return generationQueue.enqueue(payload?.id, async () => generate(payload, await apiProfiles));
+    },
   };
 }

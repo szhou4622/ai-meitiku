@@ -1336,3 +1336,40 @@ test("source preview bypasses customer activation and exposes all features", () 
   assert.doesNotThrow(() => inactive.assertAuthorized());
   assert.doesNotThrow(() => inactive.assertFeature("viral-visuals"));
 });
+
+test('status query retries a TLS reset once and restores online authorization', async () => {
+  let calls = 0;
+  const { service } = recoveryFixture(async () => {
+    if (++calls === 1) throw new TypeError('fetch failed', { cause: Object.assign(new Error('TLS disconnected'), { code: 'ECONNRESET' }) });
+    return jsonResponse(200, withoutDeviceCredentials(activePayload));
+  });
+  assert.equal((await service.refresh()).phase, 'active');
+  assert.equal(calls, 2);
+});
+
+test('persistent DNS failure is bounded and preserves device proof', async () => {
+  let calls = 0;
+  const { service, store } = recoveryFixture(async () => {
+    calls++;
+    throw new TypeError('fetch failed', { cause: Object.assign(new Error('DNS failed'), { code: 'ENOTFOUND' }) });
+  });
+  assert.equal((await service.refresh()).phase, 'network_error');
+  assert.equal(calls, 2);
+  assert.equal(store.credential.deviceCredential, 'long-lived-proof');
+});
+
+test('transport failures never replay license mutations or retry HTTP rejection', async () => {
+  let calls = 0;
+  const { service } = recoveryFixture(async () => {
+    calls++;
+    throw Object.assign(new Error('reset'), { code: 'ECONNRESET' });
+  });
+  for (const endpoint of ['/activate', '/device/unbind', '/time/renew']) {
+    await assert.rejects(service.request(endpoint, { method: 'POST', body: '{}' }), error => error.kind === 'network');
+  }
+  assert.equal(calls, 3);
+  let rejectedCalls = 0;
+  const { service: rejected } = recoveryFixture(async () => { rejectedCalls++; return jsonResponse(403, { error_code: 'device_credential_revoked' }); });
+  assert.equal((await rejected.request('/device/status')).response.status, 403);
+  assert.equal(rejectedCalls, 1);
+});

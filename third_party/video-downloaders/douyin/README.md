@@ -540,7 +540,7 @@ This is a common pagination risk-control behavior. Make sure:
 
 ### 2) Why is the progress output noisy/repeated?
 
-By default, `progress.quiet_logs: true` suppresses logs during progress stage.  
+By default, `progress.quiet_logs: true` suppresses logs during progress stage.
 Use `--show-warnings` or `-v` temporarily when debugging.
 
 ### 3) What if cookies are expired?

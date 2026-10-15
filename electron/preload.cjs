@@ -6,7 +6,9 @@ const originalInvoke = ipcRenderer.invoke.bind(ipcRenderer);
 ipcRenderer.invoke = async (channel, ...args) => {
   try { return await originalInvoke(channel, ...args); }
   catch (error) {
-    window.dispatchEvent(new CustomEvent("application-error-detail", { detail: { message: error.message, operation: channel } }));
+    const message = String(error.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+    const cancelledGeneration = /^已取消，本次未提交任务，也未扣积分。$/.test(message);
+    if (!cancelledGeneration) window.dispatchEvent(new CustomEvent("application-error-detail", { detail: { message, operation: channel } }));
     throw error;
   }
 };
@@ -14,6 +16,11 @@ window.addEventListener("error", event => ipcRenderer.send("application-renderer
 window.addEventListener("unhandledrejection", event => ipcRenderer.send("application-renderer-log", { message: String(event.reason?.message || event.reason), stack: event.reason?.stack }));
 
 contextBridge.exposeInMainWorld("desktopBridge", {
+  onPointsNotice: callback => {
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on("platform-points-notice", listener);
+    return () => ipcRenderer.removeListener("platform-points-notice", listener);
+  },
   feigua: {
     state: () => ipcRenderer.invoke("feigua-state"),
     saveLoginEntryUrl: (url) => ipcRenderer.invoke("feigua-save-login-entry", url),
@@ -28,9 +35,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     cancel: () => ipcRenderer.invoke("feigua-cancel"),
   },
   promptLibrary: {
+    onBillingSettled: callback => {
+      const listener = (_event, value) => callback(value);
+      ipcRenderer.on("platform-billing-updated", listener);
+      return () => ipcRenderer.removeListener("platform-billing-updated", listener);
+    },
     chooseSource: (id, revision, assetId) => ipcRenderer.invoke("prompt-library-source-choose", id, revision, assetId),
     sourcePreview: id => ipcRenderer.invoke("prompt-library-source-preview", id),
-    reverse: (id, revision, transcript) => ipcRenderer.invoke("prompt-library-reverse", id, revision, transcript),
+    reverse: (id, revision, transcript, repairOnly = false) => ipcRenderer.invoke("prompt-library-reverse", id, revision, transcript, repairOnly),
     migrate: (id, revision) => ipcRenderer.invoke("prompt-library-migrate", id, revision),
     onProgress: callback => {
       const listener = (_event, progress) => callback(progress);
@@ -96,6 +108,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   licenseActivate: (activationCode) => ipcRenderer.invoke("license-activate", activationCode),
   licenseRenewTime: (activationCode) => ipcRenderer.invoke("license-renew-time", activationCode),
   licenseRedeemTime: (activationCode) => ipcRenderer.invoke("license-redeem-time", activationCode),
+  pointsBalance: () => ipcRenderer.invoke("license-points-balance"),
+  pointsTransactions: (options) => ipcRenderer.invoke("license-points-transactions", options),
+  pointsRedeem: (code) => ipcRenderer.invoke("license-points-redeem", code),
   licenseRefresh: (options) => ipcRenderer.invoke("license-refresh", options),
   licenseUnbind: () => ipcRenderer.invoke("license-unbind"),
   licenseOnStateChanged: (callback) => {
@@ -199,6 +214,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   classifierMarkOutputSynced: (jobId) => ipcRenderer.invoke("classifier-mark-output-synced", jobId),
   classifierSetActive: (templateId) => ipcRenderer.invoke("classifier-set-active", templateId),
   classifierSaveConfig: (payload) => ipcRenderer.invoke("classifier-save-config", payload),
+  apiUsageGet: () => ipcRenderer.invoke("api-settings-usage-get"),
+  apiUsageSet: (provider, useOwnApi) => ipcRenderer.invoke("api-settings-usage-set", provider, useOwnApi),
   apiSettingsGet: () => ipcRenderer.invoke("api-settings-get"),
   apiSettingsSave: (payload) => ipcRenderer.invoke("api-settings-save", payload),
   apiSettingsTest: (kind, payload) => ipcRenderer.invoke("api-settings-test", kind, payload),
@@ -209,6 +226,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     return () => window.removeEventListener("application-error-detail", listener);
   },
   storageLogGet: () => ipcRenderer.invoke("storage-management-log-get"),
+  generatedResultsList: () => ipcRenderer.invoke('storage-management-generated-list'),
+  generatedResultRead: (id) => ipcRenderer.invoke('storage-management-generated-read', id),
   storageLogSave: (patch) => ipcRenderer.invoke("storage-management-log-save", patch),
   storageLogExport: () => ipcRenderer.invoke("storage-management-log-export"),
   storageManagementGet: () => ipcRenderer.invoke("storage-management-get"),

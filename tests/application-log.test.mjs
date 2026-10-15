@@ -99,6 +99,19 @@ test('resolved failure results expose their specific cause without changing retu
   const returned = await diagnosticHandler(log, "storage-management-clear", () => result)({ sender: { isDestroyed: () => false, send: (_channel, value) => { details = value; } } });
   assert.equal(returned, result); assert.match(details.message, /磁盘空间不足/); assert.match(details.message, /DISK_FULL/); assert.match(details.message, /诊断编号/);
 });
+test('saved Qianchuan cancellation is informational and never opens an error dialog', async t => {
+  const { log } = fixture(t);
+  const sent = [];
+  const result = { success: false, cancelled: true, message: '同步已取消，进度已保存' };
+  const returned = await diagnosticHandler(log, 'qianchuan-library-sync', async () => result)({
+    sender: { isDestroyed: () => false, send: (...args) => sent.push(args) },
+  });
+  assert.equal(returned, result);
+  assert.deepEqual(sent, []);
+  const records = log.files().flatMap(file => fs.readFileSync(path.join(log.root, file.name), 'utf8').trim().split('\n').map(JSON.parse));
+  assert.ok(records.some(record => record.event === 'operation.cancelled' && record.level === 'info'));
+  assert.ok(records.every(record => record.level !== 'error'));
+});
 test('streaming export preserves unicode and its snapshot during retention cleanup', async t => {
   let now = new Date('2026-10-01T00:00:00Z');
   const { root, log } = fixture(t, () => now);
@@ -115,4 +128,22 @@ test('streaming export preserves unicode and its snapshot during retention clean
   const bundle = JSON.parse(gunzipSync(fs.readFileSync(file)).toString());
   const records = bundle.records.flatMap(f => f.content.trim().split('\n').map(JSON.parse));
   assert.equal(records.find(e => e.event === 'long-error').text, text);
+});
+
+test('generation errors hide SDK identity and raw error codes while retaining private diagnostic evidence', async t => {
+  const { log } = fixture(t);
+  const error = Object.assign(new Error('Aliyun seed-model request timeout'), { code: 'ALIYUN_TIMEOUT' });
+  await assert.rejects(diagnosticHandler(log, 'aliyun-subtitle-start-batch', () => { throw error; })(null), e => {
+    assert.match(e.message, /任务未完成.*参考编号/s);
+    assert.doesNotMatch(e.message, /Aliyun|seed|ALIYUN_TIMEOUT|错误码|操作：/i);
+    return true;
+  });
+  const content = log.files().map(file => fs.readFileSync(path.join(log.root,file.name),'utf8')).join('\n');
+  assert.match(content, /ALIYUN_TIMEOUT/);
+});
+
+test('cancelled generation is an ordinary outcome with no diagnostic error details', async t => {
+  const { log } = fixture(t);
+  const cancelled = Object.assign(new Error('cancel'), { code: 'PLATFORM_TASK_CANCELLED' });
+  await assert.rejects(diagnosticHandler(log, 'prompt-library-reverse', () => { throw cancelled; })(null), /已取消，本次未提交任务，也未扣积分/);
 });

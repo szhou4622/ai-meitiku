@@ -1,4 +1,5 @@
 import { constants as fsConstants } from "node:fs";
+import { createHash } from "node:crypto";
 import { access, open, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,6 +97,24 @@ async function validateExecutable(target, asset) {
     const machOSignatures = new Set(["feedface", "feedfacf", "cefaedfe", "cffaedfe", "cafebabe", "bebafeca", "cafebabf", "bfbafeca"]);
     if (target.startsWith("darwin-") && !machOSignatures.has(signature)) {
       throw new Error(`${asset.label}不是 macOS Mach-O 可执行文件：${asset.file}`);
+    }
+    if (target.startsWith("darwin-") && asset.label === "小红书下载后端 xhs-downloader") {
+      const versionSource = await readFile(
+        path.join(projectRoot, "third_party", "video-downloaders", "xhs", "packages", "xhs-core", "src", "xhs_core", "version.py"),
+        "utf8",
+      );
+      const expectedVersion = versionSource.match(/^VERSION\s*=\s*["']([^"']+)["']/m)?.[1];
+      if (!expectedVersion) throw new Error("无法读取当前小红书后端源码版本");
+      let manifest;
+      try {
+        manifest = JSON.parse(await readFile(path.join(path.dirname(asset.file), "xhs-downloader.build.json"), "utf8"));
+      } catch {
+        throw new Error("小红书后端缺少源码构建清单，请从当前源码重新构建");
+      }
+      const digest = createHash("sha256").update(await readFile(asset.file)).digest("hex");
+      if (manifest.target !== target || manifest.version !== expectedVersion || manifest.sha256 !== digest) {
+        throw new Error(`小红书后端与当前源码/构建清单不一致（预期 ${expectedVersion}）`);
+      }
     }
   } finally {
     await handle.close();

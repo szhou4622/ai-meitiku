@@ -1,4 +1,4 @@
-import { assertPromptDuration } from "./prompt-timing.mjs";
+import { assertPromptDuration, localizeShotPrompt } from "./prompt-timing.mjs";
 import { formatPromptTimeline } from "./prompt-format.mjs";
 /** @typedef {{start:number,end:number,prompt:string}} ShotPrompt */
 const heading = /^【分镜 (\d+)｜([\d.]+)–([\d.]+)秒】\s*$/gm;
@@ -55,9 +55,10 @@ export function validateShotPrompts(value, duration) {
     assertVideoPromptSections(shot.prompt, `分镜 ${index + 1}`);
     if (/同上|参见上一镜|沿用上一镜提示词/.test(shot.prompt))
       throw new Error(`分镜 ${index + 1} 依赖其他分镜，无法独立复制使用`);
-    assertPromptDuration(shot.prompt, shot.end - shot.start);
+    const prompt = localizeShotPrompt(shot.prompt.trim(), shot.start, shot.end);
+    assertPromptDuration(prompt, shot.end - shot.start, `分镜 ${index + 1}`);
     previous = shot.end;
-    return { start: shot.start, end: shot.end, prompt: shot.prompt.trim() };
+    return { start: shot.start, end: shot.end, prompt };
   });
   if (duration !== undefined && Math.abs(previous - duration) > 0.15)
     throw new Error("逐镜时间未覆盖原片实际长度，请重新生成");

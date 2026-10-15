@@ -43,6 +43,34 @@ const response = (text) =>
     usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
   });
 
+test("reversal handles the reported absolute-shot timeline through final parsing without another model request", async () => {
+  let requests = 0;
+  const planned = [];
+  const output = await reverseMedia({
+    file: "fixture.mp4", source: {kind: "video", duration: 10.05, hasAudio: false}, config,
+    prepareModel: count => planned.push(count),
+    prepare: async () => ({frames: [{time: 0, url: "data:image/jpeg;base64,YQ=="}], cuts: [2.633, 5.167]}),
+    fetchImpl: async () => response(++requests === 1 ? "原片证据" : JSON.stringify({
+      full: sixParts("全片").replace("0–1s", "0–10.05s"),
+      shots: [
+        {start: 0, end: 2.633, prompt: sixParts("第一镜").replace("0–1s", "0–2.633s")},
+        {start: 2.633, end: 5.167, prompt: sixParts("第二镜").replace("0–1s", "2.633秒 - 5.167秒")},
+        {start: 5.167, end: 10.05, prompt: sixParts("第三镜").replace("0–1s", "5.167–10.05s")},
+      ],
+    })),
+  });
+  assert.equal(requests, 2);
+  assert.deepEqual(planned, [2]);
+  assert.match(output.shots, /【分镜 2｜2.633–5.167秒】[\s\S]*0–2.534秒/);
+  assert.match(output.shots, /【分镜 3｜5.167–10.05秒】[\s\S]*0–4.883秒/);
+  assert.equal(output.evidence.duration, 10.05);
+  assert.deepEqual(output.usage, {input: 20, output: 40, total: 60});
+  assert.throws(() => parseReverseVideoOutput(JSON.stringify({
+    full: sixParts("越界整片").replace("0–1s", "0–20s"),
+    shots: [{start: 0, end: 10.05, prompt: sixParts("单镜")}],
+  }), 10.05), /原视频实际时长 10.05/);
+});
+
 test("revoked VIP before the supplier request preserves the entitlement rejection", async (t) => {
   const root = await temporary(t);
   const file = path.join(root, "image.png");

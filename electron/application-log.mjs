@@ -1,4 +1,4 @@
-import { classifyUserAction, serializeUserAction } from "./user-action-errors.mjs";
+import { classifyUserAction, isPlatformQuoteCancellation, serializeUserAction, UNEXPECTED_DIAGNOSTIC_MARKER } from "./user-action-errors.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -6,13 +6,24 @@ import { createGzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createInterface } from "node:readline";
+import { subtitleDisplayText } from "./subtitle-display.mjs";
 
-const SECRET_KEY = /cookie|authorization|secret|token|password|api.?key|access.?key|activation.?code|base64|device.?credential|device.?session|machine.?code|machine.?id|hardware.?id|serial.?number|bios.?uuid|mac.?address|code.?id/i;
+const generationChannel = channel => /^(?:prompt-library|aliyun-subtitle)-/.test(channel);
+function generationMessage(reason, operationId) {
+  const raw = String(reason || '').split('\n')[0];
+  const safe = /[\u4e00-\u9fff]/.test(raw) && !/Token|CNY|单价|供应商|ep-\d|seed-|speech-/i.test(raw)
+    ? subtitleDisplayText(raw).replace(/模型/g, 'AI') : '任务未完成，请稍后查看任务状态或联系支持。';
+  return `${safe}\n参考编号：${operationId}`;
+}
+
+const SECRET_KEY = /cookie|authorization|secret|token|password|api.?key|access.?key|activation.?code|(?:points|redeem|recharge).?code|base64|device.?credential|device.?session|machine.?code|machine.?id|hardware.?id|serial.?number|bios.?uuid|mac.?address|code.?id/i;
 const USAGE_COUNT_KEY = /^(?:input|output|total|cached|prompt|completion|cache_creation_input|cached_input)_?tokens$/i;
 
 // Keep causes and stacks, while removing credentials from keys, text and URLs.
 export function redact(value, seen = new WeakSet()) {
   if (typeof value === "string") return value
+    .replace(/\bAIML-P-[A-Z0-9]{24,64}\b/gi, "[REDACTED_POINTS_CODE]")
+    .replace(/\bAIM-(?:[A-Z0-9]{4}-){2}[A-Z0-9]{4}\b/gi, "[REDACTED_POINTS_CODE]")
     .replace(/\b[A-Z]{2,8}(?:-[A-Z0-9]{4}){2,6}\b/g, "[REDACTED_ACTIVATION]")
     .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[REDACTED_KEY]")
     .replace(/\bv[23]_[a-f0-9]{64}\b/gi, "[REDACTED_MACHINE]")
@@ -134,18 +145,31 @@ export function diagnosticHandler(log, channel, handler) {
     log.write("info", "operation.start", { channel, operationId, args: credentialChannel ? "[Credential parameters redacted]" : args });
     try {
       const result = await handler(event, ...args);
+      const cancelled = (result?.cancelled === true || result?.canceled === true) && !result?.error && result?.terminalFailure !== true && result?.billingPending !== true;
+      if (cancelled) {
+        log.write("info", "operation.cancelled", { channel, operationId, durationMs: Date.now() - started });
+        return result;
+      }
       const failed = result?.ok === false || result?.success === false || result?.error;
       const action = failed ? classifyUserAction(result, channel) : null;
       log.write(failed ? action ? "warn" : "error" : "info", "operation.finish", { channel, operationId, durationMs: Date.now() - started, result: /reveal|copy-activation|copy-machine/.test(channel) ? "[Credential result redacted]" : result });
       if (result?.ok === false || result?.success === false || result?.error) {
         const reason = result.error || result.message || result.reason || "服务返回失败，但未提供错误原因";
-        const message = action ? redact(serializeUserAction(action)) : `${typeof reason === "string" ? redact(reason) : JSON.stringify(redact(reason))}\n操作：${channel}\n错误码：${result.code || result.status || "未提供"}\n诊断编号：${operationId}`;
-        if (event?.sender && !event.sender.isDestroyed()) event.sender.send("application-operation-error", { message, operation: channel });
+        const message = action ? redact(serializeUserAction(action)) : generationChannel(channel) ? generationMessage(redact(reason), operationId) : `${typeof reason === "string" ? redact(reason) : JSON.stringify(redact(reason))}\n操作：${channel}\n错误码：${result.code || result.status || "未提供"}\n诊断编号：${operationId}`;
+        if (event?.sender && !event.sender.isDestroyed()) event.sender.send("application-operation-error", { message: action ? message : message + UNEXPECTED_DIAGNOSTIC_MARKER, operation: channel, category: action ? "action-required" : "unexpected" });
       }
       return result;
     } catch (error) {
+      if (isPlatformQuoteCancellation(error)) {
+        log.write('info', 'operation.cancelled', { channel, operationId });
+        throw userFacingActionError(/^已取消/.test(error.message) ? error.message : '已取消，本次未提交任务，也未扣积分。', error.code);
+      }
       const action = classifyUserAction(error, channel);
       if (action) {
+        if (["OPERATION_CANCELLED", "FEIGUA_CANCELLED"].includes(action.code)) {
+          log.write("info", "operation.cancelled", { channel, operationId, durationMs: Date.now() - started });
+          throw userFacingActionError(redact(serializeUserAction(action)), action.code);
+        }
         log.write("warn", "operation.action-required", { channel, operationId, durationMs: Date.now() - started, code: action.code, message: action.message });
         const message = redact(serializeUserAction(action));
         if (event?.sender && !event.sender.isDestroyed()) event.sender.send("application-operation-error", { message, operation: channel });
@@ -153,7 +177,8 @@ export function diagnosticHandler(log, channel, handler) {
       }
       log.write("error", "operation.error", { channel, operationId, durationMs: Date.now() - started, error });
       const reason = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(redact(error));
-      throw new Error(`${redact(reason || "未提供错误原因")}\n操作：${channel}\n错误码：${error?.code || error?.name || "UNKNOWN"}\n诊断编号：${operationId}`, { cause: error });
+      if (generationChannel(channel)) throw new Error(generationMessage(redact(reason), operationId) + UNEXPECTED_DIAGNOSTIC_MARKER, { cause: error });
+      throw new Error(`${redact(reason || "未提供错误原因")}\n操作：${channel}\n错误码：${error?.code || error?.name || "UNKNOWN"}\n诊断编号：${operationId}${UNEXPECTED_DIAGNOSTIC_MARKER}`, { cause: error });
     }
   };
 }

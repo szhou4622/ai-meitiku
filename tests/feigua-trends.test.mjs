@@ -127,6 +127,7 @@ function fixture({ stored, collect, auth, write } = {}) {
   const service = new FeiguaService({ userDataPath: '/unused', browser, storage: {
     read: async () => structuredClone(disk), write: async value => { if (write) await write(value); disk = structuredClone(value); },
   } });
+  service.manualCollectionReady = true;
   return { service, calls, disk: () => disk, browser };
 }
 
@@ -150,7 +151,7 @@ test('stopping automatic collection during fresh login verification prevents all
     const checking=new Promise(resolve=>{entered=resolve;});
     browser.checkLogin=async()=>{entered();return new Promise((resolve,fail)=>{release=resolve;reject=fail;});};
     await service.login();browser.onAuthChange({status:'authenticated',message:'已登录'});await checking;
-    assert.equal((await service.state()).busy,true);assert.equal(service.controller,null);
+    assert.equal((await service.state()).busy,true);assert.ok(service.controller);
     await service.cancel();
     if(rejectCheck)reject(new Error('cancelled browser request'));else release({status:'authenticated'});
     await service.autoStart;await service.job;
@@ -374,28 +375,14 @@ test('catalogs update on their visited source pages and failed rereads preserve 
   assert.match(state.catalogMessage,/目录更新暂未完成/);
 });
 
-test('login confirmation starts collection before any separate catalog work',async t=>{
-  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
-  const {service,browser}=fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
-  let started,release;
-  const first=new Promise(resolve=>{started=resolve;});
-  const gate=new Promise(resolve=>{release=resolve;});
-  browser.getMusicTags=()=>new Promise(()=>{});
-  browser.getVideoFilters=()=>new Promise(()=>{});
-  const original=browser.collect;
-  browser.collect=async(...args)=>{if(args[0]==='music'){started();await gate;}return original(...args);};
-  browser.openLogin=async()=>{browser.onAuthChange({status:'authenticated',message:'已登录'});};
-  await service.login();await service.autoStart;
-  let timer;
-  try {
-    await Promise.race([first,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('catalog work delayed first collection')),1000);})]);
-    const state=await service.state();
-    assert.equal(state.runs[0].trigger,'login');
-    assert.equal(state.runs[0].groups[0].status,'running');
-    assert.match(state.runs[0].message,/正在采集/);
-  }finally{clearTimeout(timer);release();}
-  await service.job;
-  assert.equal((await service.state()).runs[0].status,'completed');
+test('login only refreshes catalogs even when an old client requests automatic collection', async () => {
+  const { service, browser, calls } = fixture();
+  browser.openLogin = async () => browser.onAuthChange({ status: 'authenticated', message: '已登录' });
+  await service.login({ collectAfterLogin: true }); await service.autoStart;
+  assert.equal((await service.state()).auth.status, 'authenticated');
+  assert.equal((await service.state()).runs.length, 0);
+  assert.deepEqual(calls, []);
+  assert.equal(service.manualCollectionReady, false);
 });
 
 test('page settling tracks only the current provider ranking loads, excluding analytics and other windows',()=>{
@@ -1023,16 +1010,18 @@ test('known provider notice is confirmed once and login then closes automaticall
   browser.stopLoginWatch();
 });
 
-test('login success starts a single collection automatically using saved keywords', async t => {
-  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
-  const {service,browser,calls} = fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
+test('login waits for the user to start collection with the configured keywords', async () => {
+  const { service, browser, calls } = fixture();
   await service.saveKeywords(['测试词']);
-  browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); };
-  await service.login(); await service.autoStart; await service.job;
-  browser.onAuthChange({status:'authenticated',message:'已登录'});
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal((await service.state()).runs.length,1);
-  assert.deepEqual(calls.at(-1),['videos','测试词']);
+  browser.openLogin = async () => browser.onAuthChange({ status: 'authenticated', message: '已登录' });
+  await service.login(); await service.autoStart;
+  browser.onAuthChange({ status: 'authenticated', message: '已登录' });
+  await flushMicrotasks();
+  assert.equal((await service.state()).runs.length, 0); assert.deepEqual(calls, []);
+  await service.start(); await service.job;
+  assert.equal((await service.state()).runs.length, 1);
+  assert.deepEqual(calls.at(-1), ['videos', '测试词']);
+  assert.equal(service.manualCollectionReady, true);
 });
 
 test('cancelling pending automatic startup prevents a collection from starting', async () => {
@@ -1270,4 +1259,16 @@ test('repeated category ranking refreshes do not evict hotspots and videos from 
   assert.equal(state.runs.length,12);
   const shown=displayedFeiguaGroups(state.runs,'',state.latestResults);
   assert.equal(shown.length,4);assert.ok(shown.every(group=>group.result.rows.length===5));
+});
+
+
+test('fresh startup and fresh login cannot be bypassed by an overdue scheduler tick', async () => {
+  const { service, browser, calls } = fixture(); service.manualCollectionReady = false;
+  await service.checkDailySchedule(Date.parse('2026-10-05T01:00:00Z'), () => true);
+  assert.deepEqual(calls, []); assert.equal((await service.state()).runs.length, 0);
+  service.manualCollectionReady = true;
+  browser.openLogin = async () => browser.onAuthChange({ status: 'authenticated', message: '已登录' });
+  await service.login({ collectAfterLogin: true }); await service.autoStart;
+  await service.checkDailySchedule(Date.parse('2026-10-05T01:00:00Z'), () => true);
+  assert.deepEqual(calls, []); assert.equal((await service.state()).runs.length, 0);
 });

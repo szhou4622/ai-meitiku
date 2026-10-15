@@ -1,6 +1,6 @@
 [project]
 name = "xhs-cli"
-version = "3.0.0"
+version = "3.0.1"
 description = "xhs-downloader 命令行应用"
 requires-python = ">=3.12"
 dependencies = [

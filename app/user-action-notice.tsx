@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { classifyUserAction } from "../electron/user-action-errors.mjs";
+import { qianchuanNoticePreference } from "./qianchuan-notice-preference.mjs";
 
 type Guidance = NonNullable<ReturnType<typeof classifyUserAction>>;
 export type GuidanceTarget = NonNullable<Guidance["target"]>;
@@ -12,16 +13,24 @@ export function UserActionNotice({ onConfigure, suppressQianchuan = false }: {
 }) {
   const [guidance, setGuidance] = useState<Guidance | null>(null);
   useEffect(() => {
-    const receive = (event: Event) => setGuidance((event as CustomEvent<Guidance>).detail);
+    const receive = (event: Event) => {
+      const next = (event as CustomEvent<Guidance>).detail;
+      if (next.target === "qianchuan" && (suppressQianchuan || qianchuanNoticePreference().shouldSuppress(next))) return;
+      setGuidance(next);
+    };
     const dismiss = () => setGuidance(null);
+    const connected = () => setGuidance(current => current?.target === "qianchuan" ? null : current);
+    if (suppressQianchuan) connected();
     window.addEventListener("user-action-required", receive);
     window.addEventListener("user-action-dismiss", dismiss);
-    return () => { window.removeEventListener("user-action-required", receive); window.removeEventListener("user-action-dismiss", dismiss); };
-  }, []);
+    window.addEventListener("qianchuan-connected", connected);
+    return () => { window.removeEventListener("user-action-required", receive); window.removeEventListener("user-action-dismiss", dismiss); window.removeEventListener("qianchuan-connected", connected); };
+  }, [suppressQianchuan]);
   if (!guidance || (suppressQianchuan && guidance.target === "qianchuan")) return null;
   return <aside className="user-action-notice" role="status" aria-label="操作引导">
     <div><strong>{guidance.title}</strong><p>{guidance.message}</p></div>
     {guidance.target && <button type="button" onClick={() => { onConfigure(guidance.target!); setGuidance(null); }}>{guidance.action}</button>}
+    {guidance.target === "qianchuan" && <button type="button" className="user-action-mute" onClick={() => { qianchuanNoticePreference().mute(); setGuidance(null); }}>不再提示</button>}
     <button type="button" className="user-action-dismiss" aria-label="关闭操作引导" onClick={() => setGuidance(null)}>×</button>
   </aside>;
 }
@@ -31,8 +40,14 @@ export function ErrorDetailDialog() {
   useEffect(() => {
     const show = (value: { message: string; operation?: string }) => {
       const action = classifyUserAction(value);
-      if (action) window.dispatchEvent(new CustomEvent("user-action-required", { detail: action }));
-      else setDetails(value);
+      if (action) {
+        setDetails(null);
+        window.dispatchEvent(new CustomEvent("user-action-required", { detail: action }));
+      }
+      else {
+        window.dispatchEvent(new CustomEvent("user-action-dismiss"));
+        setDetails(value);
+      }
     };
     const receive = (event: Event) => show((event as CustomEvent).detail);
     window.addEventListener("local-error-detail", receive);

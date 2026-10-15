@@ -1,4 +1,4 @@
-const SENSITIVE_KEY_PATTERN = /(?:activation.?code|device.?session|device.?credential|authorization|password|secret|token|api.?key|cookie|machine.?code|code.?id)/i;
+const SENSITIVE_KEY_PATTERN = /(?:activation.?code|(?:points|redeem|recharge).?code|device.?session|device.?credential|authorization|password|secret|token|api.?key|cookie|machine.?code|code.?id)/i;
 const MACHINE_CODE_PATTERN = /\bv[23]_[a-f0-9]{64}\b/gi;
 const LONG_HEX_PATTERN = /\b[a-f0-9]{64}\b/gi;
 const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
@@ -7,6 +7,8 @@ const MAX_TEXT_LENGTH = 360;
 
 function boundedText(value, maxLength = MAX_TEXT_LENGTH) {
   const text = String(value ?? "")
+    .replace(/\bAIML-P-[A-Z0-9]{24,64}\b/gi, "[已脱敏积分码]")
+    .replace(/\bAIM-(?:[A-Z0-9]{4}-){2}[A-Z0-9]{4}\b/gi, "[已脱敏积分码]")
     .replace(BEARER_PATTERN, "Bearer [已脱敏]")
     .replace(MACHINE_CODE_PATTERN, "[已脱敏机器码]")
     .replace(LONG_HEX_PATTERN, "[已脱敏摘要]")

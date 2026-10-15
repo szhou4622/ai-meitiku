@@ -1,3 +1,4 @@
+import { apiTaskSelection, requireCustomerApi } from "./api-usage.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { copyFile, cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -315,13 +316,14 @@ export function classificationProviderFromSettings(settings = {}) {
 }
 
 export function classificationApiKeyForProvider(profiles = {}, provider) {
+  requireCustomerApi(apiTaskSelection(provider, profiles?.[provider]?.useOwnApi ?? true));
   return String(provider === "relay" ? profiles?.relay?.apiKey || "" : profiles?.volcengine?.apiKey || "").trim();
 }
 
 export function buildClassifierRuntimeEnvironment(baseEnvironment, profiles, provider) {
   const apiKey = classificationApiKeyForProvider(profiles, provider);
-  return {
-    ...baseEnvironment,
-    ...(apiKey ? { ARK_API_KEY: apiKey } : {}),
-  };
+  const environment = { ...baseEnvironment };
+  delete environment.ARK_API_KEY;
+  if (apiKey) environment.ARK_API_KEY = apiKey;
+  return environment;
 }

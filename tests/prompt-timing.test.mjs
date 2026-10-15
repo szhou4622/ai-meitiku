@@ -15,6 +15,7 @@ test("timelines use actual source duration, accepting rounded endpoints and reje
     "镜头（00:10-00:40）",
     "总时长：40秒",
     "镜头（8–2s）",
+    "-1–2s 动作",
   ])
     assert.throws(() => assertPromptDuration(text, 11.05));
 });

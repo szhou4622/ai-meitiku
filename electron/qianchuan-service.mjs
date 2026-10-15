@@ -279,6 +279,23 @@ function sanitizedVideoCandidate(item) {
   };
 }
 
+function reportRangeKey(start, end) { return `${start}:${end}`; }
+function retainReportRanges(entry, snapshot) {
+  const ranges = { ...(entry.report_ranges || {}) };
+  if (entry.complete) {
+    const previousKey = reportRangeKey(entry.complete.start_date, entry.complete.end_date);
+    ranges[previousKey] = { ...entry.complete, insights_by_material: {
+      ...(ranges[previousKey]?.insights_by_material || {}), ...(entry.complete.insights_by_material || {}),
+    } };
+  }
+  const key = reportRangeKey(snapshot.start_date, snapshot.end_date);
+  const insights = { ...(ranges[key]?.insights_by_material || {}), ...(snapshot.insights_by_material || {}) };
+  const boundedInsights = Object.fromEntries(Object.entries(insights)
+    .sort((a, b) => String(b[1]?.synced_at || "").localeCompare(String(a[1]?.synced_at || ""))).slice(0, 1000));
+  ranges[key] = { ...snapshot, insights_by_material: boundedInsights };
+  return Object.fromEntries(Object.entries(ranges).sort((a, b) => String(b[1]?.synced_at || "").localeCompare(String(a[1]?.synced_at || ""))).slice(0, 8));
+}
+
 function libraryCacheKey(authorizationId, advertiserId) {
   return `${authorizationId}:${advertiserId}`;
 }
@@ -416,16 +433,28 @@ export class QianchuanService {
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(90000),
       });
-    } catch {
-      throw new Error("千川服务暂时无法连接，请重试");
+    } catch (cause) {
+      throw Object.assign(new Error(`千川服务暂时无法连接，请重试（${endpoint}）`, { cause }), {
+        endpoint, advertiserId: String(payload.advertiser_id || ""),
+        code: cause?.code || cause?.cause?.code || cause?.name || "network_error",
+      });
     }
     if (response.status === 401 && retry) {
       this.session = null;
       await this.accessToken(true);
       return this.request(endpoint, payload, false);
     }
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(responseMessage(body, "千川请求失败，请重试"));
+    let body;
+    try { body = await response.json(); }
+    catch (cause) {
+      throw Object.assign(new Error(`千川服务返回了无法解析的数据（${endpoint}）`, { cause }), { endpoint, httpStatus: response.status, advertiserId: String(payload.advertiser_id || "") });
+    }
+    if (!response.ok || body?.success === false || body?.ok === false) {
+      throw Object.assign(new Error(`${responseMessage(body, "千川请求失败，请重试")}（${endpoint}）`), {
+        endpoint, httpStatus: response.status, advertiserId: String(payload.advertiser_id || ""),
+        code: body?.error_code || body?.code || "",
+      });
+    }
     return body;
   }
 
@@ -510,6 +539,7 @@ export class QianchuanService {
           };
           return {
             ...entry,
+            report_ranges: retainReportRanges(entry, { ...complete, insights_by_material: insightsByMaterial, synced_at: syncedAt }),
             complete: {
               ...complete,
               insights_by_material: insightsByMaterial,
@@ -584,7 +614,7 @@ export class QianchuanService {
     const entry = store.records[libraryCacheKey(authorizationId, advertiserId)];
     return {
       success: true,
-      cache: entry?.complete || null,
+      cache: entry?.checkpoint && entry.checkpoint.stage !== "insights" ? entry.partial || entry.complete || null : entry?.complete || null,
       resumable: Boolean(entry?.checkpoint),
       checkpoint: entry?.checkpoint ? {
         query: entry.checkpoint.query,
@@ -606,12 +636,37 @@ export class QianchuanService {
     const advertiserId = String(payload?.advertiser_id || "").trim();
     if (!authorizationId || !/^\d{6,32}$/.test(advertiserId)) throw new Error("千川账户参数无效");
     const query = normalizedLibraryQuery(payload);
-    this.cancelLibrarySync();
-    const run = { cancelled: false };
+    const signature = JSON.stringify({ authorizationId, advertiserId, query });
+    const active = this.activeLibrarySync;
+    if (active) {
+      if (active.cancelled) {
+        // Finish saving the cancelled checkpoint before a continuation reads it.
+        await active.promise.catch(() => {});
+        return this.syncLibrary(payload, onProgress);
+      }
+      if (active.signature === signature) {
+        active.listeners.add(onProgress);
+        return active.promise;
+      }
+      throw Object.assign(new Error("已有千川同步任务正在运行，请完成或取消后再同步"), { code: "TASK_IN_PROGRESS" });
+    }
+    const run = { cancelled: false, signature, listeners: new Set([onProgress]), promise: null };
     this.activeLibrarySync = run;
+    run.promise = this.performLibrarySync(payload, run).finally(() => {
+      if (this.activeLibrarySync === run) this.activeLibrarySync = null;
+    });
+    return run.promise;
+  }
+
+  async performLibrarySync(payload, run) {
+    const authorizationId = String(payload?.authorization_id || "").trim();
+    const advertiserId = String(payload?.advertiser_id || "").trim();
+    if (!authorizationId || !/^\d{6,32}$/.test(advertiserId)) throw new Error("千川账户参数无效");
+    const query = normalizedLibraryQuery(payload);
     const key = libraryCacheKey(authorizationId, advertiserId);
     const store = await this.readLibraryCacheStore();
     const previousEntry = store.records[key] || {};
+    const catalog = new Map((previousEntry.catalog || previousEntry.complete?.items || []).map(item => [item.material_id, sanitizedVideoCandidate(item)]));
     const resumable = previousEntry.checkpoint
       && JSON.stringify(previousEntry.checkpoint.query) === JSON.stringify(query);
     let candidates = resumable && Array.isArray(previousEntry.checkpoint.candidates)
@@ -625,9 +680,18 @@ export class QianchuanService {
     let stage = resumable ? String(previousEntry.checkpoint.stage || "materials") : "materials";
 
     const emit = (progress) => {
-      try { onProgress({ advertiser_id: advertiserId, ...progress }); } catch {}
+      for (const listener of run.listeners) {
+        try { listener({ advertiser_id: advertiserId, ...progress }); } catch {}
+      }
     };
+    const partialSnapshot = () => ({
+      query, start_date: query.report_start_date, end_date: query.report_end_date,
+      items: candidates.map(candidate => ({ ...emptyPerformanceForVideo(candidate), advertiser_id: advertiserId, performance_pending: true })),
+      synced_at: new Date().toISOString(), scanned_count: scannedCount, total_number: totalNumber,
+      has_more: hasMore, insights_by_material: {}, insights_completed: 0, insights_total: candidates.length,
+    });
     const saveCheckpoint = async () => {
+      for (const candidate of candidates) catalog.set(candidate.material_id, candidate);
       const checkpoint = {
         query,
         stage,
@@ -643,6 +707,8 @@ export class QianchuanService {
         authorization_id: authorizationId,
         advertiser_id: advertiserId,
         checkpoint,
+        ...(stage !== "insights" ? { partial: partialSnapshot() } : {}),
+        catalog: [...catalog.values()].slice(-1000),
         updated_at: checkpoint.updated_at,
       }));
     };
@@ -653,6 +719,8 @@ export class QianchuanService {
     };
 
     try {
+      await saveCheckpoint();
+      if (candidates.length && stage !== "insights") emit({ stage, ...partialSnapshot(), collected_count: candidates.length, message: "已恢复上次分页素材，正在继续同步" });
       if (stage === "materials") {
         const seen = new Set(candidates.map((item) => item.material_id));
         while (page <= QIANCHUAN_LIBRARY_DATE_SCAN_PAGES) {
@@ -670,11 +738,17 @@ export class QianchuanService {
           totalNumber = Math.max(totalNumber, Number(result?.page_info?.total_number || 0));
           for (const item of pageItems) {
             if (!item.material_id || seen.has(item.material_id)) continue;
-            const createdDate = materialCreatedDate(item.created_at);
+            const createdDate = materialCreatedDate(item.created_at || catalog.get(item.material_id)?.created_at);
             if (query.material_mode === "created_range"
               && (!createdDate || createdDate < query.material_start_date || createdDate > query.material_end_date)) continue;
             seen.add(item.material_id);
-            candidates.push(item);
+            const cached = catalog.get(item.material_id);
+            candidates.push(cached ? { ...item,
+              filename: item.filename || cached.filename, poster_url: item.poster_url || cached.poster_url,
+              created_at: item.created_at || cached.created_at,
+              duration_seconds: item.duration_seconds || cached.duration_seconds,
+              width: item.width || cached.width, height: item.height || cached.height,
+            } : item);
             if (candidates.length >= query.material_limit) break;
           }
           const pageDates = pageItems.map((item) => materialCreatedDate(item.created_at)).filter(Boolean);
@@ -685,6 +759,7 @@ export class QianchuanService {
           page += 1;
           await saveCheckpoint();
           emit({
+            ...partialSnapshot(),
             stage: "materials",
             page: page - 1,
             total_pages: totalPages,
@@ -699,7 +774,7 @@ export class QianchuanService {
       }
 
       if (run.cancelled) return await cancelledResult();
-      emit({ stage: "performance", scanned_count: scannedCount, collected_count: candidates.length, message: "正在读取所选周期的投放数据" });
+      emit({ ...partialSnapshot(), stage: "performance", collected_count: candidates.length, message: "素材已显示，正在更新所选周期的投放数据" });
       const report = await this.top({
         authorization_id: authorizationId,
         advertiser_id: advertiserId,
@@ -732,9 +807,8 @@ export class QianchuanService {
         });
       }).sort((left, right) => (right.spend - left.spend) || (right.video_plays - left.video_plays));
       const baseCompletedAt = new Date().toISOString();
-      const previousComplete = previousEntry.complete && typeof previousEntry.complete === "object"
-        ? previousEntry.complete
-        : null;
+      const previousComplete = previousEntry.report_ranges?.[reportRangeKey(query.report_start_date, query.report_end_date)]
+        || previousEntry.complete || null;
       const canReuseInsights = Boolean(previousComplete
         && previousComplete.start_date === query.report_start_date
         && previousComplete.end_date === query.report_end_date);
@@ -769,6 +843,8 @@ export class QianchuanService {
         authorization_id: authorizationId,
         advertiser_id: advertiserId,
         complete: completeSnapshot(),
+        report_ranges: retainReportRanges(entry, completeSnapshot()),
+        partial: null,
         checkpoint: null,
         updated_at: baseCompletedAt,
       }));
@@ -801,6 +877,7 @@ export class QianchuanService {
           authorization_id: authorizationId,
           advertiser_id: advertiserId,
           complete: snapshot,
+          report_ranges: retainReportRanges(entry, snapshot),
           updated_at: persistedAt,
         }));
       };
@@ -812,6 +889,7 @@ export class QianchuanService {
           const item = pendingItems[itemIndex];
           let insight = null;
           let failed = false;
+          let insightError = "";
           try {
             const detail = await this.report({
               authorization_id: authorizationId,
@@ -823,8 +901,9 @@ export class QianchuanService {
             }, { persistInsight: false });
             insight = detail?.insights ?? null;
             insightsByMaterial[item.material_id] = { insights: insight, synced_at: new Date().toISOString() };
-          } catch {
+          } catch (error) {
             failed = true;
+            insightError = error instanceof Error ? error.message : String(error);
             failedInsights += 1;
           }
           processedNew += 1;
@@ -844,6 +923,7 @@ export class QianchuanService {
             insight: failed ? undefined : insight,
             insight_synced_at: failed ? undefined : insightsByMaterial[item.material_id]?.synced_at,
             insight_failed: failed,
+            ...(failed ? { insight_error: insightError } : {}),
             message: `基础数据已完成，正在同步扩展分析 ${processed}/${items.length}${failedInsights ? `，${failedInsights} 条待重试` : ""}`,
           });
         }
@@ -861,6 +941,8 @@ export class QianchuanService {
         authorization_id: authorizationId,
         advertiser_id: advertiserId,
         complete,
+        report_ranges: retainReportRanges(entry, complete),
+        partial: null,
         checkpoint: null,
         updated_at: completedAt,
       }));
@@ -876,6 +958,10 @@ export class QianchuanService {
           : `同步完成，共缓存 ${items.length} 条素材和扩展分析`,
       });
       return { success: true, from_cache: false, insights_failed: failedInsights, ...complete };
+    } catch (error) {
+      emit({ stage: "error", scanned_count: scannedCount, collected_count: candidates.length,
+        message: `${stage === "materials" ? "素材分页" : stage === "performance" ? "投放数据" : "扩展分析"}同步失败：${error instanceof Error ? error.message : String(error)}；已读取内容已保留，可继续同步` });
+      throw error;
     } finally {
       if (this.activeLibrarySync === run) this.activeLibrarySync = null;
     }

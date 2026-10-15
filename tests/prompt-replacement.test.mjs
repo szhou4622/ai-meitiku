@@ -19,25 +19,30 @@ test("three-stage replacement sends image evidence to all stages and returns pro
   assert.match(mock.requests[1][0].content, /台词/);
   assert.ok(!mock.requests[1][0].content.includes("使用明确占位符"));
 });
-test("old-product residues trigger one API correction even if the reviewer incorrectly approves", async () => {
+test("old-product residues retain a flagged draft without automatically paying for another candidate", async () => {
   const mock = fixture([plan, `${good} 口播Yep高光小粉瓶`, audit, good, audit]);
   const result = await generateReplacement({ context, content, request: mock.request });
-  assert.equal(result.choices[0].message.content, good);
-  assert.equal(mock.requests.length, 5);
-  assert.ok(JSON.parse(mock.requests[3][1].content[0].text).correctionIssues.some(issue => issue.includes("Yep")));
+  assert.equal(result.choices[0].message.content, `${good} 口播Yep高光小粉瓶`);
+  assert.equal(mock.requests.length, 3);
+  assert.equal(result.quality.status, 'partial');
+  assert.match(JSON.stringify(result.quality.issues), /Yep/);
 });
-test("missing new references or unchanged dialogue fail closed after bounded correction", async () => {
+test("missing references and dialogue issues remain visible alongside the generated candidate", async () => {
   const failedAudit = { ...audit, passed: false, checks: { ...audit.checks, dialogueAdapted: false }, issues: ["台词仍在卖旧商品"] };
   const mock = fixture([plan, "炭灰色直筒裤", failedAudit, "炭灰色直筒裤", failedAudit]);
-  await assert.rejects(generateReplacement({ context, content, request: mock.request }), /替换检查未通过/);
-  assert.equal(mock.requests.length, 5);
+  const result = await generateReplacement({ context, content, request: mock.request });
+  assert.equal(result.choices[0].message.content, '炭灰色直筒裤');
+  assert.equal(result.quality.status, 'partial');
+  assert.equal(mock.requests.length, 3);
 });
 test("invalid reference ids and malformed review cannot be reported as a successful replacement", async () => {
   const wrong = { ...plan, references: [{ ...plan.references[0], materialId: "unknown" }, plan.references[1]] };
   const mock = fixture([wrong]);
   await assert.rejects(generateReplacement({ context, content, request: mock.request }), /识别不完整/);
   const missing = fixture([plan, good, { passed: true, issues: [] }]);
-  await assert.rejects(generateReplacement({ context, content, request: missing.request }), /检查不完整/);
+  const retained = await generateReplacement({ context, content, request: missing.request });
+  assert.equal(retained.choices[0].message.content, good);
+  assert.equal(retained.quality.status, 'partial');
 });
 
 test("paraphrased old descriptions do not reject an otherwise valid plan before semantic review", async () => {
@@ -48,10 +53,12 @@ test("paraphrased old descriptions do not reject an otherwise valid plan before 
   assert.equal(mock.requests.length, 3);
 });
 
-test("physical object continuity failures trigger an API correction rather than manual text edits", async () => {
+test("physical continuity failures are reported without dropping or silently regenerating the paid candidate", async () => {
   const failed = { ...audit, passed: false, checks: { ...audit.checks, objectContinuity: false }, issues: ["同一条裤子同时在手中和桌面"] };
   const mock = fixture([plan, good + "同一条裤子仍放在桌面", failed, good, audit]);
   const result = await generateReplacement({ context, content, request: mock.request });
-  assert.equal(result.choices[0].message.content, good);
-  assert.match(JSON.parse(mock.requests[3][1].content[0].text).correctionIssues.join(" "), /手中和桌面/);
+  assert.equal(result.choices[0].message.content, good + '同一条裤子仍放在桌面');
+  assert.equal(result.quality.status, 'partial');
+  assert.match(JSON.stringify(result.quality.issues), /手中和桌面/);
+  assert.equal(mock.requests.length, 3);
 });

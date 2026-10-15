@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ApiUsageSwitch } from "./api-usage-switch";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Film, FolderOpen, Settings, Upload, MousePointer2, X, RefreshCw, Pause, Play, Copy } from 'lucide-react';
 
 import { subtitleDisplayText, subtitleDisplayDirectory } from '../electron/subtitle-display.mjs';
@@ -12,9 +13,9 @@ import { SUBTITLE_DRAFT_KEY, DEFAULT_SUBTITLE_REGION, subtitlePathKey, validSubt
 type BrowserMode = 'system' | 'embedded';
 type Region = { BX: number; BY: number; BW: number; BH: number };
 type Source = { path: string; name: string; url: string; width: number; height: number; duration: number; sizeBytes: number };
-type Job = { id: string; batchId?: string; itemId?: string; name: string; sourcePath: string; outputPath: string; status: string; message: string; jobId: string; createdAt: string; importedAt: string | null; sha256?: string; syncToMediaLibrary?: boolean; importError?: string };
+type Job = { id: string; batchId?: string; itemId?: string; name: string; sourcePath: string; outputPath: string; status: string; message: string; platformPhase?: string; resultRetainedUntil?: number; apiSelection?: { apiMode: string }; jobId: string; createdAt: string; importedAt: string | null; sha256?: string; syncToMediaLibrary?: boolean; importError?: string };
 type Batch = { id: string; total: number; completed: number; waiting: number; paused: number; active: number; failed: number; attention: number; cancelled: number; message: string };
-type State = { version?: number; configured: boolean; browserMode: BrowserMode; defaultOutputDirectory?: string; jobs: Job[]; batch?: Batch | null };
+type State = { version?: number; configured: boolean; apiMode?: 'platform_api' | 'customer_api'; personalConfigured?: boolean; browserMode: BrowserMode; defaultOutputDirectory?: string; jobs: Job[]; batch?: Batch | null };
 type Entry = Source & { id: string; checked: boolean; region: Region; regionMode: string; error?: string };
 export type AliyunSubtitleBridge = {
   state: () => Promise<State>;
@@ -42,6 +43,13 @@ const emptyState: State = { configured: false, browserMode: 'system', jobs: [] }
 const defaultRegion: Region = DEFAULT_SUBTITLE_REGION;
 const activeStatuses = ['preparing', 'submitting', 'queued', 'processing', 'downloading'];
 const statusNames: Record<string, string> = { waiting: '待提交', paused: '后续提交暂停', preparing: '检查中', cancelled: '已取消', 'preflight-error': '文件检查失败', submitting: '上传 / 提交中', queued: '云端排队中', processing: '处理中', downloading: '下载中', completed: '已完成', failed: '处理失败', unknown: '待核实', 'query-error': '查询暂停', 'download-error': '下载暂停' };
+function jobStatus(job: Job) {
+  if (['submitting', 'processing', 'queued'].includes(job.status) && job.jobId) {
+    const phases: Record<string, string> = { quoted: '等待确认', processing: '云端处理中', retrieving: '取回成片中', verifying: '校验成片中', storing: '转存成片中', ready: '准备下载', 'source-expired': '成片取回失败', abandoned: '已停止取回' };
+    return phases[job.platformPhase || ''] || statusNames[job.status];
+  }
+  return statusNames[job.status] || job.status;
+}
 function bridge() {
   const api = window.desktopBridge?.aliyunSubtitle;
   if (!api) throw new Error('请在桌面版使用一键去字幕');
@@ -54,7 +62,7 @@ function useAliyunState(notify: (message: string) => void, poll = false, enabled
   const [loaded, setLoaded] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(''), [connectionError, setConnectionError] = useState('');
   const notifyRef = useRef(notify);
-  notifyRef.current = notify;
+  useEffect(() => { notifyRef.current = notify; }, [notify]);
   useEffect(() => {
     if (!enabled) return;
     let alive = true, pending = false, errorReported = false;
@@ -74,7 +82,7 @@ function useAliyunState(notify: (message: string) => void, poll = false, enabled
 }
 export function AliyunSubtitleAutoSync({ ready, onImport, notify }: { ready: () => boolean; onImport: (path: string) => Promise<void>; notify: (message: string) => void }) {
   const latest = useRef({ ready, onImport, notify });
-  latest.current = { ready, onImport, notify };
+  useEffect(() => { latest.current = { ready, onImport, notify }; }, [ready, onImport, notify]);
   useEffect(() => {
     const sync = createSubtitleAutoSync({ ready: () => Boolean(window.desktopBridge?.aliyunSubtitle) && latest.current.ready(), api: bridge,
       importFile: (path: string) => latest.current.onImport(path), notify: (message: string) => latest.current.notify(message) });
@@ -96,6 +104,7 @@ export function AliyunSubtitleSettings({ notify, onStart }: { notify: (message: 
   const [mode, setMode] = useState<BrowserMode | null>(null);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const browserMode = mode || state.browserMode;
+  const personalConfigured = state.personalConfigured ?? state.configured;
   const showSetupGuide = false;
   const run = async (action: () => Promise<void>) => { setBusy(true); setMessage(''); try { await action(); } catch (error) { setMessage(errorText(error)); } finally { setBusy(false); } };
   const open = (page: string) => void run(() => bridge().open(page, browserMode));
@@ -104,15 +113,18 @@ export function AliyunSubtitleSettings({ notify, onStart }: { notify: (message: 
     <section><span className="as-step-number">2</span><div><h3>获取两项连接密钥</h3><p>打开密钥管理页，点击「创建 AccessKey」并完成验证，再把 ID 和 Secret 复制到下方。</p><button type="button" disabled={busy} onClick={() => open('keys')}>去获取密钥 <ExternalLink size={13} /></button></div></section>
   </div>;
   return <div className="api-settings-content as-root as-settings as-guided-settings"><section className="api-settings-card">
-    <div className="api-settings-card-title as-settings-heading"><div><h2>{state.configured ? '去字幕服务设置' : '首次使用：连接去字幕服务'}</h2><p>只需设置一次，以后选视频就能处理。去字幕费用由你的云服务账户支付。</p></div><div className="as-heading-controls"><span className={`api-config-status ${state.configured ? '' : 'empty'}`}>{state.configured ? '已保存密钥' : '尚未连接'}</span><div className="as-guide-toolbar"><span>下方链接打开到</span><BrowserChoice value={browserMode} onChange={setMode} /></div></div></div>
+    <div className="api-settings-card-title as-settings-heading"><div><h2>{state.configured ? '去字幕服务设置' : '首次使用：连接去字幕服务'}</h2><p>只需设置一次，以后选视频就能处理。开启个人 API 时由你的云服务账户付费；关闭后使用积分模式。</p></div><div className="as-heading-controls"><span className={`api-config-status ${state.configured ? '' : 'empty'}`}>{state.apiMode === 'platform_api' ? state.configured ? '积分服务已连接' : '积分服务未就绪' : personalConfigured ? '已保存个人密钥' : '尚未连接'}</span>{state.apiMode === 'customer_api' && <div className="as-guide-toolbar"><span>下方链接打开到</span><BrowserChoice value={browserMode} onChange={setMode} /></div>}</div></div>
     {showSetupGuide && (state.configured ? <details className="as-setup-help"><summary><ChevronDown size={14} />重新查看开通与密钥获取步骤</summary>{guide}</details> : guide)}
-    <section className="as-connect-form"><div className="as-connect-form-title">{!state.configured && <span className="as-step-number">3</span>}<div><h3>{state.configured ? '管理连接密钥' : '粘贴密钥，保存并检查'}</h3><p>{state.configured ? '更换账户时同时填写两项；留空则保留现有密钥。' : '这两项是软件连接去字幕服务的凭证，请从密钥管理页复制，不是登录密码。'}</p></div></div>
-    <div className="as-key-grid"><label>密钥 ID <span>AccessKey ID</span><input type="password" autoComplete="off" spellCheck={false} value={id} onChange={e => setId(e.target.value)} placeholder={state.configured ? '已保存，留空保留' : '粘贴从密钥管理页复制的 ID'} /></label><label>密钥 Secret <span>AccessKey Secret</span><input type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} placeholder={state.configured ? '已保存，留空保留' : '粘贴从密钥管理页复制的 Secret'} /></label></div>
+    <ApiUsageSwitch provider="aliyun" notify={notify}>
+    <section className="as-connect-form"><div className="as-connect-form-title">{!state.configured && <span className="as-step-number">3</span>}<div><h3>{personalConfigured ? '管理个人连接密钥' : '粘贴个人密钥，保存并检查'}</h3><p>{personalConfigured ? '更换账户时同时填写两项；留空则保留现有密钥。' : '这两项是软件连接去字幕服务的凭证，请从密钥管理页复制，不是登录密码。'}</p></div></div>
+    <div className="as-key-grid"><label>密钥 ID <span>AccessKey ID</span><input type="password" autoComplete="off" spellCheck={false} value={id} onChange={e => setId(e.target.value)} placeholder={personalConfigured ? '已保存，留空保留' : '粘贴从密钥管理页复制的 ID'} /></label><label>密钥 Secret <span>AccessKey Secret</span><input type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} placeholder={personalConfigured ? '已保存，留空保留' : '粘贴从密钥管理页复制的 Secret'} /></label></div>
     <p className="as-hint">密钥加密保存在本机，不会显示给其他用户。保存和身份检查不会提交视频。</p>
     {message && <p className="as-notice" role="status">{message}</p>}
-    <div className="as-footer"><div className="as-actions"><button className="as-primary" type="button" disabled={!loaded || busy || (!state.configured && (!id.trim() || !secret.trim()))} onClick={() => void run(async () => { setState(await bridge().save({ browserMode, accessKeyId: id, accessKeySecret: secret })); setId(''); setSecret(''); setMessage('密钥已保存，正在检查…'); const result = await bridge().verify(); setMessage(subtitleDisplayText(result.message)); })}>{busy ? '正在处理…' : '保存并检查密钥'}</button>{state.configured && <button type="button" onClick={onStart}>下一步：选择视频 →</button>}</div></div>
+    <div className="as-footer"><div className="as-actions"><button className="as-primary" type="button" disabled={!loaded || busy || (!personalConfigured && (!id.trim() || !secret.trim()))} onClick={() => void run(async () => { setState(await bridge().save({ browserMode, accessKeyId: id, accessKeySecret: secret })); setId(''); setSecret(''); setMessage('密钥已保存，正在检查…'); const result = await bridge().verify(); setMessage(subtitleDisplayText(result.message)); })}>{busy ? '正在处理…' : '保存并检查密钥'}</button></div></div>
     </section>
-    <details className="as-setup-help"><summary><ChevronDown size={14} />连接失败怎么办？</summary><p>确认已开通「视频生产」，并为创建密钥的子用户授予视频处理权限。身份检查成功仍需通过视频处理确认服务权限和余额。遇到登录跳转限制可切换系统浏览器。</p></details>
+    </ApiUsageSwitch>
+    {state.configured && <div className="as-footer"><button type="button" onClick={onStart}>下一步：选择视频 →</button></div>}
+    {state.apiMode !== 'platform_api' && <details className="as-setup-help"><summary><ChevronDown size={14} />连接失败怎么办？</summary><p>确认已开通「视频生产」，并为创建密钥的子用户授予视频处理权限。身份检查成功仍需通过视频处理确认服务权限和余额。遇到登录跳转限制可切换系统浏览器。</p></details>}
   </section></div>;
 }
 export function AliyunSubtitleBackgroundStatus({ visible, ready, notify, onOpen }: { visible: boolean; ready: boolean; notify: (message: string) => void; onOpen: () => void }) {
@@ -131,7 +143,7 @@ export function AliyunSubtitleBackgroundStatus({ visible, ready, notify, onOpen 
   const attentionJob = state.jobs.find(job => ['unknown', 'query-error', 'download-error'].includes(job.status));
   const attention = batch && (batch.paused || batch.attention);
   if (!ready || !visible || (!activeJob && !batch?.waiting && !attention && !attentionJob)) return null;
-  return <div className="as-background-status" role="status"><Film size={15} /><div><strong>{activeJob ? `去字幕正在后台处理：${activeJob.name} · ${statusNames[activeJob.status]}` : attentionJob ? `${attentionJob.name} · ${statusNames[attentionJob.status]}` : '去字幕批次需要处理'}</strong><span>{connectionError || (!activeJob && attentionJob ? subtitleDisplayText(attentionJob.message) : batch ? `已完成 ${batch.completed} / ${batch.total} · ${batch.paused ? subtitleDisplayText(batch.message) : `进度更新 ${lastUpdate || '正在读取'}`}` : `进度更新 ${lastUpdate}`)}</span></div><button type="button" onClick={onOpen}>查看进度</button></div>;
+  return <div className="as-background-status" role="status"><Film size={15} /><div><strong>{activeJob ? `去字幕正在后台处理：${activeJob.name} · ${jobStatus(activeJob)}` : attentionJob ? `${attentionJob.name} · ${jobStatus(attentionJob)}` : '去字幕批次需要处理'}</strong><span>{connectionError || (!activeJob && attentionJob ? subtitleDisplayText(attentionJob.message) : batch ? `已完成 ${batch.completed} / ${batch.total} · ${batch.paused ? subtitleDisplayText(batch.message) : `进度更新 ${lastUpdate || '正在读取'}`}` : `进度更新 ${lastUpdate}`)}</span></div><button type="button" onClick={onOpen}>查看进度</button></div>;
 }
 
 export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets, folders = [], contactAuthor, active = true }: { notify: (message: string) => void; onConfigure: () => void; onImport: (path: string) => Promise<void>; assets: { name: string; localPath?: string; sourceRoot?: string; type: string }[]; folders?: { path: string; name?: string; available?: boolean }[]; contactAuthor: ReactNode; active?: boolean }) {
@@ -147,7 +159,7 @@ export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets,
   const [recover, setRecover] = useState<Record<string, string>>({}), [drawing, setDrawing] = useState(false), [regionDraft, setRegionDraft] = useState<Region>({ ...defaultRegion });
   const draftWritable = useRef(true), saveErrorReported = useRef(false), importLock = useRef(false), entriesRef = useRef(entries);
   const video = useRef<HTMLVideoElement>(null), drawOrigin = useRef<{ x: number; y: number } | null>(null);
-  entriesRef.current = entries;
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
   const source = entries.find(entry => entry.id === activeId) || entries[0] || null;
   const jobFor = (entry: Entry) => state.jobs.find(job => job.itemId === entry.id);
   const currentJob = source ? jobFor(source) : null;
@@ -164,7 +176,7 @@ export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets,
   const displayVideos = videos.filter(asset => (!libraryFolder || subtitleInFolder(asset.localPath, libraryFolder)) && `${asset.name} ${asset.localPath || ''}`.toLowerCase().includes(libraryQuery.toLowerCase()));
   const jobs = history || !batch ? state.jobs : state.jobs.filter(job => job.batchId === batch.id);
   const validRegion = validSubtitleRegion(regionDraft);
-  const announce = (message: string) => { setFeedback(message); notify(message); };
+  const announce = useCallback((message: string) => { setFeedback(message); notify(message); }, [notify]);
   const run = async (label: string, action: () => Promise<void>) => {
     if (importLock.current) return;
     importLock.current = true; setBusy(label); setFeedback(label);
@@ -195,12 +207,22 @@ export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets,
     if (!draftReady || !draftWritable.current) return;
     try { localStorage.setItem(SUBTITLE_DRAFT_KEY, serializeSubtitleDraft({ entries, activeId, output, sync })); saveErrorReported.current = false; }
     catch { if (!saveErrorReported.current) { saveErrorReported.current = true; announce('草稿保存失败。已提交任务仍由后台保存，请检查本机存储。'); } }
-  }, [entries, activeId, output, sync, draftReady]);
-  useEffect(() => {
-    video.current?.pause(); drawOrigin.current = null; setDrawing(false);
+  }, [entries, activeId, output, sync, draftReady, announce]);
+  // Reset video-specific edits before committing a different source to the DOM.
+  // Effects below only synchronize the actual player and drag pointer resources.
+  const sourceId = source?.id || '';
+  const [renderedSourceId, setRenderedSourceId] = useState(sourceId);
+  const [wasActive, setWasActive] = useState(active);
+  if (renderedSourceId !== sourceId) {
+    setRenderedSourceId(sourceId); setDrawing(false);
     setRegionDraft(source ? { ...source.region } : { ...defaultRegion });
-  }, [source?.id]);
-  useEffect(() => { if (!active) { dragDepth.current = 0; setDragActive(false); video.current?.pause(); setDrawing(false); drawOrigin.current = null; setResult(null); setLibraryOpen(false); } }, [active]);
+  }
+  if (wasActive !== active) {
+    setWasActive(active);
+    if (!active) { setDragActive(false); setDrawing(false); setResult(null); setLibraryOpen(false); }
+  }
+  useEffect(() => { video.current?.pause(); drawOrigin.current = null; }, [sourceId]);
+  useEffect(() => { if (!active) { dragDepth.current = 0; video.current?.pause(); drawOrigin.current = null; } }, [active]);
   const updateEntry = (id: string, patch: Partial<Entry>) => setEntries(current => current.map(entry => entry.id === id ? { ...entry, ...patch } : entry));
   const commitRegion = (region: Region, mode = 'custom') => {
     if (!source || locked || !validSubtitleRegion(region)) return;
@@ -279,7 +301,7 @@ export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets,
             const job = jobFor(entry);
             return <article key={entry.id} className={`as-queue-item ${source?.id === entry.id ? 'selected' : ''}`}>
               <input type="checkbox" aria-label={`选择 ${entry.name}`} checked={entry.checked} disabled={!!busy} onChange={event => { updateEntry(entry.id, { checked: event.target.checked }); }} />
-              <button type="button" className="as-queue-select" aria-label={`查看 ${entry.name}`} onClick={() => setActiveId(entry.id)}><Film size={24} /><span><strong title={entry.name}>{entry.name}</strong><small>{entry.width} × {entry.height} · {entry.duration?.toFixed(1)} 秒</small><em className={entry.error ? 'error' : ''}>{entry.error ? '文件不可访问' : job ? statusNames[job.status] : entry.regionMode === 'shared' ? '统一区域' : entry.regionMode === 'custom' ? '单独区域' : '底部区域'}</em></span></button>
+              <button type="button" className="as-queue-select" aria-label={`查看 ${entry.name}`} onClick={() => setActiveId(entry.id)}><Film size={24} /><span><strong title={entry.name}>{entry.name}</strong><small>{entry.width} × {entry.height} · {entry.duration?.toFixed(1)} 秒</small><em className={entry.error ? 'error' : ''}>{entry.error ? '文件不可访问' : job ? jobStatus(job) : entry.regionMode === 'shared' ? '统一区域' : entry.regionMode === 'custom' ? '单独区域' : '底部区域'}</em></span></button>
               <button type="button" className="as-queue-remove" aria-label={`移除 ${entry.name}`} disabled={!!busy} onClick={() => { setEntries(current => current.filter(item => item.id !== entry.id)); if (entry.id === activeId) setActiveId(''); announce(job && activeStatuses.includes(job.status) ? '已从列表移除，后台任务仍会继续，可在进度中查看' : '视频已从列表移除，原文件保留'); }}><X size={13} /></button>
             </article>;
           })}</div>
@@ -306,14 +328,16 @@ export function AliyunSubtitleWorkbench({ notify, onConfigure, onImport, assets,
           <label className="as-consent as-sync-choice"><input type="checkbox" checked={sync} onChange={event => setSync(event.target.checked)} />完成后自动同步到媒体库</label>
           <button type="button" className="as-primary as-submit" disabled={!!busy || !draftReady || !loaded || !state.configured || !eligible.length || !directory || queueOpen || drawing || (source && !locked && !validRegion) === true} onClick={start}>{busy || (queueOpen ? batch?.paused && !batch.active ? '后续提交已暂停，请继续批次' : '当前批次正在后台运行' : !state.configured ? '请先连接去字幕服务' : !eligible.length ? '请先添加待处理视频' : `开始批量去字幕（${eligible.length} 个）`)}</button>
           {batch && (batch.waiting > 0 || batch.paused > 0 || preparing) && <div className="as-batch-controls">{batch.waiting > 0 || preparing ? <button type="button" disabled={!!busy} onClick={() => void run('正在暂停后续提交…', async () => { setState(await bridge().pauseBatch(batch.id)); announce('后续提交已暂停，已提交任务继续处理'); })}><Pause size={13} />暂停后续提交</button> : <button type="button" disabled={!!busy} onClick={() => void run('正在继续批次…', async () => { setState(await bridge().resumeBatch(batch.id)); announce('批次已继续，后台按队列处理'); })}><Play size={13} />继续批次</button>}<button type="button" disabled={!!busy} onClick={() => void run('正在取消待提交视频…', async () => { setState(await bridge().cancelPending(batch.id)); announce('待提交视频已取消，已提交任务继续查询和下载'); })}>取消待提交</button></div>}
-          <p className="as-hint">按队列逐个处理。可以切换其他栏目；请保持软件运行以自动下载。</p></section>
+          <p className="as-hint">{state.apiMode === 'platform_api' ? '按队列逐个处理。可以切换其他栏目；云端完成后自动转存保留 7 天；重新打开软件可继续下载。' : '按队列逐个处理。可以切换其他栏目；使用个人 API 时，请保持软件运行以及时下载成片。'}</p></section>
           <section className="as-card as-history"><div className="as-history-heading"><h2>进度与成片</h2><button type="button" className="as-link" onClick={() => setHistory(current => !current)}>{history ? '返回本批次' : '历史记录'}</button></div>
             {batch && !history && <div className="as-batch-progress"><strong>{batch.completed} / {batch.total} 已完成</strong><progress aria-label="本批次进度" max={batch.total} value={batch.completed + batch.failed + batch.cancelled} /><div><span>待提交 {batch.waiting + batch.paused}</span><span>处理中 {batch.active}</span><span>失败 {batch.failed + batch.attention}</span>{batch.cancelled > 0 && <span>已取消 {batch.cancelled}</span>}</div>{batch.paused > 0 && <p className="as-mixed-warning">{subtitleDisplayText(batch.message)}</p>}</div>}
             <small className="as-progress-heartbeat">{connectionError || `后台进度更新：${lastUpdate || '正在读取…'}`}</small>
-            <div className="as-job-scroll">{!jobs.length && <p className="as-hint">暂无处理记录。完成后可在这里预览成片。</p>}{jobs.map(job => <article key={job.id} className="as-job"><div className="as-job-title"><strong title={job.name}>{job.name}</strong><span className={`as-status as-status-${job.status}`}>{statusNames[job.status] || job.status}</span></div><p>{job.importError || (job.importedAt ? '成片已保存并同步到媒体库' : job.status === 'completed' && job.syncToMediaLibrary ? '成片已保存，正在同步到媒体库…' : job.message)}</p><details className="as-task-detail"><summary>任务详情</summary><small>{new Date(job.createdAt).toLocaleString()}<br />{job.jobId ? `任务编号：${job.jobId}` : '尚无云端任务编号'}</small></details><div className="as-actions">
-              {['query-error', 'download-error'].includes(job.status) && <button type="button" disabled={!!busy} onClick={() => void run('正在恢复原任务…', async () => { setState(await bridge().retry(job.id)); announce('正在继续查询或下载原任务，不会重新提交'); })}>继续查询 / 下载</button>}
+            <div className="as-job-scroll">{!jobs.length && <p className="as-hint">暂无处理记录。完成后可在这里预览成片。</p>}{jobs.map(job => <article key={job.id} className="as-job"><div className="as-job-title"><strong title={job.name}>{job.name}</strong><span className={`as-status as-status-${job.status}`}>{jobStatus(job)}</span></div><p>{subtitleDisplayText(job.importError) || (job.importedAt && job.status === 'completed' ? '成片已保存并同步到媒体库' : job.status === 'completed' && job.syncToMediaLibrary ? '成片已保存，正在同步到媒体库…' : subtitleDisplayText(job.message))}</p><details className="as-task-detail"><summary>任务详情</summary><small>{new Date(job.createdAt).toLocaleString()}<br />{job.resultRetainedUntil && <>云端保留至：{new Date(job.resultRetainedUntil * 1000).toLocaleString()}<br /></>}{job.jobId ? `任务编号：${job.jobId}` : '尚无云端任务编号'}</small></details><div className="as-actions">
+              {activeStatuses.includes(job.status) && <button type="button" disabled={!!busy} onClick={() => void run('正在刷新进度…', async () => { setState(await bridge().state()); announce('进度已刷新，服务器会继续处理原任务'); })}><RefreshCw size={12} />刷新进度</button>}
+              {job.jobId && <button type="button" disabled={!!busy} onClick={() => void run('正在复制任务编号…', async () => { await navigator.clipboard.writeText(job.jobId); announce('任务编号已复制，可提供给支持人员排查'); })}><Copy size={12} />复制任务编号</button>}
+              {['query-error', 'download-error'].includes(job.status) && <button type="button" disabled={!!busy} onClick={() => void run('正在恢复原任务…', async () => { setState(await bridge().retry(job.id)); announce('正在继续查询或下载原任务，不会重新提交'); })}>{job.status === 'download-error' ? '重新下载' : '重新查询'}</button>}
               {job.status === 'unknown' && <><input aria-label={`找回 ${job.name} 的 RequestId`} placeholder="任务 RequestId" value={recover[job.id] || ''} onChange={event => setRecover(current => ({ ...current, [job.id]: event.target.value }))} /><button type="button" disabled={!!busy || !recover[job.id]?.trim()} onClick={() => void run('正在找回原任务…', async () => { setState(await bridge().recover(job.id, recover[job.id].trim())); announce('原任务已找回，正在查询'); })}>找回并查询</button></>}
-              {job.status === 'completed' && <><button type="button" disabled={!!busy} onClick={() => void run('正在载入成片预览…', async () => { const media = await bridge().preview(job.id); if (!media) throw new Error('成片文件不可用'); setResult({ name: job.name, url: media.url }); setFeedback('成片预览已打开'); })}>预览成片</button><button type="button" disabled={!!busy || !!job.importedAt || (!!job.syncToMediaLibrary && !job.importError)} onClick={() => void run('正在同步媒体库…', async () => { await onImport(job.outputPath); setState(await bridge().imported(job.id)); announce('成片已加入媒体库'); })}>{job.importedAt ? '已同步媒体库' : job.importError ? '重试同步' : job.syncToMediaLibrary ? '正在同步…' : '加入媒体库'}</button><button type="button" disabled={!!busy} onClick={() => void run('正在打开成片文件夹…', async () => { await window.desktopBridge?.mediaRevealFile(job.outputPath); setFeedback('已打开成片所在位置'); })}>打开所在文件夹</button></>}
+              {job.status === 'completed' && <><button type="button" disabled={!!busy} onClick={() => void run('正在载入成片预览…', async () => { const media = await bridge().preview(job.id); if (!media) throw new Error('成片文件不可用'); setResult({ name: job.name, url: media.url }); setFeedback('成片预览已打开'); })}>预览成片</button><button type="button" disabled={!!busy || !!job.importedAt || (!!job.syncToMediaLibrary && !job.importError)} onClick={() => void run('正在同步媒体库…', async () => { await onImport(job.outputPath); setState(await bridge().imported(job.id)); announce('成片已加入媒体库'); })}>{job.importedAt ? '已同步媒体库' : job.importError ? '重试同步' : job.syncToMediaLibrary ? '正在同步…' : '加入媒体库'}</button><button type="button" disabled={!!busy} onClick={() => void run('正在打开成片文件夹…', async () => { await window.desktopBridge?.mediaRevealFile(job.outputPath); setFeedback('已打开成片所在位置'); })}>打开所在文件夹</button>{job.apiSelection?.apiMode === 'platform_api' && <button type="button" disabled={!!busy} onClick={() => void run('正在重新下载原成片…', async () => { setState(await bridge().retry(job.id)); announce('正在重新下载原成片，不会重新生成或扣分'); })}>重新下载</button>}</>}
             </div></article>)}</div>
             <button type="button" className="as-open-output" disabled={!!busy || !directory || (!state.jobs.some(job => subtitlePathKey(job.outputPath).startsWith(subtitlePathKey(directory).replace(/\/$/, '') + '/')) && directory !== state.defaultOutputDirectory)} onClick={() => void run('正在打开成片目录…', async () => { await bridge().openOutput(directory); setFeedback('成片目录已打开'); })}><FolderOpen size={14} />打开成片文件夹</button>
           </section></div>

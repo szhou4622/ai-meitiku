@@ -24,12 +24,12 @@ export type FeiguaBridge = {
   saveMusicTag: (path: string[]) => Promise<State>;
   saveAndRefreshMusicTag: (path: string[]) => Promise<State>;
   refreshMusicTags: () => Promise<State>;
-  login: (options?: { collectAfterLogin: boolean }) => Promise<State>;
+  login: () => Promise<State>;
   checkLogin: () => Promise<State>;
   start: () => Promise<State>;
   cancel: () => Promise<State>;
 };
-const emptyState: State = { keywords: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后自动采集' } };
+const emptyState: State = { keywords: [], videoFilterOptions: { categoryPath: [], tagPath: [] }, musicTag: [], musicTagOptions: [], musicTagOptionsLoadedAt: null, musicTagRestricted: false, latestResults: [], runs: [], busy: false, auth: { status: 'unknown', message: '登录后设置完成，手动开始采集' } };
 const savedVideoQueries = (state: State): VideoQuery[] => state.videoQueries || state.keywords.map(keyword => ({ keyword, categoryPath: [], tagPath: [] }));
 const pathLabel = (path?: string[]) => path?.join(' > ') || '全部';
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', retrying: '自动重试中', waiting: '等待新周榜', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
@@ -220,7 +220,7 @@ export function FeiguaTrends() {
     <header className={styles.heading}>
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
-        <button disabled={disabled || state.busy || loginEntryDirty || !state.loginEntryUrl} onClick={() => void perform('login', api => api.login({ collectAfterLogin: !dirty && !musicDirty && !editorDirty }))}><LogIn size={16} />打开登录入口</button>
+        <button disabled={disabled || state.busy || loginEntryDirty || !state.loginEntryUrl} onClick={() => void perform('login', api => api.login())}><LogIn size={16} />打开登录入口</button>
         {state.busy ? <button disabled={!desktop || !loaded || cancelling} onClick={() => void cancelCollection()}><Square size={14} />{cancelling ? '正在停止…' : '停止采集'}</button>
           : <button className={styles.primary} disabled={disabled || loginEntryDirty || dirty || musicDirty || editorDirty || !['authenticated','verification_required'].includes(state.auth.status)} onClick={() => void perform('start', api => api.start())}><RefreshCw size={16} />{action === 'start' ? '准备中…' : state.auth.status === 'verification_required' ? '验证后重新采集' : '开始采集'}</button>}
       </div>
@@ -231,13 +231,13 @@ export function FeiguaTrends() {
       <button type="submit" disabled={disabled || state.busy || !loginEntryDirty}>{action === 'entry-save' ? '保存中…' : '保存网址'}</button>
       <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
     </form>
-    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后设置完成，手动开始采集 · 数据保存在当前电脑</span></div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
-    <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
+    <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。本次登录手动开始采集后启用定时任务；保持应用运行，错过时间后会补采；BGM 当天成功后不再自动重复采集。</p>
 
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
@@ -283,7 +283,7 @@ export function FeiguaTrends() {
 
     <div className={styles.history}>
       <h2>采集结果</h2>
-      <span role="status">{run ? state.busy ? `${run.message} · 已有结果持续显示` : `已展示 ${displayedCount} 条采集结果` : '登录后自动采集'}</span>
+      <span role="status">{run ? state.busy ? `${run.message} · 已有结果持续显示` : `已展示 ${displayedCount} 条采集结果` : '登录后设置完成，手动开始采集'}</span>
     </div>
     <div className={styles.boards}>
       {(['music', 'topics', 'hotspots'] as Kind[]).map(kind => {

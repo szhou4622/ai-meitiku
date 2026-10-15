@@ -3,6 +3,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { PlatformTaskClient } from "../electron/platform-task-client.mjs";
+import { createPlatformOperation } from "../electron/platform-operation.mjs";
+import { reverseMedia } from "../electron/prompt-reverse.mjs";
+import { updatePromptBilling } from "../electron/prompt-billing.mjs";
 import { formatShotPrompts } from "../electron/prompt-shots.mjs";
 import {
   createPromptLibraryService,
@@ -33,6 +37,7 @@ async function fixture(t, options = {}) {
     service: createPromptLibraryService({
       userDataPath: root,
       getProfiles: async () => profiles,
+      getPlatformStatus: async () => ({ ready: true }),
       reverseMedia: async () => ({
         full: "原文",
         shots: "原逐镜",
@@ -59,6 +64,85 @@ async function readyForMigration(root, service) {
   const reversed = await service.reverse(bound.id, bound.revision);
   return service.migrate(reversed.id, reversed.revision);
 }
+
+test("points text generation confirms server quote, uses no personal key and safely reuses the original task", async t => {
+  const calls = [], seen = [], quoteId = "b".repeat(40);
+  const quote = { ok: true, app_name: "ai-media-library", quote_id: quoteId, feature: "prompt-library", provider: "volcengine",
+    points: "3.000000", expires_at: 9999999999, pricing_kind: "estimate", price_version: "synthetic",
+    billing_basis: "supplier_debit_with_zero_fallback", status: "quoted" };
+  let completed = false, confirmations = 0;
+  const client = new PlatformTaskClient({ confirm: async () => { confirmations++; return true; }, request: async (action, input) => {
+    calls.push(action); seen.push(input);
+    if (action === "quote" && !completed) return quote;
+    completed = true;
+    return { ...quote, status: "succeeded", points_used: "0.250001",
+      result: { model: "server-model", choices: [{ message: { content: "文本生成结果" } }], usage: { prompt_tokens: 10, completion_tokens: 6, total_tokens: 16 } } };
+  } });
+  const { service } = await fixture(t, {
+    getProfiles: async () => ({ provider: "volcengine", volcengine: { apiKey: "personal-key-must-not-leave", useOwnApi: false } }),
+    fetchImpl: async () => { throw new Error("personal API must not execute"); },
+    platformExecute: input => client.execute(input),
+  });
+  const imported = await service.importText("积分文本", "原始文本");
+  const item = await service.migrate(imported.id, imported.revision);
+  const payload = { id: item.id, source: "原始文本", action: "refine", mode: "template", view: "full" };
+  const first = await service.generate(payload), replay = await service.generate(payload);
+  assert.equal(first.text, "文本生成结果"); assert.equal(replay.text, first.text);
+  assert.equal(first.billing.pointsUsed, "0.250001"); assert.equal(first.usage.total, 16);
+  assert.deepEqual(calls, ["quote", "run", "quote"]); assert.equal(confirmations, 1);
+  assert.doesNotMatch(JSON.stringify(seen), /personal-key-must-not-leave|budget_cny|cost_cny/);
+  assert.equal(seen[0].request_id, seen[2].request_id);
+  assert.equal((await service.list())[0].variants.restore.full, "原始文本");
+});
+
+test("cancelled points generation never executes and awaiting bills keep the result without zero-charge claims", async t => {
+  let pending = false;
+  const { service } = await fixture(t, {
+    getProfiles: async () => ({ provider: "volcengine", volcengine: { useOwnApi: false } }),
+    platformExecute: async () => {
+      if (!pending) throw Object.assign(new Error("已取消"), { code: "PLATFORM_TASK_CANCELLED" });
+      return { result: { choices: [{ message: { content: "账单待核对结果" } }] }, quoteId: "a".repeat(40), pointsUsed: null, billingPending: true };
+    }, fetchImpl: async () => { throw new Error("must not use own API"); },
+  });
+  const imported = await service.importText("积分测试", "原文");
+  const item = await service.migrate(imported.id, imported.revision);
+  const payload = { id: item.id, source: "原文", action: "refine", mode: "template", view: "full" };
+  await assert.rejects(service.generate(payload), { code: "PLATFORM_TASK_CANCELLED" });
+  pending = true;
+  const result = await service.generate(payload);
+  assert.equal(result.text, "账单待核对结果"); assert.equal(result.billing.pointsUsed, null); assert.equal(result.billing.billingPending, true);
+});
+
+test("points output truncation retains a paid partial draft while the original prompt remains intact", async t => {
+  const { service } = await fixture(t, {
+    getProfiles: async () => ({ provider: "volcengine", volcengine: { useOwnApi: false } }),
+    platformExecute: async () => ({ result: { choices: [{ finish_reason: "length", message: { content: "半句" } }] },
+      quoteId: "a".repeat(40), pointsUsed: "1" }),
+  });
+  const imported = await service.importText("截断测试", "原文");
+  const item = await service.migrate(imported.id, imported.revision);
+  const partial = await service.generate({ id: item.id, source: "原文", action: "refine", mode: "template", view: "full" });
+  assert.equal(partial.text, '半句');
+  assert.equal(partial.quality.status, 'partial');
+  assert.equal(partial.billing.pointsUsed, '1.000000');
+  assert.equal((await service.list())[0].variants.restore.full, "原文");
+});
+
+test("closed live capabilities disable points generation before quote or any supplier call", async t => {
+  let requests = 0;
+  const { service } = await fixture(t, {
+    getProfiles: async () => ({ provider: "volcengine", volcengine: { useOwnApi: false } }),
+    getPlatformStatus: async () => ({ ready: false, reason: "积分生成服务尚未开放。" }),
+    platformExecute: async () => { requests++; },
+    fetchImpl: async () => { requests++; },
+  });
+  assert.equal((await service.status()).ready, false);
+  const imported = await service.importText("关闭状态验证", "原文");
+  const item = await service.migrate(imported.id, imported.revision);
+  await assert.rejects(service.generate({ id: item.id, source: "原文", action: "refine", mode: "template", view: "full" }),
+    error => error.code === "PLATFORM_API_UNAVAILABLE" && /未提交任务，也未扣积分/.test(error.message));
+  assert.equal(requests, 0);
+});
 function replacementMock(body, candidate, anchor) {
   const system = body.messages[0].content;
   const input = JSON.parse(body.messages[1].content[0].text);
@@ -66,6 +150,100 @@ function replacementMock(body, candidate, anchor) {
   if (system.startsWith("你是替换结果核查员")) return JSON.stringify({ passed: true, checks: { references: true, oldElementsRemoved: true, actionsAdapted: true, dialogueAdapted: true, unchangedRolesPreserved: true, noInventedClaims: true, objectContinuity: true }, issues: [] });
   return candidate;
 }
+
+test('points image reverse uses platform only, journals its receipt and preserves personal configuration', async t => {
+  const seen = [];
+  const { root, service } = await fixture(t, {
+    getProfiles: async () => ({ provider: 'volcengine', volcengine: { useOwnApi: false, apiKey: 'must-stay-local' } }),
+    reverseMedia: options => reverseMedia(options),
+    fetchImpl: async () => { throw new Error('personal API must not run'); },
+    platformExecute: async input => {
+      seen.push(input); await input.onQuoted('a'.repeat(40));
+      return { quoteId: 'a'.repeat(40), pointsUsed: '0.123457', result: { model: 'trusted-platform-model',
+        choices: [{ message: { content: '图片可见细节' } }], usage: { prompt_tokens: 1400, completion_tokens: 20, total_tokens: 1420 } } };
+    },
+  });
+  const file = path.join(root, 'source.png'); await writeFile(file, 'test-image-bytes');
+  const draft = await service.importText('积分反推', '');
+  const bound = await service.setSource(draft.id, draft.revision, file, { kind: 'image', mime: 'image/png' });
+  const result = await service.reverse(bound.id, bound.revision);
+  assert.equal(result.reverse.full, '图片可见细节');
+  assert.equal(result.reverse.billing.pointsUsed, '0.123457');
+  assert.equal(result.reverse.model, 'trusted-platform-model');
+  assert.equal(seen[0].payload.messages[1].content[0].type, 'image_url');
+  assert.doesNotMatch(JSON.stringify(seen), /must-stay-local|Authorization|apiKey/);
+});
+
+test('points reference replacement sums every paid stage and reuses logical request identities', async t => {
+  const seen = [], identities = new Map(); let next = 0;
+  const { root, service } = await fixture(t, {
+    getProfiles: async () => ({ provider: 'volcengine', volcengine: { useOwnApi: false } }),
+    fetchImpl: async () => { throw new Error('must use platform'); },
+    platformExecute: async input => {
+      seen.push(input);
+      if (!identities.has(input.requestId)) identities.set(input.requestId, (++next).toString(16).padStart(40, '0'));
+      const quoteId = identities.get(input.requestId); await input.onQuoted(quoteId);
+      return { quoteId, pointsUsed: '0.000007', result: { choices: [{ message: { content: replacementMock(input.payload, '新的蓝色杯子在桌面', '蓝色杯子') } }],
+        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } } };
+    },
+  });
+  const original = await service.importText('换图', '红色杯子在桌面');
+  const migrated = await service.migrate(original.id, original.revision);
+  const file = path.join(root, 'reference.png'); await writeFile(file, 'reference-bytes');
+  const item = await service.addMaterials(migrated.id, migrated.revision, 'product', [file]);
+  const payload = { id: item.id, source: '红色杯子在桌面', action: 'replace', mode: 'template', view: 'full', materialIds: item.materials.map(m => m.id) };
+  const first = await service.generate(payload), second = await service.generate(payload);
+  assert.equal(first.billing.pointsUsed, '0.000021');
+  assert.equal(first.billing.tasks.length, 3);
+  assert.deepEqual(first.usage, { input: 30, output: 60, total: 90 });
+  assert.equal(second.billing.pointsUsed, first.billing.pointsUsed);
+  assert.equal(identities.size, 3);
+  assert.deepEqual(seen.slice(0, 3).map(x => x.requestId), seen.slice(3).map(x => x.requestId));
+  assert.equal((await service.list())[0].variants.restore.full, '红色杯子在桌面');
+});
+
+test('replacement service keeps all its model stages inside one confirmed operation', async t => {
+  const quotes = new Map(), snapshots = [];
+  let confirmations = 0, sequence = 0;
+  const client = new PlatformTaskClient({ confirm: async options => {
+    confirmations++; assert.match(options.message, /本次最多扣除 3 积分/); return true;
+  }, request: async (action, input) => {
+    if (action === 'quote') {
+      const quoteId = (++sequence).toString(16).padStart(40, '0');
+      const quote = { ok: true, app_name: 'ai-media-library', quote_id: quoteId, feature: 'prompt-library', provider: 'volcengine',
+        points: '1', expires_at: 9999999999, pricing_kind: 'estimate', price_version: 'synthetic', billing_basis: 'supplier_usage_tariff', status: 'quoted' };
+      quotes.set(quoteId, { quote, payload: input.payload }); return quote;
+    }
+    const { quote, payload } = quotes.get(input.quote_id);
+    return { ...quote, status: 'succeeded', points_used: '0.123456', result: {
+      choices: [{ message: { content: replacementMock(payload, '新的蓝色杯子在桌面', '蓝色杯子') } }],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    } };
+  } });
+  const { root, service } = await fixture(t, {
+    getProfiles: async () => ({ provider: 'volcengine', volcengine: { useOwnApi: false } }),
+    platformExecute: input => client.execute(input),
+    createOperation: () => createPlatformOperation({ onUpdate: async value => snapshots.push(value) }),
+  });
+  const original = await service.importText('换图', '红色杯子在桌面');
+  const migrated = await service.migrate(original.id, original.revision);
+  const file = path.join(root, 'reference.png'); await writeFile(file, 'reference-bytes');
+  const item = await service.addMaterials(migrated.id, migrated.revision, 'product', [file]);
+  const generated = await service.generate({ id: item.id, source: '红色杯子在桌面', action: 'replace', mode: 'template', view: 'full', materialIds: item.materials.map(m => m.id) });
+  assert.equal(confirmations, 1); assert.equal(sequence, 3);
+  assert.equal(generated.billing.pointsUsed, '0.370368');
+  assert.equal(snapshots.at(-1).finished, true);
+  assert.equal(snapshots.at(-1).tasks.length, 3);
+  assert.equal(new Set(snapshots.map(value => value.id)).size, 1);
+});
+
+test('settling one subtask cannot advertise the whole operation as settled', () => {
+  const billing = { tasks: [{ quoteId: 'a', pointsUsed: null, billingPending: true }, { quoteId: 'b', pointsUsed: null, billingPending: true }] };
+  const first = updatePromptBilling(billing, { quoteId: 'a', pointsUsed: '0.100001' });
+  assert.equal(first.billingPending, true); assert.equal(first.pointsUsed, null);
+  const final = updatePromptBilling(first, { quoteId: 'b', pointsUsed: '0.200002' });
+  assert.equal(final.billingPending, false); assert.equal(final.pointsUsed, '0.300003');
+});
 test("prompt library follows subtitle removal in navigation and owns its protected IPC operations", () => {
   const index = featureDefinitions.findIndex(
     (entry) => entry.id === "subtitle-removal",
@@ -285,15 +463,16 @@ test("API error, truncation, empty output and incomplete configuration preserve 
       fetchImpl: async () => response,
     });
     const item = await readyForMigration(root, service);
-    await assert.rejects(
-      service.generate({
+    const generated = service.generate({
         id: item.id,
         action: "refine",
         mode: "template",
         view: "full",
         source: "原文",
-      }),
-    );
+      });
+    if (response.ok && (await response.clone().json()).choices?.[0]?.finish_reason === 'length') {
+      assert.equal((await generated).quality.status, 'partial');
+    } else await assert.rejects(generated);
     assert.equal((await service.list())[0].variants.restore.full, "原文");
   }
   let calls = 0;
@@ -320,7 +499,7 @@ test("API error, truncation, empty output and incomplete configuration preserve 
   assert.equal(calls, 0);
 });
 
-test("all editing actions receive authoritative duration and reject expanded timelines without overwriting baseline", async (t) => {
+test("all editing actions retain expanded timelines as flagged drafts without overwriting baseline", async (t) => {
   const requests = [];
   const { root, service } = await fixture(t, {
     fetchImpl: async (_url, options) => {
@@ -337,17 +516,16 @@ test("all editing actions receive authoritative duration and reject expanded tim
   });
   const item = await readyForMigration(root, service);
   for (const action of ["refine", "convert", "apply-dialogue"]) {
-    await assert.rejects(
-      service.generate({
+    const draft = await service.generate({
         id: item.id,
         mode: "template",
         view: "full",
         action,
         source: "错误旧版本 40秒",
         dialogue: "新台词",
-      }),
-      /实际时长/,
-    );
+      });
+    assert.equal(draft.quality.status, 'partial');
+    assert.match(draft.quality.issues.at(-1).message, /实际时长/);
     const input = JSON.parse(requests.at(-1).messages[1].content);
     assert.equal(input.sourceDurationSeconds, 1);
     assert.match(requests.at(-1).messages[0].content, /错误时长/);
@@ -355,12 +533,14 @@ test("all editing actions receive authoritative duration and reject expanded tim
   assert.equal((await service.list())[0].variants.restore.full, "原文");
 });
 
-test("video editing rejects API output without lighting and preserves the saved baseline", async (t) => {
+test("video editing flags missing lighting while preserving both generated draft and saved baseline", async (t) => {
   const { root, service } = await fixture(t, {
     fetchImpl: async () => Response.json({ choices: [{ message: { content: sixParts("修改结果").replace(/【光影】[^\n]*\n/, "") }, finish_reason: "stop" }] }),
   });
   const item = await readyForMigration(root, service);
-  await assert.rejects(service.generate({ id: item.id, mode: "template", view: "full", action: "refine", source: item.reverse.full }), /光影/);
+  const draft = await service.generate({ id: item.id, mode: "template", view: "full", action: "refine", source: item.reverse.full });
+  assert.equal(draft.quality.status, 'partial');
+  assert.match(draft.quality.issues.at(-1).message, /光影/);
   assert.equal((await service.list())[0].reverse.full, "原文");
 });
 
@@ -524,4 +704,32 @@ test("an attached but unreversed source still requires reversal instead of treat
   const withSource = await service.setSource(item.id, item.revision, file, { kind: "video", duration: 1 });
   await assert.rejects(service.migrate(withSource.id, withSource.revision), /先导入提示词/);
   await assert.rejects(service.generate({ action: "refine", mode: "template", view: "full", id: withSource.id, source: "原文" }), /完成原素材反推/);
+});
+
+test('queued prompts retain their chosen personal API, and later points tasks never call that key', async t => {
+  let own = true, release, calls = 0;
+  const { root, service } = await fixture(t, {
+    getProfiles: async () => ({ ...profiles, volcengine: { ...profiles.volcengine, useOwnApi: own } }),
+    taskQueueOptions: { concurrency: 1 },
+    reverseMedia: async ({ config }) => {
+      calls++;
+      assert.equal(config.apiKey, profiles.volcengine.apiKey);
+      if (calls === 1) await new Promise(resolve => { release = resolve; });
+      return { full: '模拟结果', shots: '', provider: 'test' };
+    },
+  });
+  const file = path.join(root, 'fixture.png'); await writeFile(file, 'fixture');
+  const records = [];
+  for (const name of ['first', 'second', 'third']) {
+    const item = await service.importText(name, '原文');
+    records.push(await service.setSource(item.id, item.revision, file, { kind: 'image', width: 10, height: 10 }));
+  }
+  const first = service.reverse(records[0].id, records[0].revision);
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  const second = service.reverse(records[1].id, records[1].revision);
+  own = false;
+  release(); await first; await second;
+  assert.equal(calls, 2);
+  await assert.rejects(service.reverse(records[2].id, records[2].revision), { code: 'PLATFORM_API_UNAVAILABLE' });
+  assert.equal(calls, 2);
 });

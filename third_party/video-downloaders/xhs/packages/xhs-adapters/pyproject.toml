@@ -1,6 +1,6 @@
 [project]
 name = "xhs-adapters"
-version = "3.0.0"
+version = "3.0.1"
 description = "xhs-downloader 网络、文件与持久化适配器"
 requires-python = ">=3.12"
 dependencies = [

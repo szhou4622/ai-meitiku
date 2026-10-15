@@ -55,6 +55,8 @@ test("explicit platform API choice remains separate from configured customer cre
 });
 
 test("billing defaults and eligible features are immutable", () => {
+  assert.equal(POINTS_POLICY.billingBasis, "supplier_debit_with_zero_fallback");
+  assert.equal(POINTS_POLICY.providerFreeAllowanceReducesPoints, false);
   assert.throws(() => { POINTS_POLICY.platformApiAvailable = true; }, TypeError);
   assert.throws(() => { PLATFORM_POINTS_FEATURES.push("downloads"); }, TypeError);
 });

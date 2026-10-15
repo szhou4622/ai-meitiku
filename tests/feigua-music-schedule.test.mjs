@@ -13,6 +13,7 @@ function fixture({stored={},auth='authenticated',write}={}) {
   let checks=0;const calls=[];
   const browser={checkLogin:async()=>{checks++;return{status:auth,message:auth==='authenticated'?'已登录':'请重新登录'};},collect:async(kind,_keyword,_signal,options)=>{calls.push(kind);return capture(kind,options);},stop(){}};
   const service=new FeiguaService({userDataPath:'/unused',browser,storage:{read:async()=>structuredClone(disk),write:async next=>{await write?.(next);disk=structuredClone(next);}}});
+  service.manualCollectionReady = true;
   return{service,browser,calls,disk:()=>disk,checks:()=>checks};
 }
 const clock=(t,now=atEight)=>t.mock.timers.enable({apis:['Date'],now});

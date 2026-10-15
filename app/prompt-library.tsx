@@ -7,7 +7,8 @@ import {
   formatShotPrompts,
 } from "../electron/prompt-shots.mjs";
 import { formatPromptTimeline } from "../electron/prompt-format.mjs";
-import { classifyUserAction } from "../electron/user-action-errors.mjs";
+import { classifyUserAction, isPlatformQuoteCancellation } from "../electron/user-action-errors.mjs";
+import { updatePromptBilling } from "../electron/prompt-billing.mjs";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -31,6 +32,7 @@ type View = "full" | "shots";
 type Role = "product" | "person" | "scene";
 type Action =
   "refine" | "replace" | "convert" | "extract-dialogue" | "apply-dialogue";
+type GenerationQuality = { status: 'partial' | 'complete'; issues: { part: string; index?: number; message: string }[] };
 type Material = {
   id: string;
   name: string;
@@ -50,6 +52,8 @@ export type PromptRecord = {
   updatedAt: string;
   lastUsedAt: string | null;
   materials: Material[];
+  generatedDraft?: GeneratedResult | null;
+  reverseHistory?: NonNullable<PromptRecord['reverse']>[];
   source?: {
     id: string;
     kind: "image" | "video";
@@ -65,12 +69,17 @@ export type PromptRecord = {
     provider: string;
     model: string;
     usage: Generated["usage"];
+    billing?: Generated["billing"];
     generatedAt: string;
     sourceId: string;
+    quality?: GenerationQuality;
     evidence?: { audioEvidence?: string; audioStatus?: string; audioError?: string | null; frameCount?: number };
   } | null;
 };
 type Generated = {
+  quality?: GenerationQuality;
+  billing?: { apiSource: "platform_api"; quoteId: string; pointsUsed: string | null; billingPending: boolean;
+    tasks?: { quoteId: string; pointsUsed: string | null; billingPending: boolean }[] };
   text: string;
   provider: string;
   model: string;
@@ -81,6 +90,7 @@ type Generated = {
   } | null;
 };
 export type PromptLibraryBridge = {
+  onBillingSettled?: (callback: (value: { quoteId: string; pointsUsed: string }) => void) => () => void;
   chooseSource: (
     id: string,
     revision: number,
@@ -91,13 +101,14 @@ export type PromptLibraryBridge = {
     id: string,
     revision: number,
     transcript: string,
+    repairOnly?: boolean,
   ) => Promise<PromptRecord>;
   migrate: (id: string, revision: number) => Promise<PromptRecord>;
   onProgress: (
     callback: (progress: { id: string; message: string; state?: "queued" | "running" | "retrying"; concurrency?: number }) => void,
   ) => () => void;
   list: () => Promise<PromptRecord[]>;
-  status: () => Promise<{ provider: string; ready: boolean; concurrency: number }>;
+  status: () => Promise<{ provider: string; ready: boolean; apiMode?: string; reason?: string | null; concurrency: number }>;
   save: (payload: Partial<PromptRecord>) => Promise<PromptRecord>;
   remove: (id: string, revision: number) => Promise<{ ok: boolean }>;
   visit: (id: string) => Promise<PromptRecord>;
@@ -200,7 +211,7 @@ export function PromptLibrary({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [api, setApi] = useState<{ provider: string; ready: boolean } | null>(
+  const [api, setApi] = useState<{ provider: string; ready: boolean; apiMode?: string; reason?: string | null } | null>(
     null,
   );
   const [roles, setRoles] = useState<Role[]>(["product", "person", "scene"]);
@@ -226,7 +237,7 @@ export function PromptLibrary({
   const [aiDialog, setAiDialog] = useState<Action | null>(null);
   const [concurrency, setConcurrency] = useState(3);
   const currentId = useRef(current.id);
-  currentId.current = current.id;
+  useEffect(() => { currentId.current = current.id; }, [current.id]);
   const [tasks, setTasks] = useState<Record<string, { title: string; action: Action | "reverse"; state: "queued" | "running" | "retrying"; message: string }>>({});
   const currentTask = tasks[current.id];
   const generatingAction = currentTask?.action === "reverse" ? null : currentTask?.action;
@@ -247,7 +258,6 @@ export function PromptLibrary({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [sourcePicker, setSourcePicker] = useState(false);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
-  const [reverseOpen, setReverseOpen] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [progress, setProgress] = useState("");
 
@@ -311,6 +321,14 @@ export function PromptLibrary({
   useEffect(() => {
     if (active) void bridge().status().then(status => { setApi(status); setConcurrency(status.concurrency); }).catch(failure);
   }, [active]);
+  useEffect(() => bridge().onBillingSettled?.(value => {
+    setResults(previous => Object.fromEntries(Object.entries(previous).map(([id, result]) => [id,
+      { ...result, billing: updatePromptBilling(result.billing, value) as Generated["billing"] }])));
+    const settle = (item: PromptRecord) => item.reverse?.billing
+      ? { ...item, reverse: { ...item.reverse, billing: updatePromptBilling(item.reverse.billing, value) as Generated["billing"] } } : item;
+    setItems(previous => previous.map(settle));
+    setCurrent(settle);
+  }), []);
   const previewId = current?.id;
   const sourceId = current.source?.id;
   useEffect(() => {
@@ -387,39 +405,6 @@ export function PromptLibrary({
     current?.variants.template.full ||
     "";
   const editable = !busy && !result && !currentTask;
-  useEffect(() => {
-    registerBeforeLeave(async () => {
-      if (
-        busy ||
-        resultOpen ||
-        newOpen ||
-        dialogueOpen ||
-        aiDialog ||
-        picker ||
-        deleteOpen ||
-        sourcePicker ||
-        reverseOpen ||
-        materialLightbox
-      ) {
-        notify("请先完成或关闭提示词库中的当前操作");
-        return false;
-      }
-      try {
-        await persistIfDirty();
-        return true;
-      } catch (reason) {
-        failure(reason);
-        return false;
-      }
-    });
-    return () => registerBeforeLeave(null);
-  });
-  const edit = (patch: Partial<PromptRecord>) => {
-    if (current) {
-      setCurrent({ ...current, ...patch });
-      setDirty(true);
-    }
-  };
   async function run(label: string, task: () => Promise<void>) {
     setBusy(label);
     setError("");
@@ -452,6 +437,38 @@ export function PromptLibrary({
   async function persistIfDirty() {
     if (current && dirty) await persist();
   }
+  useEffect(() => {
+    registerBeforeLeave(async () => {
+      if (
+        busy ||
+        resultOpen ||
+        newOpen ||
+        dialogueOpen ||
+        aiDialog ||
+        picker ||
+        deleteOpen ||
+        sourcePicker ||
+        materialLightbox
+      ) {
+        notify("请先完成或关闭提示词库中的当前操作");
+        return false;
+      }
+      try {
+        await persistIfDirty();
+        return true;
+      } catch (reason) {
+        failure(reason);
+        return false;
+      }
+    });
+    return () => registerBeforeLeave(null);
+  });
+  const edit = (patch: Partial<PromptRecord>) => {
+    if (current) {
+      setCurrent({ ...current, ...patch });
+      setDirty(true);
+    }
+  };
   async function add(role: Role, assetIds?: number[], droppedPaths?: string[]) {
     await run("正在添加素材…", async () => {
       const saved = await persist();
@@ -497,28 +514,33 @@ export function PromptLibrary({
   function enqueueTask(saved: PromptRecord, action: Action | "reverse", work: () => Promise<void>) {
     setTasks(previous => ({ ...previous, [saved.id]: { title: saved.title, action, state: "queued", message: "等待排队" } }));
     void work().catch(reason => {
+      if (isPlatformQuoteCancellation(reason)) {
+        notify(`「${saved.title}」已取消，本次未提交任务，也未扣积分。`);
+        if (currentId.current === saved.id) setError('');
+        return;
+      }
       const message = reason instanceof Error ? reason.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, "") : `操作失败：${typeof reason === "string" ? reason : JSON.stringify(reason) || "未提供错误原因"}`;
+      if (/已取消/.test(message)) { notify(`「${saved.title}」${message}`); return; }
       notify(`「${saved.title}」任务失败：${message}`);
       if (currentId.current === saved.id) failure(reason);
     }).finally(() => {
       setTasks(previous => { const next = { ...previous }; delete next[saved.id]; return next; });
     });
   }
-  async function reverse() {
+  async function reverse(repairOnly = false) {
     if (currentTask || busy) return;
     const submittedTranscript = transcript;
-    setReverseOpen(false);
     await run("正在提交任务…", async () => {
       const saved = await persist();
       enqueueTask(saved, "reverse", async () => {
-        const item = await bridge().reverse(saved.id, saved.revision, submittedTranscript);
+        const item = await bridge().reverse(saved.id, saved.revision, submittedTranscript, repairOnly);
         upsert(item);
         if (currentId.current === saved.id) {
           adopt(item);
           setMode("restore");
           setView("full");
         }
-        notify(`「${item.title}」反推完成，原始结果已保存到提示词库`);
+        notify(item.reverse?.quality?.status === 'partial' ? `「${item.title}」已保存生成内容，部分内容待核对，可选择仅补生成问题部分。` : `「${item.title}」反推完成，原始结果已保存到提示词库`);
       });
     });
   }
@@ -538,7 +560,7 @@ export function PromptLibrary({
           materialIds: action === "replace" ? saved.materials.filter(material => submittedRoles.includes(material.role)).map(material => material.id) : [],
         });
         setResults(previous => ({ ...previous, [saved.id]: { ...output, action, mode: submitted.mode, view: submitted.view, recordId: saved.id, dialogue: submitted.dialogue } }));
-        notify(`「${saved.title}」AI 生成完成，打开该提示词查看并采用结果`);
+        notify(output.quality?.status === 'partial' ? `「${saved.title}」生成草稿已保存，部分内容待核对，打开结果查看问题。` : `「${saved.title}」AI 生成完成，打开该提示词查看并采用结果`);
       });
     });
   }
@@ -636,15 +658,16 @@ export function PromptLibrary({
       )}
       <div className="prompt-api-status">
         <span>
-          生成 API：
+          {api?.apiMode === 'platform_api' ? '积分生成：' : '生成 API：'}
           {api
-            ? api.provider === "relay"
+            ? api.apiMode === 'platform_api' ? api.ready ? '已就绪' : '暂不可用' : api.provider === "relay"
               ? "中转 API"
               : "火山引擎"
             : loading
               ? "读取中…"
               : "暂不可用"}
-          {api && !api.ready ? " · 未配置完整" : ""}
+          {api?.apiMode === "platform_api" ? api.ready ? " · 积分模式（文本、反推与参考图替换）" : " · 积分生成暂不可用" : api && !api.ready ? " · 未配置完整" : ""}
+          {api?.apiMode === "platform_api" && !api.ready && api.reason ? ` · ${api.reason}` : ""}
         </span>
         <button
           onClick={onConfigure}
@@ -911,13 +934,13 @@ export function PromptLibrary({
                         更换原素材会重置该条目的反推结果与迁移版本。
                       </small>
                     )}
+                    {current.source && <small>{api?.apiMode === 'platform_api' ? '点击反推后确认预计积分；原始结果独立保存。' : '点击反推会将原素材发送给已配置的视觉模型，按你的 API 账户计费。'}</small>}
+                    {current.source?.kind === 'video' && <details className="prompt-transcript-supplement"><summary>补充原片台词 / 字幕（可选）</summary><p>默认使用本地 Whisper 识别中文和英文台词，中文转为简体。音乐与音效无法由转写确认。</p><label>原片实际台词<textarea value={transcript} disabled={!editable} maxLength={20000} onChange={event => setTranscript(event.target.value)} placeholder="可粘贴带时间的字幕，或原视频实际台词…" /></label></details>}
+                    {reverseRunning && <small role="status">{currentTask?.message || progress || '正在反推…'}</small>}
                     <button
                       className="primary"
                       disabled={!editable || !current.source}
-                      onClick={() => {
-                        setProgress("");
-                        setReverseOpen(true);
-                      }}
+                      onClick={() => void reverse()}
                     >
                       <Sparkles size={16} />
                       {reverseRunning
@@ -1153,16 +1176,29 @@ export function PromptLibrary({
             {mode === "restore" && current.reverse && (
               <div className="prompt-reverse-meta">
                 原始反推结果 ·{" "}
-                {current.reverse.provider === "relay" ? "中转 API" : "火山引擎"}{" "}
-                ·{" "}
+                {!current.reverse.billing && <>{current.reverse.provider === "relay" ? "中转 API" : "火山引擎"}{" "} ·{" "}
                 {current.reverse.usage
                   ? `Token 输入 ${current.reverse.usage.input ?? "未返回"} / 输出 ${current.reverse.usage.output ?? "未返回"} / 总计 ${current.reverse.usage.total ?? "未返回"}`
-                  : "API 未返回 Token 用量"}
+                  : "API 未返回 Token 用量"}</>}
+                {current.reverse.billing && <span role="status"> · {current.reverse.billing.billingPending
+                  ? '积分待核对，请查看账单，不要重复生成'
+                  : `本次使用 ${current.reverse.billing.pointsUsed} 积分`}</span>}
               </div>
             )}
             {mode === "restore" && current.reverse?.evidence?.audioStatus === "transcribed" && (
               <p className="prompt-audio-status">原片台词已由本地 Whisper 识别，中文使用简体，英文保留原文。</p>
             )}
+            {mode === 'restore' && current.reverse?.quality?.status === 'partial' && <section className="prompt-guidance" role="status" aria-label="反推结果待核对">
+              <strong>已保留生成结果，以下部分待补充或核对</strong>
+              <ul>{current.reverse.quality.issues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>
+              <p>可先复制或使用已有内容；仅在你选择补生成时继续调用模型，积分按实际回执显示。</p>
+              {current.source?.kind === 'video' && <button disabled={!editable} onClick={() => void reverse(true)}>仅补生成问题部分</button>}
+              {!!current.reverseHistory?.length && <details><summary>查看此前反推结果</summary><textarea aria-label="此前反推结果" readOnly value={current.reverseHistory.at(-1)!.full} /></details>}
+            </section>}
+            {current.generatedDraft && !result && <div className="prompt-guidance" role="status">
+              上次生成草稿已保存{current.generatedDraft.quality?.status === 'partial' ? '，部分内容待核对' : ''}。
+              <button disabled={!!busy || !!currentTask} onClick={() => { setResult({ ...current.generatedDraft!, recordId: current.id }); setResultOpen(true); }}>查看已保存草稿</button>
+            </div>}
             {mode === "restore" && current.reverse?.evidence?.audioStatus === "failed" && (
               <p className="prompt-audio-status" role="status">{current.reverse.evidence.audioError}。当前结果仅有画面证据。</p>
             )}
@@ -1370,49 +1406,6 @@ export function PromptLibrary({
           </button>,
           () => setSourcePicker(false),
         )}
-      {reverseOpen &&
-        modal(
-          "开始原素材反推",
-          <div className="prompt-dialog-content">
-            <p>
-              将原{current.source?.kind === "image" ? "图片" : "视频的抽帧画面"}
-              发送给设置中选择的
-              {api?.provider === "relay" ? "中转 API" : "火山引擎"}
-              视觉模型，按你的账户计费。原素材保存在本地，原始反推结果独立保存。
-            </p>
-            {current.source?.kind === "video" && (
-              <>
-                <p>
-                  分析全片镜头与动作；原片台词使用本地 Whisper 识别，仅支持中文和英文，中文自动转为简体，英文保留原文。音乐与音效无法通过语音转写确认。长视频可能需要数分钟。
-                </p>
-                <label>
-                  补充原片台词 / 字幕（可选）
-                  <textarea
-                    value={transcript}
-                    disabled={!!busy}
-                    maxLength={20000}
-                    onChange={(event) => setTranscript(event.target.value)}
-                    placeholder="可粘贴带时间的字幕，或原视频实际台词…"
-                  />
-                </label>
-              </>
-            )}
-            <p role="status">{busy ? progress || busy : ""}</p>
-          </div>,
-          <>
-            <button disabled={!!busy} onClick={() => setReverseOpen(false)}>
-              取消
-            </button>
-            <button
-              className="primary"
-              disabled={!!busy}
-              onClick={() => void reverse()}
-            >
-              {busy ? "正在反推…" : "开始反推"}
-            </button>
-          </>,
-          () => setReverseOpen(false),
-        )}
       {newOpen &&
         modal(
           "新建提示词",
@@ -1606,8 +1599,7 @@ export function PromptLibrary({
           }[aiDialog],
           <div className="prompt-dialog-content">
             <p>
-              当前设置：{api?.provider === "relay" ? "中转 API" : "火山引擎"}
-              。本次会发送原提示词
+              {api?.apiMode === 'platform_api' ? '本次使用积分生成。根据原提示词' : '本次会发送原提示词'}
               {aiDialog === "replace"
                 ? "和已选类别的参考图片"
                 : aiDialog === "apply-dialogue"
@@ -1622,7 +1614,7 @@ export function PromptLibrary({
                 maxLength={8000}
                 disabled={!!busy}
                 onChange={(event) => setInstructions(event.target.value)}
-                placeholder="如：保留原有节奏，强化产品细节与自然光线"
+                placeholder={aiDialog === "replace" ? "可留空，直接点击开始生成；有额外要求时再填写" : "如：保留原有节奏，强化产品细节与自然光线"}
               />
             </label>
           </div>,
@@ -1632,7 +1624,7 @@ export function PromptLibrary({
             </button>
             <button
               className="primary"
-              disabled={!!busy}
+              disabled={!!busy || api?.ready !== true}
               onClick={() => void generate(aiDialog)}
             >
               {busy || "开始生成"}
@@ -1646,13 +1638,16 @@ export function PromptLibrary({
           "AI 生成结果",
           <div className="prompt-dialog-content">
             <p>
-              {result.provider === "relay" ? "中转 API" : "火山引擎"} ·{" "}
+              {!result.billing && <>{result.provider === "relay" ? "中转 API" : "火山引擎"} ·{" "}
               {result.model}
+              </>}
             </p>
+            {result.quality?.status === 'partial' && <div className="prompt-guidance" role="status"><strong>已生成草稿，部分内容待核对</strong><ul>{result.quality.issues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul><p>已有内容已保存，可以复制、编辑或采用；不会自动重做或追加生成。</p></div>}
+            {result.billing && <p role="status">{result.billing.billingPending ? '积分结算待核对，请查看原任务账单。' : `本次已确认使用 ${result.billing.pointsUsed} 积分。`}</p>}
             <p>
-              {result.usage
+              {!result.billing && (result.usage
                 ? `Token：输入 ${result.usage.input ?? "未返回"} / 输出 ${result.usage.output ?? "未返回"} / 总计 ${result.usage.total ?? "未返回"}`
-                : "API 未返回 Token 用量"}
+                : "API 未返回 Token 用量")}
             </p>
             <textarea
               aria-label="生成结果"

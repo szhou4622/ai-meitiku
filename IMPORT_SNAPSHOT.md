@@ -1,5 +1,7 @@
 # Source import snapshot
 
+Current source synchronization: **1.1.28 / 2026-10-15**. Earlier sections below are historical stage records; see the final section for the current scope and verification.
+
 - Imported at: 2026-10-01 (Asia/Tokyo)
 - Source baseline: local AI Media Library working tree based on commit `835d8e0`
 - Source files inventoried: 533
@@ -42,7 +44,7 @@ and the large bundled classifier/downloader/model/tool runtimes described in
 - No production deployment, service restart, database migration, or production
   configuration change is part of this integration.
 
-## Latest local source synchronization (2026-10-09, Asia/Tokyo)
+## Historical local source synchronization (2026-10-09, Asia/Tokyo)
 
 - Application version: `1.1.19`.
 - Remote baseline: `994715eb0243d86602a6c7239c686c2c1f0ba771` (PR #7).
@@ -94,3 +96,56 @@ database, or deployment was changed. Local credentials, login entries/sessions,
 user databases, real logs, caches, screenshots, temporary files, and large
 runtime/model payloads are excluded. Existing source contract/candidate files
 are retained as source evidence, not deployed server changes.
+
+## Current local source synchronization (2026-10-15, Asia/Tokyo)
+
+- Application version: `1.1.28`.
+- Publication continues PR #9 on `codex/latest-source-20261009`, based on its
+  existing `530fff7` head; this is an additive commit, with no history rewrite.
+- Input: the immutable source used by the locally validated Windows 1.1.28
+  package, frozen at 2026-10-15T16:14:27.992132+09:00 (the exact manifest timestamp
+  and digest below are authoritative).
+- Canonical packaging manifest SHA-256:
+  `312869c6b710314b02b3ca136ad27746202d5a84a62471ac56e00f1a4a2f1e0a`.
+- Public inventory: 721 files, excluding this self-referential record.
+- Public inventory SHA-256: `b47764c5c9b79e292612b4d1cc0c13d0db214d848496283b09869dc970abb49c`.
+
+This snapshot includes the current customer/platform API selection, points
+wallet and operation receipts, expired-quote recovery, partial generation
+preservation, Qianchuan account/synchronization fixes, subtitle result recovery
+and resumable download, generated-result layout, and the preview-stream and
+subtitle lifecycle fixes. Application-specific platform/points Python modules
+and their synthetic tests are included; shared production-server references,
+actual production configurations, deployment helpers and receipts are excluded.
+
+Remote repository governance, manual-only installer publication, and its
+cross-platform runtime-import test assertion were preserved. Trailing
+whitespace and extra EOF blank lines were normalized only in the public
+export; no canonical working files were reset, switched, or overwritten.
+Dependencies, large bundled runtimes, installer binaries, live account data,
+credentials, local databases, logs and acceptance artifacts are not published.
+
+Verification of the prepared public snapshot:
+
+- TypeScript and production build: passed.
+- Full Node suite: 1005 passed, 0 failed.
+- Existing CI command (Feigua/features/runtime contracts): 228 passed.
+- XHS Python regressions: 6 passed.
+- Application-specific platform Python regressions: 159 passed.
+- Application-specific points Python regressions: 38 passed.
+- Electron runtime import preflight: 101 files checked, passed.
+- Repository hygiene, staged whitespace and literal-credential review: passed.
+
+Tests used existing local dependencies and temporary symlinks to frozen runtime
+assets; these links were removed before staging. XHS Python tests used the
+existing downloader environment rather than the dependency-free system Python.
+Platform vault tests used the real `/private/tmp` directory on macOS, preserving
+symlink rejection behavior. No live inference, production deployment, license
+mutation or account redemption was performed for this source publication.
+
+The local Windows installer is 1,000,531,338 bytes; SHA-256:
+`d436532f7eeaefc439e568de6c841a9e8ca3508a5d05db4ab22984e5de29f476`.
+Its payload, code consistency and credential-exclusion checks passed. It is
+unsigned and has not undergone Windows-device installation/upgrade acceptance.
+It is not uploaded by this source synchronization. A source push is not a main
+branch merge or a production release; see PR #9 for its current CI/merge status.

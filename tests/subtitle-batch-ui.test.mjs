@@ -9,15 +9,21 @@ import { renderToStaticMarkup } from 'react-dom/server';
 test('batch screen renders complete controls without monetary estimates and is kept mounted across navigation', async () => {
   const source=await readFile(new URL('../app/aliyun-subtitle.tsx',import.meta.url),'utf8');
   const modulePath=new URL(`../app/.subtitle-ui-${randomUUID()}.mjs`,import.meta.url);
+  const switchPath=new URL(`../app/.subtitle-switch-${randomUUID()}.mjs`,import.meta.url);
   try {
-    await writeFile(modulePath,ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
+    const compilerOptions={jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext};
+    await writeFile(switchPath,ts.transpileModule(await readFile(new URL('../app/api-usage-switch.tsx',import.meta.url),'utf8'),{compilerOptions}).outputText);
+    await writeFile(modulePath,ts.transpileModule(source,{compilerOptions}).outputText.replace('"./api-usage-switch"',JSON.stringify(switchPath.href)));
     const {AliyunSubtitleWorkbench,AliyunSubtitleSettings}=await import(modulePath.href);
     const settingsHtml=renderToStaticMarkup(createElement(AliyunSubtitleSettings,{notify(){},onStart(){}}));
     assert.doesNotMatch(settingsHtml,/阿里云|AliyunVIAPIFullAccess/);
     assert.doesNotMatch(settingsHtml.replace(/<[^>]*>/g,''),/aliyun/i);
-    for(const label of ['首次使用：连接去字幕服务','AccessKey ID','AccessKey Secret','保存并检查密钥','云服务账户支付'])assert.ok(settingsHtml.includes(label),label);
+    for(const label of ['首次使用：连接去字幕服务','使用自己的 API','云服务账户付费'])assert.ok(settingsHtml.includes(label),label);
+    // SSR has not loaded the API mode yet: credential fields must remain hidden.
+    assert.ok(!settingsHtml.includes('AccessKey ID'));
+    for(const label of ['AccessKey ID','AccessKey Secret','保存并检查密钥'])assert.ok(source.includes(label),label);
     assert.doesNotMatch(settingsHtml, /as-connect-steps|去开通服务|去获取密钥|重新查看开通与密钥获取步骤/);
-    assert.ok(settingsHtml.includes('粘贴密钥，保存并检查'));
+    assert.ok(source.includes('粘贴个人密钥，保存并检查'));
     const settingsSource=source.slice(source.indexOf('export function AliyunSubtitleSettings'),source.indexOf('export function AliyunSubtitleBackgroundStatus'));
     assert.doesNotMatch(settingsSource,/阿里云|AliyunVIAPIFullAccess/);
     assert.doesNotMatch(settingsHtml,/官方接入说明/);
@@ -49,5 +55,5 @@ test('batch screen renders complete controls without monetary estimates and is k
     assert.match(page, /desktopRecordAsset\(record, imported.sourceKind, SUBTITLE_RESULT_COLLECTION,/);
     assert.ok(!page.includes('desktopRecordAsset(record, imported.sourceKind, "阿里云去字幕"'));
     assert.match(source,/onChange\?\.\(next/);
-  }finally{await rm(modulePath,{force:true});}
+  }finally{await rm(modulePath,{force:true});await rm(switchPath,{force:true});}
 });

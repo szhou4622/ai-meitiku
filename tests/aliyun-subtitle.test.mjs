@@ -29,6 +29,8 @@ test('historical status copy is neutral while credentials, task identifiers and 
   assert.doesNotMatch(subtitleDisplayDirectory('/Downloads/阿里云去字幕'), /阿里云/);
   assert.equal(subtitleDisplayDirectory('/Downloads/成片'), '/Downloads/成片');
   assert.doesNotMatch(subtitleDisplayText('阿里云处理中'), /阿里云/);
+  assert.doesNotMatch(subtitleDisplayText('ALIYUN_TIMEOUT: https://x.aliyuncs.com/file?secret=unsafe'), /aliyun|aliyuncs|secret|https:/i);
+  assert.doesNotMatch(subtitleDisplayText('MiniMax / 火山引擎 / volcengine 返回失败'), /MiniMax|火山|volcengine/i);
 });
 function store() {
   const files = new Map();
@@ -267,4 +269,131 @@ test('unchecked job stays opt-out and failed marker write cannot claim import su
   const job = service.jobs[0]; assert.equal(job.syncToMediaLibrary, false);
   secureStore.writeEncrypted = async () => { throw new Error('disk full'); };
   await assert.rejects(service.markImported(job.id)); assert.equal(job.importedAt, null);
+});
+
+test('points mode refuses personal credentials before submission, while an existing personal task keeps querying', async t => {
+  let own = true;
+  const { service, submit, submissions } = await setup(t, { getApiSelection: async () => ({ provider: 'aliyun', apiMode: own ? 'customer_api' : 'platform_api', usesSoftwarePoints: !own }) });
+  own = false;
+  await assert.rejects(submit(), { code: 'PLATFORM_API_UNAVAILABLE' });
+  await assert.rejects(service.verify(), { code: 'PLATFORM_API_UNAVAILABLE' });
+  assert.equal(submissions(), 0);
+  assert.equal(service.jobs.length, 0);
+  assert.equal(service.publicState().configured, false);
+  own = true;
+  await submit(); await flush();
+  assert.equal(service.jobs[0].apiSelection.apiMode, 'customer_api');
+  own = false;
+  await service.tick();
+  assert.equal(service.jobs[0].status, 'completed');
+  assert.equal(submissions(), 1);
+  await assert.rejects(submit(), { code: 'PLATFORM_API_UNAVAILABLE' });
+});
+
+test('a queued subtitle batch keeps the original personal mode for each file after a switch change', async t => {
+  let own = true;
+  const { service, directory, submissions } = await setup(t, { getApiSelection: async () => ({ provider: 'aliyun', apiMode: own ? 'customer_api' : 'platform_api', usesSoftwarePoints: !own }) });
+  await service.startBatch({ consent: true, outputDirectory: directory, entries: [{ path: path.join(directory, 'one.mp4'), region }, { path: path.join(directory, 'two.mp4'), region }] });
+  own = false;
+  await flush();
+  for (let i = 0; i < 5; i++) { await service.tick(); await flush(); }
+  assert.equal(submissions(), 2);
+  assert.ok(service.jobs.every(job => job.apiSelection.apiMode === 'customer_api' && job.status === 'completed'));
+});
+
+test('platform subtitles persist the quote before running and never use saved personal keys', async t => {
+  const calls = [];
+  const quoteId = 'a'.repeat(40);
+  const { service, submit, submissions, directory } = await setup(t, {
+    getApiSelection: async () => ({ provider: 'aliyun', apiMode: 'platform_api', usesSoftwarePoints: true }),
+    getPlatformStatus: async () => ({ ready: true }),
+    platformUpload: async filePath => { assert.equal(path.extname(filePath), '.mp4'); return { upload_id: 'b'.repeat(48) }; },
+    platformExecute: async input => { calls.push(input); await input.onQuoted(quoteId); return { quoteId, result: { VideoUrl: 'https://bucket.aliyuncs.com/test.mp4' }, billingPending: true }; },
+    platformStatus: async () => { throw new Error('stored result already available'); },
+  });
+  await writeFile(path.join(directory, 'video.mp4'), 'test bytes');
+  await submit();
+  for (let i = 0; i < 30 && service.jobs[0].status === 'submitting'; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  await service.tick();
+  assert.equal(service.jobs[0].status, 'completed');
+  assert.equal(service.jobs[0].jobId, quoteId);
+  assert.equal(service.jobs[0].billingPending, true);
+  assert.equal(submissions(), 0);
+  assert.equal(calls.length, 1); assert.equal(calls[0].feature, 'subtitle-removal');
+  assert.equal(calls[0].payload.apiKey, undefined);
+  assert.equal(calls[0].payload.video, undefined);
+  assert.equal(calls[0].payload.upload_id, 'b'.repeat(48));
+});
+
+test('platform upload failure pauses safely before quoting and does not become an uncertain paid task', async t => {
+  let quotes=0;
+  const {service,submit,directory}=await setup(t,{
+    getApiSelection:async()=>({provider:'aliyun',apiMode:'platform_api',usesSoftwarePoints:true}),
+    getPlatformStatus:async()=>({ready:true}),platformUpload:async()=>{throw new Error('synthetic upload timeout');},
+    platformExecute:async()=>{quotes++;},platformStatus:async()=>({}),
+  });
+  await writeFile(path.join(directory,'video.mp4'),'test bytes');await submit();
+  for(let i=0;i<30&&service.jobs[0].status==='submitting';i++)await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(service.jobs[0].status,'paused');assert.equal(quotes,0);
+  assert.match(service.jobs[0].message,/未冻结或扣除积分/);assert.ok(!service.jobs[0].jobId);
+});
+
+test('lost quote response resumes with identical uploaded bytes and logical request identity', async t => {
+  let uploads=0;const quotes=[];
+  const {service,submit,directory}=await setup(t,{
+    getApiSelection:async()=>({provider:'aliyun',apiMode:'platform_api',usesSoftwarePoints:true}),
+    getPlatformStatus:async()=>({ready:true}),platformUpload:async()=>{uploads++;return {upload_id:'c'.repeat(48)};},
+    platformExecute:async input=>{quotes.push(input);if(quotes.length===1)throw new Error('lost quote response');
+      await input.onQuoted('d'.repeat(40));return {quoteId:'d'.repeat(40),result:{VideoUrl:'https://bucket.aliyuncs.com/test.mp4'}};},
+    platformStatus:async()=>({}),
+  });
+  await writeFile(path.join(directory,'video.mp4'),'test bytes');await submit();
+  for(let i=0;i<30&&service.jobs[0].status==='submitting';i++)await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(service.jobs[0].status,'paused');await flush();await service.resumeBatch(service.jobs[0].batchId);
+  for(let i=0;i<30&&!service.jobs[0].jobId;i++)await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(uploads,1);assert.equal(quotes.length,2);assert.equal(quotes[0].requestId,quotes[1].requestId);
+  assert.deepEqual(quotes[0].payload,quotes[1].payload);assert.equal(service.jobs[0].jobId,'d'.repeat(40));
+});
+
+test('confirmed platform failure is terminal and pauses remaining batch without claiming it is free', async t => {
+  const {service} = await setup(t);
+  const job={id:'synthetic-failed',batchId:'one',status:'submitting',jobId:'a'.repeat(40),apiSelection:{apiMode:'platform_api'}};
+  const waiting={id:'synthetic-next',batchId:'one',status:'waiting'};
+  service.jobs=[job,waiting];
+  await service.finishSubmit(job,{submit:async()=>{throw Object.assign(new Error('private'),{terminalFailure:true,billingPending:true});}});
+  assert.equal(job.status,'failed'); assert.equal(waiting.status,'paused');
+  assert.equal(job.billingPending,true); assert.match(job.message,/结算待核对/);
+  assert.doesNotMatch(job.message,/未扣|免费|aliyun|private/i);
+});
+
+test('retry download refreshes cached platform URL and never quotes or generates again', async t => {
+  let queries=0, downloads=0;
+  const {service,directory}=await setup(t,{
+    platformExecute:async()=>{throw new Error('must not generate');},
+    platformUpload:async()=>{throw new Error('must not upload');},
+    platformStatus:async()=>{queries++;return {status:'succeeded',result:{VideoUrl:'https://test.aliyuncs.com/fresh.mp4',download_expires_at:Date.now()/1000+900,size_bytes:12,sha256:'checked-hash'}};},
+    download:async(url,output,options)=>{downloads++;assert.match(url,/fresh.mp4/);assert.equal(options.expectedSize,12);await writeFile(output,'local-result');return {sizeBytes:12,sha256:'checked-hash'};},
+  });
+  const job={id:'download-test',jobId:'a'.repeat(40),status:'download-error',apiSelection:{apiMode:'platform_api'},
+    outputPath:path.join(directory,'retry.mp4'),platformResult:{VideoUrl:'https://test.aliyuncs.com/expired.mp4'}};
+  service.jobs=[job];await service.retry(job.id);await service.tick();
+  assert.equal(job.status,'completed');assert.equal(queries,1);assert.equal(downloads,1);
+  assert.match(job.platformResult.VideoUrl,/fresh/);
+});
+
+test('expired retained output reports download state without resubmitting paid generation', async t => {
+  const {service}=await setup(t,{platformExecute:async()=>{throw new Error('must not generate');},platformUpload:async()=>{},
+    platformStatus:async()=>({status:'succeeded',result:{download_error:'SUBTITLE_RESULT_EXPIRED'}})});
+  const job={id:'expired-output',jobId:'b'.repeat(40),status:'download-error',apiSelection:{apiMode:'platform_api'}};
+  service.jobs=[job];await service.retry(job.id);await service.tick();
+  assert.equal(job.status,'download-error');assert.match(job.message,/暂存已过期/);assert.doesNotMatch(job.message,/aliyun/i);
+});
+
+test('restart during a confirmed platform task queries the durable quote without reconnecting or resubmitting',async t=>{
+ const context=await setup(t);const {secureStore,directory}=context;context.service.shutdown();
+ const id='c'.repeat(40);let queries=0,executions=0;
+ await secureStore.writeEncrypted('aliyun-subtitle-jobs.v1.bin',JSON.stringify([{id:'restart',jobId:id,status:'submitting',platformPhase:'retrieving',apiSelection:{apiMode:'platform_api'},name:'video.mp4',sourcePath:path.join(directory,'video.mp4'),outputPath:path.join(directory,'result.mp4')} ]));
+ const restarted=await new AliyunSubtitleService({secureStore,probe:async()=>({duration:5}),getApiSelection:async()=>({apiMode:'platform_api'}),getPlatformStatus:async()=>({ready:true}),platformUpload:async()=>{throw new Error('must not upload');},platformExecute:async()=>{executions++;throw new Error('must not submit');},platformStatus:async quote=>{assert.equal(quote,id);queries++;return {status:'executing',transfer:{phase:'storing'}};}}).initialize();
+ t.after(()=>restarted.shutdown());assert.equal(restarted.jobs[0].status,'processing');
+ await restarted.refresh(restarted.jobs[0]);assert.equal(queries,1);assert.equal(executions,0);assert.match(restarted.jobs[0].message,/转存/);
 });

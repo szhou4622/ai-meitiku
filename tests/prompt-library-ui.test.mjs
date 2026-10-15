@@ -85,6 +85,16 @@ test("first entry displays media reverse workflow and keeps output tabs beside m
     assert.ok(imageHtml.includes("整片提示词"));
     assert.ok(!imageHtml.includes("逐镜提示词"));
     assert.ok(imageHtml.includes("反推图片提示词"));
+    const videoHtml = renderToStaticMarkup(createElement(PromptLibrary, {
+      assets: [], notify() {}, onConfigure() {}, contactAuthor: null, registerBeforeLeave() {},
+      initialRecord: { id: 'video', title: '视频', tags: '', dialogue: '', favorite: false, variants: { restore: { full: '', shots: '' }, template: { full: '', shots: '' } }, revision: 1, createdAt: '', updatedAt: '', lastUsedAt: null, materials: [], source: { id: 'source-video', kind: 'video', name: 'interview.mp4' } },
+    }));
+    assert.ok(videoHtml.includes('反推原视频提示词'));
+    assert.match(videoHtml, /<details[^>]*prompt-transcript-supplement[\s\S]*补充原片台词/);
+    assert.ok(videoHtml.includes('原片实际台词'));
+    assert.ok(!videoHtml.includes('开始原素材反推'));
+    assert.ok(!videoHtml.includes('aria-modal="true"'));
+
   } finally {
     await rm(modulePath, { force: true });
   }

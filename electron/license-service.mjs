@@ -1,5 +1,6 @@
 import { assertMachineIdentityUsable } from "./machine-code.mjs";
 import { LICENSE_CONFIG } from "./license-config.mjs";
+import { POINTS_APP_NAME, pointsPayload, pointsError, decodePointsResponse } from "./points-client.mjs";
 import { secureStorageErrorMessage } from "./license-secure-store.mjs";
 import { createOfflineGrant, verifyAndAdvanceOfflineGrant } from "./license-offline-grace.mjs";
 import { featureRegistry, requireFeatureAccess, resolveEntitlements } from "./feature-registry.mjs";
@@ -524,7 +525,7 @@ export class LicenseService {
     }
   }
 
-  async request(pathname, options = {}) {
+  async request(pathname, options = {}, attempt = 0) {
     const startedAt = this.now();
     const method = String(options.method || "GET").toUpperCase();
     this.diagnostic("info", "network", `开始请求 ${method} ${pathname}`, { endpoint: pathname, method });
@@ -543,6 +544,15 @@ export class LicenseService {
         signal: AbortSignal.timeout(12000),
       });
     } catch (error) {
+      const errorCode = error?.code || error?.cause?.code || "";
+      // Retry only the read-only status query. Never replay activation, renewal,
+      // unbind, or points mutations after an ambiguous transport failure.
+      if (method === "GET" && pathname === "/device/status" && attempt === 0
+        && ["ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT"].includes(errorCode)) {
+        this.diagnostic("warning", "network", "授权状态查询连接中断，正在重试一次", { endpoint: pathname, method, errorCode, attempt: 1, cause: error?.cause });
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return this.request(pathname, options, attempt + 1);
+      }
       this.diagnostic("error", "network", `请求失败 ${method} ${pathname}`, {
         endpoint: pathname,
         method,
@@ -916,6 +926,47 @@ export class LicenseService {
 
   // Enabled only after a compatible server explicitly advertises atomic
   // two-deadline redemption. An old /time/renew must never consume a VIP code.
+  async requestPoints(action, input = {}) {
+    if (this.config.appName !== POINTS_APP_NAME) throw pointsError("APP_SCOPE_MISMATCH");
+    const payload = pointsPayload(action, input);
+    if (action === "redeem" && this.previewAllFeatures) {
+      throw pointsError("POINTS_PREVIEW_REDEMPTION_DISABLED", "源码预览不提交真实积分码，请使用正式客户端兑换。");
+    }
+    let credential = await this.secureStore.readCredential();
+    if (!hasRefreshableCredential(credential)) {
+      throw pointsError("POINTS_CREDENTIAL_REQUIRED", "本机缺少设备凭证，请先完成设备授权验证。");
+    }
+    const rotate = async () => {
+      if (!this.pointsSessionRefreshPromise) {
+        this.pointsSessionRefreshPromise = this.refreshDeviceSession(credential)
+          .finally(() => { this.pointsSessionRefreshPromise = null; });
+      }
+      const refresh = await this.pointsSessionRefreshPromise;
+      if (!refresh.ok || !hasCompleteCredential(refresh.credential)) {
+        throw pointsError("DEVICE_AUTH_FAILED", "设备会话恢复未完成，请检查网络后重新验证。");
+      }
+      credential = refresh.credential;
+    };
+    if (!hasCompleteCredential(credential)) await rotate();
+    const accountId = credential.codeId;
+    if (action === "redeem") {
+      payload.request_id = createHash("sha256").update(`aiml-points-redeem-v1\0${accountId}\0${payload.code}`).digest("hex");
+    }
+    const send = () => this.request(`/ai-media-library/points/${action}`, {
+      method: "POST", headers: this.credentialHeaders(credential), body: JSON.stringify(payload),
+    });
+    let result = await send();
+    if (result.response.status === 401) {
+      await rotate();
+      if (credential.codeId !== accountId) throw pointsError("DEVICE_CHANGED");
+      result = await send();
+    }
+    if (!result.response.ok || result.body?.ok !== true) {
+      throw pointsError(String(result.body?.error_code || "POINTS_REQUEST_FAILED"));
+    }
+    return decodePointsResponse(result.body, action);
+  }
+
   async redeemTimeCode(activationCode, { allowExpired = false, credential: suppliedCredential = null } = {}) {
     if (!allowExpired) {
       this.assertAuthorized();

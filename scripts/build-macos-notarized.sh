@@ -174,6 +174,7 @@ notarize_one() {
   fi
 
   print "[5/7] 检查 $arch 视频下载运行时"
+  node "$PROJECT_ROOT/scripts/rebuild-macos-xhs-downloader.mjs" "$arch"
   node "$PROJECT_ROOT/scripts/verify-video-downloader-assets.mjs" "darwin-$arch"
   if [[ -n "${ELECTRON_DIST_ARCHIVE_DIR:-}" ]]; then
     local electron_version electron_zip_name electron_zip expected_sha actual_sha

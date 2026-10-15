@@ -1032,7 +1032,7 @@ test("packages a self-contained desktop app with a stable loopback origin", asyn
   assert.match(main, /const classifierMediaExtensions = new Set/);
   assert.match(main, /mediaCounts: classifierMediaCounts\(records\)/);
   assert.match(main, /没有可发送到素材工作台的图片或视频/);
-  assert.match(main, /buildClassifierRuntimeEnvironment\(process\.env, profiles, provider\)/);
+  assert.match(main, /buildClassifierRuntimeEnvironment\(process\.env, engineProfiles, provider\)/);
   assert.match(main, /env: environment/);
   assert.match(main, /classification_mode: payload\.mode/);
   assert.match(main, /classifier-generate-template-draft/);
@@ -1054,7 +1054,10 @@ test("packages a self-contained desktop app with a stable loopback origin", asyn
   assert.match(main, /\/__media\//);
   assert.match(main, /"Accept-Ranges": "bytes"/);
   // v3 身份采集必须排在首屏之后，且不得被 await
-  assert.match(main, /await createMainWindow\(\);\n\s*\/\/[^\n]*\n\s*const factorCollection = machineIdentityService\?\.start\(\);/);
+  const startup = main.slice(main.indexOf("await createMainWindow();"));
+  assert.match(startup, /const factorCollection = machineIdentityService\?\.start\(\);/);
+  assert.ok(startup.indexOf("const factorCollection") > 0);
+  assert.doesNotMatch(startup.slice(0, startup.indexOf("const factorCollection")), /await machineIdentityService/);
   assert.match(main, /factorCollection\.then\(\(\) => \{[\s\S]{0,900}identityObserveCoordinator\?\.maybeSend\(\)/);
   assert.doesNotMatch(main, /await machineIdentityService/);
   assert.match(main, /machineIdentity: machineIdentityService/);
@@ -1311,27 +1314,30 @@ test("provides user-owned API settings for classification and MiniMax", async ()
   assert.match(page, /const \[volcengineKey, setVolcengineKey\]/);
   assert.match(page, /const \[relayKey, setRelayKey\]/);
   assert.doesNotMatch(page, /const \[classificationKey, setClassificationKey\]/);
-  assert.match(page, /MiniMax 声音克隆/);
+  assert.match(page, /<h2>声音服务<\/h2>/);
+  assert.match(page, /value="MiniMax" readOnly/);
   assert.match(page, /测试分类模型连接/);
   assert.match(page, /测试 MiniMax 连接/);
   assert.match(page, /apiSettingsTest/);
   assert.match(page, /请补全必填项；保存时会校验格式/);
-  assert.match(page, /软件直接请求所选模型服务，不经过统一中转后台/);
+  assert.match(page, /开关立即保存；切换仅影响后续任务，已开始的任务沿用原方式/);
   assert.match(main, /const VOLCENGINE_API_BASE_URL = "https:\/\/ark\.cn-beijing\.volces\.com\/api\/v3"/);
   assert.match(main, /registerProtectedHandle\("api-settings-get"/);
   assert.match(main, /registerProtectedHandle\("api-settings-save"/);
   assert.match(main, /registerProtectedHandle\("api-settings-test"/);
   assert.match(main, /function normalizeApiKey/);
   assert.match(main, /function normalizeVolcengineEndpoint/);
-  assert.match(main, /const API_SETTINGS_STORE_FILE = "api-settings\.v1\.bin"/);
+  const customerProfiles = await readFile(new URL("../electron/customer-api-profiles.mjs", import.meta.url), "utf8");
+  assert.match(main, /import \{ API_SETTINGS_STORE_FILE, loadCustomerProfiles/);
+  assert.match(customerProfiles, /export const API_SETTINGS_STORE_FILE = "api-settings\.v1\.bin"/);
   assert.match(main, /async function loadClassificationProfiles/);
-  assert.match(main, /stored\?\.volcengine\?\.endpointId/);
-  assert.match(main, /stored\?\.relay\?\.baseUrl/);
+  assert.match(customerProfiles, /stored\?\.volcengine\?\.endpointId/);
+  assert.match(customerProfiles, /stored\?\.relay\?\.baseUrl/);
   assert.match(main, /profiles\.volcengine\.apiKey/);
   assert.match(main, /profiles\.relay\.apiKey/);
   assert.match(main, /writeEncrypted\(API_SETTINGS_STORE_FILE, JSON\.stringify\(profiles\)\)/);
   assert.match(main, /ensureClassifierUserConfig/);
-  assert.match(main, /buildClassifierRuntimeEnvironment\(process\.env, profiles, provider\)/);
+  assert.match(main, /buildClassifierRuntimeEnvironment\(process\.env, engineProfiles, provider\)/);
   assert.doesNotMatch(main, /writeFile\(path\.join\([^\n]*\.env[^\n]*ARK_API_KEY/);
   assert.match(main, /Endpoint ID 格式不正确/);
   assert.match(main, /chat\/completions/);
@@ -1355,7 +1361,8 @@ test("provides a restricted recoverable desktop update workflow", async () => {
   const updater = await readFile(new URL("../electron/update-service.mjs", import.meta.url), "utf8");
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-  assert.equal(packageJson.version, "1.1.19");
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(packageJson.build.appId, "com.meixiaoqian.ai-media-library");
   assert.equal(packageJson.dependencies.semver, "^7.7.4");
   assert.match(updater, /UPDATE_APP_NAME = "ai-media-library"/);
   assert.match(updater, /UPDATE_BASE_URL = "https:\/\/update\.dadaozixun\.com"/);

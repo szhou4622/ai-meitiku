@@ -1,11 +1,15 @@
 "use client";
+import { ApiUsageSwitch, type ApiProvider, type ApiUsageState } from "./api-usage-switch";
 
 import { AliyunSubtitleAutoSync, AliyunSubtitleBackgroundStatus, AliyunSubtitleSettings, AliyunSubtitleWorkbench, type AliyunSubtitleBridge } from "./aliyun-subtitle";
 import { SUBTITLE_RESULT_COLLECTION, normalizeSubtitleCollection } from "./subtitle-library-sync.mjs";
 import { PromptLibrary, type PromptLibraryBridge } from "./prompt-library";
 import { classifyUserAction } from "../electron/user-action-errors.mjs";
-import { CURRENT_API_BILLING_NOTICE, CURRENT_PLATFORM_API_NOTICE } from "../electron/points-policy.mjs";
+import { PointsWalletCard, type PointsBridge } from "./points-wallet";
+import { GeneratedResultsPanel, type GeneratedRecord } from './generated-results';
+import { PointsNotice, type PointsNoticeValue } from "./points-notice";
 import { ErrorDetailDialog, UserActionNotice, type GuidanceTarget } from "./user-action-notice";
+import { markQianchuanConnected } from "./qianchuan-notice-preference.mjs";
 import { VipWorkflowPreview } from "./vip-workflow-preview";
 import { FeiguaTrends, type FeiguaBridge } from "./feigua-trends";
 
@@ -151,6 +155,7 @@ type QianchuanVideo = {
   download_reason: string;
 };
 type QianchuanPerformance = {
+  performance_pending?: boolean;
   advertiser_id: string;
   material_id: string;
   video_id?: string;
@@ -229,7 +234,7 @@ type QianchuanLibraryCacheState = {
 };
 type QianchuanLibrarySyncProgress = {
   advertiser_id: string;
-  stage: "materials" | "performance" | "insights" | "complete" | "cancelled";
+  stage: "materials" | "performance" | "insights" | "complete" | "cancelled" | "error";
   page?: number;
   total_pages?: number;
   scanned_count: number;
@@ -850,6 +855,7 @@ type ClassifierDraftQuality = { passed: boolean; issues: Array<{ code: string; s
 declare global {
   interface Window {
     desktopBridge?: {
+      onPointsNotice?: (callback: (value: PointsNoticeValue) => void) => () => void;
       promptLibrary: PromptLibraryBridge;
       aliyunSubtitle: AliyunSubtitleBridge;
       feigua: FeiguaBridge;
@@ -869,6 +875,9 @@ declare global {
       licenseActivate: (activationCode: string) => Promise<LicenseState>;
       licenseRenewTime: (activationCode: string) => Promise<LicenseState>;
       licenseRedeemTime: (activationCode: string) => Promise<LicenseState>;
+      pointsBalance: PointsBridge["pointsBalance"];
+      pointsTransactions: PointsBridge["pointsTransactions"];
+      pointsRedeem: PointsBridge["pointsRedeem"];
       licenseRefresh: (options?: { resetOfflineCache?: boolean }) => Promise<LicenseState>;
       licenseUnbind: () => Promise<LicenseState>;
       licenseOnStateChanged: (callback: (state: LicenseState) => void) => void;
@@ -952,12 +961,16 @@ declare global {
       classifierMarkOutputSynced: (jobId: string) => Promise<{ ok: boolean }>;
       classifierSetActive: (templateId: string) => Promise<ClassifierState>;
       classifierSaveConfig: (payload: { baseUrl: string; model: string; apiKey: string }) => Promise<{ ok: boolean }>;
+      apiUsageGet: () => Promise<ApiUsageState>;
+      apiUsageSet: (provider: ApiProvider, useOwnApi: boolean) => Promise<ApiUsageState>;
       apiSettingsGet: () => Promise<ApiSettingsState>;
       apiSettingsSave: (payload: ApiSettingsSavePayload) => Promise<ApiSettingsState>;
       apiSettingsTest: (kind: "classification" | "minimax", payload: ApiSettingsSavePayload) => Promise<{ ok: boolean; message: string; latencyMs: number }>;
       diagnosticReport: (details: unknown) => void;
       diagnosticOnError: (callback: (details: { message: string; operation?: string }) => void) => () => void;
       storageLogGet: () => Promise<StorageLogState>;
+      generatedResultsList: () => Promise<Omit<GeneratedRecord, 'text'>[]>;
+      generatedResultRead: (id: string) => Promise<GeneratedRecord>;
       storageLogSave: (patch: Partial<StorageLogState["settings"]>) => Promise<StorageLogState>;
       storageLogExport: () => Promise<{ canceled: boolean; path?: string }>;
       storageManagementGet: () => Promise<StorageManagementState>;
@@ -966,7 +979,7 @@ declare global {
       classifierCreateTemplate: (payload: ClassifierTemplatePayload) => Promise<ClassifierState>;
       classifierEditTemplate: (payload: ClassifierTemplatePayload & { templateId: string }) => Promise<ClassifierState>;
       classifierGenerateTemplateDraft: (productBrief: string) => Promise<Omit<ClassifierTemplate, "template_id"> & { quality?: ClassifierDraftQuality; repairedCount?: number }>;
-      classifierDraftOnProgress: (callback: (progress: { stage: string; current?: number; total?: number }) => void) => () => void;
+      classifierDraftOnProgress: (callback: (progress: { stage: string; current?: number; total?: number; receivedChars?: number; thinking?: boolean; retrying?: boolean }) => void) => () => void;
       classifierImportProductInfoFiles: () => Promise<{ cancelled?: boolean; text: string; files: Array<{ name: string; extension: string; size: number; sourceId?: string }>; documents?: ProductInfoDocument[]; warnings: string[]; scanCandidates: ProductInfoScanCandidate[] }>;
       classifierImportProductInfoPaths: (filePaths: string[]) => Promise<{ cancelled?: boolean; text: string; files: Array<{ name: string; extension: string; size: number; sourceId?: string }>; documents?: ProductInfoDocument[]; warnings: string[]; scanCandidates: ProductInfoScanCandidate[] }>;
       classifierRecognizeScannedProductInfo: (files: ProductInfoScanCandidate[]) => Promise<{ text: string; files: Array<{ name: string; path: string; extension: string; size: number; sourceId?: string; recognitionId?: string; recognizedPages?: number[] }>; documents?: ProductInfoDocument[]; warnings: string[] }>;
@@ -1174,6 +1187,7 @@ type StorageCleanupResult = {
 };
 
 type ClassifierRunPayload = {
+  apiTaskId?: string;
   command: "classify" | "review" | "split" | "correction-create" | "correction-apply" | "self-check";
   folder: string;
   output_root: string;
@@ -1638,7 +1652,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
     setServiceError("");
     try {
       const [dataUrl, duration] = await Promise.all([fileToDataUrl(sampleFile), readAudioDuration(sampleFile)]);
-      const data = await voiceApi<{ voice: VoiceLibraryItem; audio?: { audioUrl?: string } }>("/api/voice-clone/create", {
+      const data = await voiceApi<{ voice: VoiceLibraryItem; audio?: { audioUrl?: string }; warning?: string }>("/api/voice-clone/create", {
         method: "POST",
         body: JSON.stringify({
           name: voiceName.trim(),
@@ -1661,7 +1675,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
         downloadLink.click();
         downloadLink.remove();
       }
-      notify("试听已生成并开始下载，不会正式启用音色");
+      notify(data.warning || "试听已生成并开始下载，不会正式启用音色");
     } catch (error) {
       const message = errorDetails(error, "试听生成失败");
       setServiceError(message);
@@ -1710,7 +1724,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
       <header className="voice-workbench-head">
         <div className="voice-heading-icon workspace-heading-icon"><Mic2 /></div>
         <div><div className="feature-title-line"><h1>声音克隆</h1><ContactAuthorButton appName={appName} /></div><p>上传已授权的声音样本，只生成可下载试听，不正式启用音色</p></div>
-        <span className="voice-provider">MiniMax · 试听模式</span>
+        <span className="voice-provider">试听模式</span>
       </header>
       <div className="voice-content">
         <nav className="voice-tabs two" aria-label="声音复刻模块">
@@ -1731,7 +1745,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
                 <label className="voice-field"><span>试听文本</span><textarea value={previewText} maxLength={500} onChange={(event) => setPreviewText(event.target.value)} placeholder="请输入想要合成的试听文本内容…" /><small>必填，最多 500 字</small></label>
                 <label className="voice-consent-row"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>我确认拥有该声音样本的使用授权，并同意仅用于合法内容生成。</span></label>
                 {missingCreateFields.length > 0 && <p className="voice-action-hint error">还需完成：{missingCreateFields.join("、")}</p>}
-                <p className="voice-action-hint">仅收取 MiniMax 试听字符费用；不会发起正式 T2A 合成或启用音色。</p>
+                <p className="voice-action-hint">仅生成可下载试听，不正式启用音色。</p>
                 <button className="voice-primary" disabled={loading || !createReady} onClick={createClone}>{loading ? "正在生成…" : "生成并下载试听"}</button>
               </div>
             )}
@@ -1751,7 +1765,7 @@ function VoiceCloneWorkbench({ notify, appName }: { notify: (message: string) =>
                       <div className="voice-card-actions"><button onClick={() => renameVoice(voice)}>重命名</button><button className="danger" onClick={() => deleteVoice(voice)}>删除</button></div>
                     </article>
                   );
-                })}</div> : <div className="voice-library-empty"><Mic2 size={35} /><strong>暂无试听记录</strong><span>生成的试听音频会保存在本机，不会正式启用 MiniMax 音色</span></div>}
+                })}</div> : <div className="voice-library-empty"><Mic2 size={35} /><strong>暂无试听记录</strong><span>生成的试听音频会保存在本机，不会正式启用音色</span></div>}
               </div>
             )}
           </section>
@@ -2416,16 +2430,7 @@ function LicenseManagement({ state, onStateChange, notify }: {
               ? <small className="preview-ready">双期限兑换界面已启用；源码预览不提交真实时间码。</small>
               : (state.license?.redemptionProtocolVersion || 0) < 1 && <small>服务端尚未启用双期限兑换，暂不可提交。</small>}
           </div>
-          <div className="license-redemption-card license-points-redemption-card">
-            <span>积分兑换</span>
-            <div className="license-redemption-controls">
-              <input type="password" placeholder="输入积分兑换码" aria-label="积分兑换码" autoComplete="off" spellCheck={false} disabled />
-              <button type="button" disabled>兑换</button>
-            </div>
-            <small>积分兑换暂未开放</small>
-            <small className="preview-ready">{CURRENT_API_BILLING_NOTICE}</small>
-            <small>{CURRENT_PLATFORM_API_NOTICE}</small>
-          </div>
+          <PointsWalletCard key={`${state.canUnbind}:${state.phase}:${state.lastValidatedAt || ""}:${state.license?.activatedAt || ""}:${state.license?.transferCount || 0}`} canUse={state.canUnbind && state.phase !== "disabled"} preview={state.previewAllFeatures === true} notify={notify} />
         </div>
         <MachineCodeField compact />
         <div className="license-management-actions">
@@ -2765,6 +2770,7 @@ function StorageManagementPanel({ notify }: { notify: (message: string) => void 
     </section>
     {logs && <section className="storage-auto-cleanup storage-log-settings"><span className="storage-category-icon slate"><HardDrive size={19} /></span><div><strong>日志保留规则</strong><span>{logs.fileCount} 个日志文件 · 超过时间或容量后自动删除最旧日志{logs.lastWriteError ? ` · 日志写入失败：${logs.lastWriteError}` : ""}</span></div><select aria-label="日志保留时间" value={logs.settings.retentionDays} onChange={event => void saveLogs({ retentionDays: Number(event.target.value) })}>{[7, 14, 30, 90].map(days => <option key={days} value={days}>保留 {days} 天</option>)}</select><select aria-label="日志容量上限" value={logs.settings.maxMegabytes} onChange={event => void saveLogs({ maxMegabytes: Number(event.target.value) })}>{[50, 100, 200, 500].map(mb => <option key={mb} value={mb}>上限 {mb} MB</option>)}</select></section>}
     {state.classifierCleanupBlockedReason && <p className="storage-blocked-note"><AlertTriangle size={14} />{state.classifierCleanupBlockedReason}，相关打标缓存已保留，不会自动清理。</p>}
+    <GeneratedResultsPanel notify={notify} />
     <p className="storage-safety-note"><ShieldCheck size={15} />不会清理分类方案、API 配置、授权信息、媒体库索引、原素材、输出结果或正在运行的任务。</p>
   </div>;
 }
@@ -2823,7 +2829,8 @@ function QianchuanIntegrationPanel({ notify }: { notify: (message: string) => vo
       setError("");
       if ((next.authorized || next.authorizations.length > 0) && bridge.qianchuanBootstrap) {
         try {
-          await bridge.qianchuanBootstrap();
+          const connected = await bridge.qianchuanBootstrap();
+          if (connected.success) markQianchuanConnected();
           setAuthorizationHealthError("");
         } catch (bootstrapError) {
           const message = bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError);
@@ -2856,6 +2863,7 @@ function QianchuanIntegrationPanel({ notify }: { notify: (message: string) => vo
         if (stopped) return;
         setOauthState(next);
         if (next.status === "success") {
+          markQianchuanConnected();
           window.clearInterval(timer);
           setFlowId("");
           await loadStatus();
@@ -3224,14 +3232,14 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
     <section className="api-settings-page">
       <header className="api-settings-heading">
         <div className="api-settings-heading-icon workspace-heading-icon"><Settings /></div>
-        <div><div className="feature-title-line"><h1>设置</h1><ContactAuthorButton appName={licenseState.appName} /></div><p>{settingsSection === "storage" ? "管理软件占用、自动清理与本地文件。" : settingsSection === "qianchuan" ? "按顺序连接用户自己的巨量千川开放平台应用与账户。" : settingsSection === "models" ? "由使用者填写自己的模型 API，密钥仅保存在当前电脑。" : settingsSection === "aliyun" ? "管理去字幕服务的连接与密钥。" : "管理软件授权、查看版本与检查更新。"}</p></div>
+        <div><div className="feature-title-line"><h1>设置</h1><ContactAuthorButton appName={licenseState.appName} /></div><p>{settingsSection === "storage" ? "管理软件占用、自动清理与本地文件。" : settingsSection === "qianchuan" ? "按顺序连接用户自己的巨量千川开放平台应用与账户。" : settingsSection === "models" ? "分别选择个人 API 或积分模式，个人密钥加密保存在当前电脑。" : settingsSection === "aliyun" ? "管理去字幕服务的连接与密钥。" : "管理软件授权、查看版本与检查更新。"}</p></div>
       </header>
 
       <nav className="settings-section-tabs" aria-label="设置分类">
         <button type="button" className={settingsSection === "api" ? "active" : ""} onClick={() => setSettingsSection("api")}><Settings size={15} />授权与更新</button>
         <button type="button" className={settingsSection === "qianchuan" ? "active" : ""} onClick={() => setSettingsSection("qianchuan")}><KeyRound size={15} />千川接入</button>
         <button type="button" className={settingsSection === "storage" ? "active" : ""} onClick={() => setSettingsSection("storage")}><HardDrive size={15} />存储管理</button>
-        <button type="button" className={settingsSection === "models" ? "active" : ""} onClick={() => setSettingsSection("models")}><Mic2 size={15} />火山引擎与 MiniMax</button>
+        <button type="button" className={settingsSection === "models" ? "active" : ""} onClick={() => setSettingsSection("models")}><Mic2 size={15} />AI 服务设置</button>
         <button type="button" className={settingsSection === "aliyun" ? "active" : ""} onClick={() => setSettingsSection("aliyun")}><Film size={15} />去字幕服务</button>
       </nav>
 
@@ -3244,10 +3252,11 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
       {settingsSection === "models" && <div className="api-settings-content">
         <section className="api-settings-card classification-api-card">
           <div className="api-settings-card-title">
-            <div><span className="api-settings-kicker">CLASSIFICATION & PROMPT API</span><h2>分类与提示词模型</h2><p>{settings.classification.provider === "volcengine" ? "同一个推理接入点用于分类方案、素材分类与提示词库。" : "文本模型用于分类方案和提示词改写；视觉模型用于素材分类及提示词参考图片替换。"}</p></div>
+            <div><span className="api-settings-kicker">CLASSIFICATION & PROMPT API</span><h2>分类与提示词服务</h2><p>用于分类方案、素材分类和提示词库。可选择积分模式，或使用自己的 API。</p></div>
             <span className={`api-config-status ${(settings.classification.provider === "volcengine" ? settings.classification.volcengine.apiKeyConfigured : settings.classification.relay.apiKeyConfigured) ? "ready" : "empty"}`}>{(settings.classification.provider === "volcengine" ? settings.classification.volcengine.apiKeyConfigured : settings.classification.relay.apiKeyConfigured) ? "已配置" : "未配置"}</span>
           </div>
 
+          <ApiUsageSwitch key={settings.classification.provider} provider={settings.classification.provider} notify={notify}>
           <div className="api-provider-options" role="radiogroup" aria-label="分类 API 类型">
             <button type="button" role="radio" aria-checked={settings.classification.provider === "volcengine"} className={settings.classification.provider === "volcengine" ? "active" : ""} onClick={() => selectClassificationProvider("volcengine")}>
               <strong>火山引擎</strong><span>固定使用火山方舟 OpenAI 兼容接口</span>
@@ -3277,13 +3286,15 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
             <button type="button" disabled={loading || saving || testingConnection !== null} onClick={() => void testConnection("classification")}><RefreshCw size={13} />{testingConnection === "classification" ? "正在测试…" : "测试分类模型连接"}</button>
             {connectionResults.classification && <span className={connectionResults.classification.ok ? "success" : "error"} role="status">{connectionResults.classification.message}</span>}
           </div>
+          </ApiUsageSwitch>
         </section>
 
         <section className="api-settings-card minimax-api-card">
           <div className="api-settings-card-title">
-            <div><span className="api-settings-kicker">VOICE API</span><h2>MiniMax 声音克隆</h2><p>仅用于上传新声音并生成可下载试听，不正式启用音色。</p></div>
+            <div><span className="api-settings-kicker">VOICE API</span><h2>声音服务</h2><p>仅用于上传新声音并生成可下载试听，不正式启用音色。</p></div>
             <span className={`api-config-status ${settings.minimax.apiKeyConfigured ? "ready" : "empty"}`}>{settings.minimax.apiKeyConfigured ? "已配置" : "未配置"}</span>
           </div>
+          <ApiUsageSwitch provider="minimax" notify={notify}>
           <div className="api-settings-form-grid">
             <label className="api-setting-field"><span>服务商</span><input value="MiniMax" readOnly /></label>
             <label className="api-setting-field"><span>Base URL</span><input value={settings.minimax.baseUrl} readOnly /><small>默认使用 MiniMax 中国区接口</small></label>
@@ -3295,10 +3306,11 @@ function ApiSettingsPage({ notify, licenseState, onLicenseStateChange, updateSta
             <button type="button" disabled={loading || saving || testingConnection !== null} onClick={() => void testConnection("minimax")}><RefreshCw size={13} />{testingConnection === "minimax" ? "正在测试…" : "测试 MiniMax 连接"}</button>
             {connectionResults.minimax && <span className={connectionResults.minimax.ok ? "success" : "error"} role="status">{connectionResults.minimax.message}</span>}
           </div>
+          </ApiUsageSwitch>
         </section>
 
         <footer className="api-settings-actions">
-          <div><strong>本地直连</strong><span>软件直接请求所选模型服务，不经过统一中转后台。</span></div>
+          <div><strong>独立选择使用方式</strong><span>开关立即保存；切换仅影响后续任务，已开始的任务沿用原方式。</span></div>
           <div className="api-settings-action-buttons">
             <button className="secondary" type="button" onClick={() => window.desktopBridge?.openProductGuide()}>产品使用教程</button>
             <div className="api-settings-save-area">
@@ -3509,6 +3521,7 @@ function ClassifierWorkbench({
   const [schemeGenerating, setSchemeGenerating] = useState(false);
   const [schemeGenerationStage, setSchemeGenerationStage] = useState("");
   const [schemeDraftQuality, setSchemeDraftQuality] = useState<ClassifierDraftQuality | null>(null);
+  const [schemeDraftRaw, setSchemeDraftRaw] = useState('');
   const [schemeImportingProductFiles, setSchemeImportingProductFiles] = useState(false);
   const [schemeRecognizingScannedPdfs, setSchemeRecognizingScannedPdfs] = useState(false);
   const [schemeImportedProductFiles, setSchemeImportedProductFiles] = useState<string[]>([]);
@@ -3548,7 +3561,8 @@ function ClassifierWorkbench({
 
   useEffect(() => window.desktopBridge?.classifierDraftOnProgress?.((progress) => {
     const suffix = progress.total && progress.total > 1 ? ` ${progress.current || 0}/${progress.total}` : "";
-    setSchemeGenerationStage(`${progress.stage}${suffix}`);
+    const receiving = progress.retrying ? " · 正在重新生成完整结果" : progress.thinking ? " · 模型正在处理" : progress.receivedChars ? ` · 已接收 ${progress.receivedChars} 字` : "";
+    setSchemeGenerationStage(`${progress.stage}${suffix}${receiving}`);
   }), []);
 
   useEffect(() => {
@@ -3568,6 +3582,7 @@ function ClassifierWorkbench({
         setSchemeImportedProductSourceIds(Array.isArray(saved.importedSourceIds) ? saved.importedSourceIds.map(String) : []);
         setSchemeProductScanCandidates(Array.isArray(saved.scanCandidates) ? saved.scanCandidates : []);
         setSchemeDraftQuality(saved.quality || null);
+        setSchemeDraftRaw(String(saved.rawDraftText || ''));
       }
     } catch {
       window.localStorage.removeItem(classifierTemplateDraftStorageKey);
@@ -3945,7 +3960,7 @@ function ClassifierWorkbench({
             ];
     startLogSession(startMessages, activeSplitStatus, activeTaggingStatus);
     try {
-      const response = await window.desktopBridge.classifierRun({ command, folder: runFolder, output_root: runOutputRoot, mode: runMode, workers: runWorkers, frames: runFrames, split_precision: runSplitPrecision, naming: runNaming, source_paths: resumePayload?.source_paths || inputPaths });
+      const response = await window.desktopBridge.classifierRun({ command, apiTaskId: resumePayload?.apiTaskId, folder: runFolder, output_root: runOutputRoot, mode: runMode, workers: runWorkers, frames: runFrames, split_precision: runSplitPrecision, naming: runNaming, source_paths: resumePayload?.source_paths || inputPaths });
       if (response.networkSafe?.enabled) setNetworkSafeMessage(response.networkSafe.reason || "共享网盘安全处理已启用");
       const outputCommand = command === "classify" || command === "review" || command === "split";
       const resultItems = Array.isArray(response.result) ? response.result : [];
@@ -4264,10 +4279,11 @@ function ClassifierWorkbench({
       importedSourceIds: schemeImportedProductSourceIds,
       scanCandidates: schemeProductScanCandidates,
       quality: schemeDraftQuality,
+      rawDraftText: schemeDraftRaw,
       savedAt: new Date().toISOString(),
     })), 350);
     return () => window.clearTimeout(timeout);
-  }, [schemeDialog, schemeEditTemplateId, expandedSchemeId, schemeName, schemeProductName, schemeProductBrief, schemeTaxonomyText, schemeRules, schemeNamingRule, schemeImportedProductFiles, schemeImportedProductSourceIds, schemeProductScanCandidates, schemeDraftQuality]);
+  }, [schemeDialog, schemeEditTemplateId, expandedSchemeId, schemeName, schemeProductName, schemeProductBrief, schemeTaxonomyText, schemeRules, schemeNamingRule, schemeImportedProductFiles, schemeImportedProductSourceIds, schemeProductScanCandidates, schemeDraftQuality, schemeDraftRaw]);
 
   const setNamingRulePartsFromString = (rule: string | undefined, productName: string) => {
     setSchemeNamingParts(parseClassifierNamingRule(rule, productName));
@@ -4316,6 +4332,7 @@ function ClassifierWorkbench({
     setSchemeImportedProductSourceIds([]);
     setSchemeProductScanCandidates([]);
     setSchemeDraftQuality(null);
+    setSchemeDraftRaw('');
     setNamingRulePartsFromString(defaultClassifierNamingRule, "新产品");
     setSchemeDialog("create");
     setExpandedSchemeId("__new__");
@@ -4336,6 +4353,7 @@ function ClassifierWorkbench({
     setSchemeImportedProductSourceIds([]);
     setSchemeProductScanCandidates([]);
     setSchemeDraftQuality(null);
+    setSchemeDraftRaw('');
     setNamingRulePartsFromString(template.naming_rule || defaultClassifierNamingRule, template.product_name);
     setSchemeDialog("edit");
     setExpandedSchemeId(template.template_id);
@@ -4438,15 +4456,17 @@ function ClassifierWorkbench({
     }
     setSchemeGenerating(true);
     setSchemeGenerationStage("正在整理产品资料");
+    setSchemeDraftRaw('');
     setSchemeDraftQuality(null);
     try {
       const draft = await window.desktopBridge.classifierGenerateTemplateDraft(schemeProductBrief);
       setSchemeName(draft.name || schemeName);
       const nextProductName = draft.product_name || schemeProductName;
       setSchemeProductName(nextProductName);
-      setSchemeTaxonomyText(classifierTaxonomyToText(draft.taxonomy));
-      setSchemeRules(draft.rules || "");
-      setNamingRulePartsFromString(draft.naming_rule || defaultClassifierNamingRule, nextProductName);
+      if (Object.keys(draft.taxonomy || {}).length) setSchemeTaxonomyText(classifierTaxonomyToText(draft.taxonomy));
+      if (draft.rules) setSchemeRules(draft.rules);
+      if (draft.naming_rule) setNamingRulePartsFromString(draft.naming_rule, nextProductName);
+      setSchemeDraftRaw((draft as typeof draft & { rawDraftText?: string }).rawDraftText || '');
       setSchemeDraftQuality(draft.quality || null);
       const qualityMessage = draft.quality?.issues?.length ? `；质量检查发现 ${draft.quality.issues.length} 项需要确认` : "；质量检查通过";
       const repairedMessage = draft.repairedCount ? `，已自动修复 ${draft.repairedCount} 项` : "";
@@ -4563,9 +4583,11 @@ function ClassifierWorkbench({
                 ><Eye size={14} />{schemeRecognizingScannedPdfs ? "正在 AI 识别扫描件…" : "AI 识别扫描件"}</button>
               </div>
             )}
+            <p role="status">资料较长时会分段整理，生成内容逐步接收；完成后回填可编辑草案。</p>
             <textarea value={schemeProductBrief} rows={11} onChange={(event) => setSchemeProductBrief(event.target.value)} />
             {schemeBriefMissingFields.length > 0 && <div className="classifier-draft-check warning" role="status"><strong>资料检查：还缺少 {schemeBriefMissingFields.join("、")}</strong><span>仍可继续生成，但草案的覆盖范围和准确度可能不完整。</span></div>}
             {schemeDraftQuality && <div className={`classifier-draft-check ${schemeDraftQuality.passed ? "passed" : "warning"}`} role="status"><strong>{schemeDraftQuality.passed ? "生成后质量检查通过" : `生成后质量检查：${schemeDraftQuality.issues.length} 项需要确认`}</strong>{schemeDraftQuality.issues.length > 0 && <ul>{schemeDraftQuality.issues.map((issue) => <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>)}</ul>}</div>}
+            {schemeDraftRaw && <details><summary>查看本次已返回内容（未完成草稿）</summary><p>已返回的内容已保存。可复制后手动补充；再次生成会重新确认积分。</p><textarea aria-label="未完成分类草稿" value={schemeDraftRaw} readOnly /><button onClick={() => void navigator.clipboard.writeText(schemeDraftRaw).then(() => notify('已复制本次草稿'))}>复制已有内容</button></details>}
             <button type="button" disabled={schemeGenerating || schemeSaving || schemeImportingProductFiles || schemeRecognizingScannedPdfs} onClick={() => void generateTemplateDraft()}><Sparkles size={15} />{schemeGenerating ? `${schemeGenerationStage || "正在生成草案"}…` : "AI 生成草案"}</button>
           </section>
           <div className="classifier-scheme-form classifier-template-full-form">
@@ -5378,9 +5400,10 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
     const unsubscribe = window.desktopBridge?.qianchuanLibraryOnProgress?.((progress) => {
       if (progress.advertiser_id !== activeAdvertiserId) return;
       setSyncProgress(progress);
+      if (progress.stage === "error") { setPageError(progress.message); setResumable(true); }
+      if (progress.stage === "cancelled") setResumable(true);
       if (progress.items) {
         setItems(progress.items);
-        setGridPage(1);
         if (progress.query) setCachedQuery(progress.query);
         if (progress.start_date && progress.end_date) setRange(`${progress.start_date} 至 ${progress.end_date}`);
         if (progress.synced_at) setLastSyncedAt(progress.synced_at);
@@ -5450,8 +5473,8 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
     return () => { cancelled = true; };
   }, [activeAdvertiserId, bootstrap?.authorization_id]);
 
-  const refresh = async (requestedAdvertiserId = activeAdvertiserId) => {
-    const ready = await ensureBootstrap();
+  const refresh = async (requestedAdvertiserId = activeAdvertiserId, refreshedBootstrap?: QianchuanBootstrap) => {
+    const ready = refreshedBootstrap || await ensureBootstrap();
     const selected = requestedAdvertiserId || ready.default_advertiser_id || ready.accounts[0]?.advertiser_id;
     if (!selected || !window.desktopBridge?.qianchuanLibrarySync) throw new Error("没有可用的千川账户");
     if (query.material_mode === "created_range" && query.material_start_date > query.material_end_date) {
@@ -5463,6 +5486,7 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
       return;
     }
     setSyncing(true);
+    setGridPage(1);
     setPageError("");
     setSyncProgress({ advertiser_id: selected, stage: "materials", scanned_count: 0, collected_count: 0, message: "正在准备同步…" });
     try {
@@ -5484,6 +5508,7 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
       setResumable(false);
       setGridPage(1);
     } catch (requestError) {
+      setResumable(true);
       setPageError(requestError instanceof Error ? requestError.message : "千川数据读取失败");
     } finally {
       setSyncing(false);
@@ -5713,11 +5738,11 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
         {reportPreset === "custom" && <div className="viral-date-field report"><span>投放数据日期</span><div><input type="date" value={query.report_start_date} max={query.report_end_date} disabled={syncing} onChange={(event) => setQuery((current) => ({ ...current, report_start_date: event.target.value }))} /><i>至</i><input type="date" value={query.report_end_date} min={query.report_start_date} disabled={syncing} onChange={(event) => setQuery((current) => ({ ...current, report_end_date: event.target.value }))} /></div></div>}
         <div className="viral-sync-actions">{syncing ? <button type="button" className="secondary" onClick={() => void cancelSync()}>取消同步</button> : null}<button type="button" onClick={() => void refresh(activeAdvertiserId)} disabled={loading || syncing || cacheLoading || !activeAdvertiserId}><RefreshCw size={15} className={syncing ? "spin" : ""} />{syncing ? "正在同步" : resumable ? "继续同步" : lastSyncedAt ? "刷新当前结果" : "同步当前范围"}</button></div>
       </div>
-      <div className={`viral-cache-status ${queryChanged ? "changed" : ""}`}><div><strong>{cacheLoading ? "正在读取本地缓存…" : lastSyncedAt ? `上次同步：${formatServerDate(lastSyncedAt)}` : "当前账户还没有本地缓存"}</strong><span>{lastSyncedAt ? `已缓存 ${items.length} 条素材 · 扩展分析 ${cachedInsightCount}/${items.length} · 数据周期 ${range || "—"}` : "设置素材范围和数据统计周期后开始同步；以后进入页面会直接显示缓存。"}</span></div>{queryChanged && <em>筛选条件已修改，点击“刷新当前结果”后生效</em>}{resumable && !syncing && <em>检测到未完成同步，可以从上次分页继续</em>}{syncProgress && (syncing || syncProgress.stage === "complete") && <em>{syncProgress.message}</em>}</div>
+      <div className={`viral-cache-status ${queryChanged ? "changed" : ""}`}><div><strong>{cacheLoading ? "正在读取本地缓存…" : lastSyncedAt ? `上次同步：${formatServerDate(lastSyncedAt)}` : "当前账户还没有本地缓存"}</strong><span>{lastSyncedAt ? `已缓存 ${items.length} 条素材 · 扩展分析 ${cachedInsightCount}/${items.length} · 数据周期 ${range || "—"}` : "设置素材范围和数据统计周期后开始同步；以后进入页面会直接显示缓存。"}</span></div>{queryChanged && <em>筛选条件已修改，点击“刷新当前结果”后生效</em>}{resumable && !syncing && <em>检测到未完成同步，可以从上次分页继续</em>}{syncProgress && (syncing || ["complete", "cancelled", "error"].includes(syncProgress.stage)) && <em>{syncProgress.message}</em>}</div>
       {connectionGuidance?.target === "qianchuan" ? <section className="qianchuan-connection-guide" role="status">
         <KeyRound size={22} /><div><h2>{connectionGuidance.title}</h2><p>{connectionGuidance.message}</p></div>
         <button type="button" onClick={onConnect}>{connectionGuidance.action}</button>
-        <button type="button" className="secondary" disabled={loading} onClick={() => void ensureBootstrap(true).then(() => refresh(activeAdvertiserId)).catch(() => {})}>已连接，重新读取</button>
+        <button type="button" className="secondary" disabled={loading} onClick={() => void ensureBootstrap(true).then((next) => refresh(next.accounts.some(account => account.advertiser_id === activeAdvertiserId) ? activeAdvertiserId : next.default_advertiser_id || next.accounts[0]?.advertiser_id, next)).catch(() => {})}>已连接，重新提取</button>
       </section> : (error || pageError) && <div className="viral-alert"><AlertTriangle size={16} /><span>{pageError || error}</span><button type="button" onClick={() => void ensureBootstrap(true).then(() => refresh(activeAdvertiserId)).catch(() => {})}>重试</button></div>}
       <div className="viral-view-toolbar">
         <label className="viral-search-field"><Search size={16} /><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索素材名称、素材 ID…" /></label>
@@ -5751,9 +5776,9 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
               <div className="viral-card-body">
                 <strong title={item.filename}>{item.filename}</strong>
                 <small>素材 ID {item.material_id}{item.created_at ? ` · ${item.created_at.slice(0, 10)}` : ""}</small>
-                <div className="viral-card-metrics"><div><span>消耗</span><b>¥{qianchuanCompactMetric(item.spend)}</b></div><div><span>成交 ROI</span><b className="accent">{qianchuanMetric(item.paid_roi, 2)}</b></div><div><span>成交金额</span><b>¥{qianchuanCompactMetric(item.paid_gmv)}</b></div><div><span>成交订单</span><b>{qianchuanCompactMetric(item.paid_orders)}</b></div></div>
+                {item.performance_pending ? <div className="viral-card-metrics"><span>素材已缓存 · 投放数据待同步</span></div> : (<div className="viral-card-metrics"><div><span>消耗</span><b>¥{qianchuanCompactMetric(item.spend)}</b></div><div><span>成交 ROI</span><b className="accent">{qianchuanMetric(item.paid_roi, 2)}</b></div><div><span>成交金额</span><b>¥{qianchuanCompactMetric(item.paid_gmv)}</b></div><div><span>成交订单</span><b>{qianchuanCompactMetric(item.paid_orders)}</b></div></div>)}
               </div>
-              <footer><span>{item.video_3s_play_rate_percent > 0 ? `3秒播放率 ${qianchuanMetric(item.video_3s_play_rate_percent, 1)}%` : `播放 ${qianchuanCompactMetric(item.video_plays)}`}</span>{linkedAsset ? <button type="button" onClick={(event) => { event.stopPropagation(); onLocate(linkedAsset); }}><FolderOpen size={13} />媒体库查看</button> : <button type="button" disabled={!selectedAccount || importingId === item.material_id} onClick={(event) => { event.stopPropagation(); void importItem(item); }}><Download size={13} />{importingId === item.material_id ? "正在导入" : "导入媒体库"}</button>}</footer>
+              <footer><span>{item.performance_pending ? "投放数据待同步" : item.video_3s_play_rate_percent > 0 ? `3秒播放率 ${qianchuanMetric(item.video_3s_play_rate_percent, 1)}%` : `播放 ${qianchuanCompactMetric(item.video_plays)}`}</span>{linkedAsset ? <button type="button" onClick={(event) => { event.stopPropagation(); onLocate(linkedAsset); }}><FolderOpen size={13} />媒体库查看</button> : <button type="button" disabled={!selectedAccount || importingId === item.material_id} onClick={(event) => { event.stopPropagation(); void importItem(item); }}><Download size={13} />{importingId === item.material_id ? "正在导入" : "导入媒体库"}</button>}</footer>
             </article>;
           })}</div> : <div className="viral-filter-empty"><Search size={28} /><strong>没有符合当前筛选的素材</strong><button type="button" onClick={() => { setSearchText(""); setLibraryFilter("all"); }}>清除筛选</button></div>}
           {gridPageCount > 1 && <div className="viral-pagination"><button type="button" disabled={gridPage <= 1} onClick={() => setGridPage((current) => Math.max(1, current - 1))}>上一页</button><span>第 {gridPage}/{gridPageCount} 页 · 共 {filteredItems.length} 条</span><button type="button" disabled={gridPage >= gridPageCount} onClick={() => setGridPage((current) => Math.min(gridPageCount, current + 1))}>下一页</button></div>}{cacheHasMore && <p className="viral-truncated-note">当前结果已按所选范围截取；如需更多素材，请提高数量或改用创建日期范围。</p>}
@@ -5773,8 +5798,10 @@ function QianchuanVideoLibrary({ bootstrap, loading, error, ensureBootstrap, onI
             </div>
             {previewError && <div className="viral-detail-error"><AlertTriangle size={14} />{previewError}</div>}
             <div className="viral-detail-identity"><span>素材 ID {selectedItem.material_id}</span><span>{selectedAccount?.name || "千川账户"}</span><span>{selectedItem.created_at ? `创建 ${selectedItem.created_at}` : "创建时间未返回"}</span>{detailResolving && <em>正在刷新素材信息…</em>}{detailInsightsLoading && <em className="insights"><RefreshCw size={10} className="spin" />扩展数据同步中…</em>}</div>
+            {selectedItem.performance_pending ? <section className="viral-detail-section"><h3>投放数据待同步</h3><p>素材信息已缓存，所选统计周期的指标尚未读取完成。同步完成后会自动更新。</p></section> : (<>
             <section className="viral-detail-section"><h3>所选周期核心数据</h3><p>{range || `${query.report_start_date} 至 ${query.report_end_date}`}</p><div className="viral-detail-primary-metrics"><div><span>消耗</span><strong>¥{qianchuanMetric(selectedItem.spend, 2)}</strong></div><div><span>成交金额</span><strong>¥{qianchuanMetric(selectedItem.paid_gmv, 2)}</strong></div><div><span>成交 ROI</span><strong className="accent">{qianchuanMetric(selectedItem.paid_roi, 2)}</strong></div><div><span>成交订单</span><strong>{qianchuanMetric(selectedItem.paid_orders)}</strong></div></div></section>
             <section className="viral-detail-section"><h3>播放与互动</h3><div className="viral-detail-metric-list"><div><span>累计播放</span><strong>{qianchuanMetric(selectedItem.video_plays)}</strong></div><div><span>整体展现次数</span><strong>{qianchuanMetric(selectedItem.live_impressions)}</strong></div><div><span>整体点击次数</span><strong>{qianchuanMetric(selectedItem.live_viewers)}</strong></div><div><span>整体点击率</span><strong>{qianchuanMetric(selectedItem.live_conversion_rate_percent, 2)}%</strong></div><div><span>点赞</span><strong>{qianchuanMetric(selectedItem.video_likes)}</strong></div><div><span>评论</span><strong>{qianchuanMetric(selectedItem.video_comments)}</strong></div><div><span>平均观看时长</span><strong>{qianchuanMetric(selectedItem.video_average_watch_seconds, 1)} 秒</strong></div></div><div className="viral-rate-bars"><div><span>3 秒播放率</span><i><b style={{ width: `${Math.max(0, Math.min(100, selectedItem.video_3s_play_rate_percent))}%` }} /></i><strong>{qianchuanMetric(selectedItem.video_3s_play_rate_percent, 2)}%</strong></div><div><span>完播率</span><i><b style={{ width: `${Math.max(0, Math.min(100, selectedItem.video_completion_rate_percent))}%` }} /></i><strong>{qianchuanMetric(selectedItem.video_completion_rate_percent, 2)}%</strong></div></div></section>
+            </>)}
             <QianchuanInsightsPanel insights={detailInsights} loading={detailInsightsLoading} error={detailInsightsError} />
             <section className="viral-detail-section viral-media-link"><h3>媒体库关联</h3>{selectedLinkedAsset ? <><div className="viral-linked-state"><ShieldCheck size={16} /><div><strong>已导入媒体库</strong><span>{selectedLinkedAsset.collection || QIANCHUAN_PROJECT_COLLECTION} · {selectedLinkedAsset.name}</span></div></div><button type="button" onClick={() => onLocate(selectedLinkedAsset)}><FolderOpen size={14} />在媒体库中查看</button></> : <><div className="viral-linked-state unlinked"><Unlink size={16} /><div><strong>尚未导入媒体库</strong><span>当前只缓存千川素材信息，导入时才下载原视频。</span></div></div><button type="button" disabled={!selectedAccount || importingId === selectedItem.material_id} onClick={() => void importItem(selectedItem)}><Download size={14} />{importingId === selectedItem.material_id ? "正在导入…" : "导入媒体库"}</button></>}</section>
           </div>
@@ -6731,6 +6758,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
     setQianchuanBootstrapError("");
     try {
       const state = await window.desktopBridge.qianchuanBootstrap();
+      if (state.success) markQianchuanConnected();
       setQianchuanBootstrap(state);
       setQianchuanAdvertiserId((current) => current || state.default_advertiser_id || state.accounts[0]?.advertiser_id || "");
       return state;
@@ -9442,6 +9470,7 @@ function LicensedApplication({ licenseState, onLicenseStateChange }: {
       <UpdateDialog key={updateState.targetVersion || "no-update"} state={updateState} notify={notify} />
 
       <ErrorDetailDialog />
+      <PointsNotice />
       <UserActionNotice onConfigure={openGuidedSettings} suppressQianchuan={activeModule === "qianchuan-videos"} />
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>

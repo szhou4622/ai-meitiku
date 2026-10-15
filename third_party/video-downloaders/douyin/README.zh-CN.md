@@ -549,7 +549,7 @@ rm dy_downloader.db
 
 ### 2) 进度条出现重复刷屏怎么办？
 
-默认 `progress.quiet_logs: true` 会在进度阶段静默日志。  
+默认 `progress.quiet_logs: true` 会在进度阶段静默日志。
 调试时再临时加 `--show-warnings` 或 `-v`。
 
 ### 3) Cookie 失效怎么办？
