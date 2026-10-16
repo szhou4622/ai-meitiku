@@ -218,7 +218,7 @@ export function FeiguaTrends() {
   }
 
   const disabled = !desktop || !loaded || !!action;
-  return <section className={styles.page}>
+  return <section className={`${styles.page} ${panel === 'shops' ? styles.shopMode : ''}`}>
     <header className={styles.heading}>
       <div><h1>热点采集</h1><p>飞瓜抖音数据 · 发现热门音乐、话题与带货视频</p></div>
       <div className={styles.actions}>
@@ -234,8 +234,6 @@ export function FeiguaTrends() {
       <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
     </form>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
-    <nav className={styles.moduleTabs} aria-label="采集功能"><button aria-pressed={panel === 'rankings'} onClick={() => setPanel('rankings')}>热点榜单</button><button aria-pressed={panel === 'shops'} onClick={() => setPanel('shops')}>竞对店铺</button></nav>
-    {panel === 'shops' ? <FeiguaShopMonitoring /> : <>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
@@ -243,6 +241,8 @@ export function FeiguaTrends() {
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
     <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
 
+    <nav className={styles.moduleTabs} aria-label="采集功能"><button aria-pressed={panel === 'rankings'} onClick={() => setPanel('rankings')}>热点榜单</button><button aria-pressed={panel === 'shops'} onClick={() => setPanel('shops')}>竞对店铺</button></nav>
+    {panel === 'shops' ? <FeiguaShopMonitoring /> : <>
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">

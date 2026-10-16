@@ -1,3 +1,4 @@
+import { FeiguaShopService } from "./feigua-shop-service.mjs";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, safeStorage, session, shell } from "electron";
 import { AliyunSubtitleService } from "./aliyun-subtitle-service.mjs";
 import { probeVideo } from "./aliyun-subtitle-client.mjs";
@@ -65,7 +66,6 @@ import { createStableMachineIdentity, publicMachineIdentity } from "./machine-co
 import { QianchuanService, qianchuanInternals } from "./qianchuan-service.mjs";
 import { FeiguaService } from "./feigua-service.mjs";
 import { FeiguaBrowser } from "./feigua-browser.mjs";
-import { FeiguaShopService } from "./feigua-shop-service.mjs";
 import { FeiguaLoginCredentialStore } from "./feigua-login-credentials.mjs";
 import { buildFolderRelinkPlan } from "./media-folder-relink.mjs";
 import { extractProductInfoFiles, extractScannedProductInfoFiles, PRODUCT_INFO_SUPPORTED_EXTENSIONS } from "./product-info-files.mjs";
