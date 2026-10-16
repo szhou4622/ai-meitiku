@@ -218,17 +218,17 @@ export function feiguaPage(command, argument = {}) {
     const sevenDays = start && end && Date.parse(end) - Date.parse(start) === 6 * 86400000;
     const shortcuts = exact('近7天', root);
     if (shortcuts.length > 1) return failure('无法唯一定位统计时间的「近7天」');
-    if (shortcuts.length) {
+    if (shortcuts.length && !argument.videoWeek) {
       if (restricted(shortcuts[0])) return failure('视频统计时间筛选权限受限');
       if (selected(shortcuts[0])) return sevenDays ? { verified: true, label: '近7天', dateRange: `${start} - ${end}` } : failure('近7天选项与实际统计日期不一致');
       if (argument.verify) return { verified: false };
       shortcuts[0].click(); return { changed: true };
     }
     if (restricted(starts[0]) || restricted(ends[0])) return failure('视频统计时间筛选权限受限');
-    const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-    const first = new Date(Date.parse(today) - 6 * 86400000).toISOString().slice(0, 10);
+    const today = argument.videoWeek?.end || new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    const first = argument.videoWeek?.start || new Date(Date.parse(today) - 6 * 86400000).toISOString().slice(0, 10);
     const verified = start === first && end === today;
-    if (verified) return { verified: true, label: '近7天', dateRange: `${start} - ${end}` };
+    if (verified) return { verified: true, label: argument.videoWeek ? '本周周一至昨天' : '近7天', dateRange: `${start} - ${end}` };
     if (argument.verify) return { verified: false };
     if (!argument.phase) return { calendar: true };
     const editors = elements('.el-date-editor--daterange', root);
@@ -250,11 +250,11 @@ export function feiguaPage(command, argument = {}) {
     if (!matching.length) {
       const direction = key < Math.min(...calendars.map(item => item.key)) ? 'left' : key > Math.max(...calendars.map(item => item.key)) ? 'right' : null;
       const buttons = direction ? elements(`button.el-icon-arrow-${direction}`, panel).filter(button => !button.disabled && !button.classList.contains('is-disabled')) : [];
-      if (buttons.length !== 1) return failure('无法切换到近7天所在月份');
+      if (buttons.length !== 1) return failure('无法切换到统计区间所在月份');
       buttons[0].click(); return { moved: true };
     }
     const cells = matching.flatMap(item => elements('.el-date-table td', item.calendar)).filter(cell => !cell.classList.contains('prev-month') && !cell.classList.contains('next-month') && compact(cell) === String(day));
-    if (cells.length !== 1 || cells[0].classList.contains('disabled') || !cells[0].classList.contains('available')) return failure('近7天所需日期不可选择');
+    if (cells.length !== 1 || cells[0].classList.contains('disabled') || !cells[0].classList.contains('available')) return failure('统计区间所需日期不可选择');
     cells[0].click(); return { picked: true };
   }
   if (command === 'choice') {
@@ -310,7 +310,7 @@ export function feiguaPage(command, argument = {}) {
     const videoTag = argument.kind === 'videos' ? musicTagData('视频标签') : null;
     if (hasCategory && (!Array.isArray(category?.path) || category.unsupportedDepth)) return failure('无法核对榜单分类，本组未保存');
     if (argument.kind === 'videos' && (!Array.isArray(videoCategory?.path) || !Array.isArray(videoTag?.path))) return failure('无法核对视频分类，本组未保存');
-    const videoPeriod = argument.kind === 'videos' ? feiguaPage('video-period', { verify: true }) : null;
+    const videoPeriod = argument.kind === 'videos' ? feiguaPage('video-period', { verify: true, videoWeek: argument.videoWeek }) : null;
     if (videoPeriod && !videoPeriod.verified) return failure(videoPeriod.error || '视频统计周期未生效，本组未保存');
     const choices = argument.kind === 'topics' ? ['话题总榜', argument.period] : argument.kind === 'hotspots' ? ['热点榜', argument.period] : [];
     let period = videoPeriod?.label || '昨日使用人数';
@@ -337,7 +337,7 @@ export function feiguaPage(command, argument = {}) {
     if (argument.kind !== 'music' && !dateRange) return failure('未能唯一回读实际统计日期，本组未保存');
     return { url: location.href, period, keyword, dateRange, filtersVerified: true,
       ...(hasCategory ? { musicTag: category.path, musicTagId: category.selectionId, musicTagOptions: category.options, musicTagRestricted: category.restricted } : {}),
-      ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, categoryId: videoCategory.selectionId, tagPath: videoTag.path, tagId: videoTag.selectionId } : {}),
+      ...(argument.kind === 'videos' ? { categoryPath: videoCategory.path, categoryId: videoCategory.selectionId, tagPath: videoTag.path, tagId: videoTag.selectionId, ...(argument.videoWeek ? { videoWeek: argument.videoWeek } : {}) } : {}),
     };
   }
   const findTable = sortLabel => {

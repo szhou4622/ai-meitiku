@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { collectionUpdateDate } from './feigua-collection-period.mjs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FeiguaShopCollector } from './feigua-shop-collector.mjs';
@@ -98,9 +99,9 @@ export class FeiguaShopService {
   async cancel() { this.controller?.abort(); if (this.controller && this.gateway.controller === this.controller) this.gateway.browser.stop?.(); return this.state(); }
   async checkSchedule(now = this.now(), canRun = () => false) {
     await this.ready;
-    const local = new Date(now + 8 * 3_600_000), date = local.toISOString().slice(0, 10);
+    const date = collectionUpdateDate(now);
     const week = currentShopWeek(now);
-    if (this.disposed || !canRun() || !week || !this.data.shops.length || local.getUTCHours() < 7 || this.controller || this.gateway.controller || this.gateway.operation || this.data.lastScheduledDate === date) return;
+    if (this.disposed || !canRun() || !date || !week || !this.data.shops.length || this.controller || this.gateway.controller || this.gateway.operation || this.data.lastScheduledDate === date) return;
     const pending = this.data.shops.filter(shop => !this.data.snapshots.some(row => row.shop.id === shop.id && row.weekStart === week.start && row.through === week.end));
     await this.commit({ ...this.data, lastScheduledDate: date });
     if (!this.disposed && pending.length) await this.start({ ids: pending.map(shop => shop.id) });

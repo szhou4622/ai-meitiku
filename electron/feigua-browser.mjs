@@ -1,4 +1,5 @@
 import { observeShopRequest } from './feigua-shop-api.mjs';
+import { COLLECTION_WEEK_LABEL } from './feigua-collection-period.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
@@ -479,19 +480,20 @@ export class FeiguaBrowser {
     if (!verified.verified) throw issue('未能确认筛选条件，已停止本组采集');
   }
 
-  async chooseVideoPeriod(signal) {
+  async chooseVideoPeriod(signal, videoWeek = null) {
     if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
-    const selected = await this.execute('video-period');
+    const args = videoWeek ? { videoWeek } : {};
+    const selected = await this.execute('video-period', args);
     if (selected.verified) return;
     if (selected.calendar) {
       if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
-      await this.execute('video-period', { phase: 'open' });
+      await this.execute('video-period', { ...args, phase: 'open' });
       await this.settle(signal);
       for (const phase of ['start', 'end']) {
         let picked = false;
         for (let attempt = 0; attempt < 13; attempt++) {
           if (signal?.aborted) throw issue('已取消采集', 'FEIGUA_CANCELLED');
-          const result = await this.execute('video-period', { phase });
+          const result = await this.execute('video-period', { ...args, phase });
           if (result.picked) { picked = true; break; }
           if (!result.moved) throw issue('视频统计日期选择未完成');
           await this.settle(signal);
@@ -500,7 +502,7 @@ export class FeiguaBrowser {
       }
     }
     await this.settle(signal);
-    if (!(await this.execute('video-period', { verify: true })).verified) throw issue('未能确认近7天统计日期，已停止本组采集');
+    if (!(await this.execute('video-period', { ...args, verify: true })).verified) throw issue(`未能确认${videoWeek ? COLLECTION_WEEK_LABEL : '近7天'}统计日期，已停止本组采集`);
   }
 
   async openSource(kind, signal) {
@@ -551,7 +553,7 @@ export class FeiguaBrowser {
         }
         await this.choose('video-filter', { label, path, phase: 'select' }, signal);
       }
-      await this.chooseVideoPeriod(signal);
+      await this.chooseVideoPeriod(signal, options.videoWeek);
       await this.choose('keyword', { keyword }, signal);
     } else {
       if (kind === 'topics') {
@@ -580,7 +582,7 @@ export class FeiguaBrowser {
       await this.settle(signal);
     }
     if (!sorted) throw issue('无法确认降序排列');
-    const args = { kind, keyword, period: source.period };
+    const args = { kind, keyword, period: source.period, ...(kind === 'videos' && options.videoWeek ? { videoWeek: options.videoWeek } : {}) };
     const context = await this.execute('capture-context', args);
     const capture = await this.readRanking(kind, context, since, signal);
     await this.settle(signal);

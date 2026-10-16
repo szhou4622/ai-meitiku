@@ -1,3 +1,4 @@
+import { currentCollectionWeek } from './feigua-collection-period.mjs';
 export const SHOP_LIMIT = 10;
 export const SHOP_METRICS = Object.freeze({
   sales: 'SalesGmvStr', salesCount: 'SalesCountStr', goods: 'GoodsCountStr',
@@ -34,13 +35,7 @@ export function shopDate(value) {
 }
 
 // Beijing natural week; Monday has no settled day yet. No partial future day.
-export function currentShopWeek(now = Date.now()) {
-  const local = new Date(now + 8 * 3_600_000);
-  const today = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
-  const weekday = new Date(today).getUTCDay() || 7;
-  if (weekday === 1) return null;
-  return { start: new Date(today - (weekday - 1) * 86_400_000).toISOString().slice(0, 10), end: new Date(today - 86_400_000).toISOString().slice(0, 10) };
-}
+export const currentShopWeek = currentCollectionWeek;
 
 export function validateShopWeek(period, now = Date.now()) {
   const start = shopDate(period?.start), end = shopDate(period?.end);

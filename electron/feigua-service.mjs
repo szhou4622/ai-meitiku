@@ -3,7 +3,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
-import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
+import { recoverVideoHistory } from './feigua-video-history.mjs';
+import { currentCollectionWeek, collectionUpdateDate, COLLECTION_WEEK_LABEL } from './feigua-collection-period.mjs';
 import { pendingTopicCheck, settledTopicPeriod } from './feigua-topic-schedule.mjs';
 import { pendingMusicCheck } from './feigua-music-schedule.mjs';
 import { retainProductFields, restoreProductFieldsInState } from './feigua-product-cache.mjs';
@@ -41,9 +42,7 @@ export function dueHotspotsDate(now = Date.now()) {
 }
 
 export function dueVideosDate(now = Date.now()) {
-  const beijing = new Date(now + 8 * 60 * 60 * 1000);
-  if (beijing.getUTCDay() === 1 && beijing.getUTCHours() * 60 + beijing.getUTCMinutes() < 390) return null;
-  return videoCollectionWeek(new Date(now).toISOString());
+  return collectionUpdateDate(now);
 }
 
 export class FeiguaService {
@@ -110,7 +109,7 @@ export class FeiguaService {
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
-      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' ? videoCollectionWeek(`${data.lastVideosScheduleDate}T04:00:00Z`) : null,
+      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.lastVideosScheduleDate) ? data.lastVideosScheduleDate : null,
       lastTopicsCheck: data.lastTopicsCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastTopicsCheck.slot) && typeof data.lastTopicsCheck.expectedPeriod === 'string'
         ? { slot: data.lastTopicsCheck.slot, expectedPeriod: data.lastTopicsCheck.expectedPeriod, checkedAt: data.lastTopicsCheck.checkedAt, musicTag: normalizeMusicTag(data.lastTopicsCheck.musicTag) } : null,
       lastMusicCheck: data.lastMusicCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastMusicCheck.date)
@@ -193,8 +192,17 @@ export class FeiguaService {
         // One browser session: catch up the earlier video task first, then the
         // next timer tick starts hotspots once the session is idle.
         if (videosDate && (!this.data.lastVideosScheduleDate || this.data.lastVideosScheduleDate < videosDate) && this.data.videoQueries.length) {
-          await this.launchRun([], [...this.data.keywords], { onlyVideos: true, verifyLogin: true, scheduledDate: videosDate });
-        } else if (hotspotsDate && (!this.data.lastHotspotsScheduleDate || this.data.lastHotspotsScheduleDate < hotspotsDate)) {
+          const week = currentCollectionWeek(now);
+          const pending = this.data.videoQueries.filter(query => !this.data.latestResults.some(group => group.kind === 'videos' && group.keyword === query.keyword && group.result?.period === COLLECTION_WEEK_LABEL && group.result.dateRange === `${week.start} - ${week.end}` && ['categoryPath', 'tagPath'].every(key => JSON.stringify(group.result.filters?.[key] || []) === JSON.stringify(query[key]))));
+          if (pending.length) {
+            await this.launchRun([], pending.map(query => query.keyword), { onlyVideos: true, verifyLogin: true, scheduledDate: videosDate, videoWeek: week });
+            this.scheduleMessage = null; return;
+          }
+          const previous = this.data.lastVideosScheduleDate;
+          this.data.lastVideosScheduleDate = videosDate;
+          try { await this.persist(); } catch (error) { this.data.lastVideosScheduleDate = previous; throw error; }
+        }
+        if (hotspotsDate && (!this.data.lastHotspotsScheduleDate || this.data.lastHotspotsScheduleDate < hotspotsDate)) {
           await this.launchRun([], [], { onlyHotspots: true, verifyLogin: true, scheduledDate: hotspotsDate });
         } else if (musicCheck) {
           await this.launchRun(musicCheck.musicTag, [], { onlyMusic: true, verifyLogin: true, musicCheck });
@@ -421,12 +429,12 @@ export class FeiguaService {
     return this.state();
   }
 
-  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, onlyTopics = false, skipTopics = false, skipMusic = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null, topicCheck = null, musicCheck = null } = {}) {
+  async launchRun(musicTag, keywords, { onlyMusic = false, onlyRankings = false, onlyHotspots = false, onlyVideos = false, onlyTopics = false, skipTopics = false, skipMusic = false, verifyLogin = false, scheduledDate = null, videoQueries = this.data.videoQueries, trigger = null, topicCheck = null, musicCheck = null, videoWeek = currentCollectionWeek() } = {}) {
     const sequence = this.operationSequence ?? this.loginSequence;
     if (this.disposed || sequence !== this.loginSequence) return;
     const groups = (onlyVideos ? [] : onlyMusic ? ['music'] : onlyRankings ? ['music', 'topics'] : onlyHotspots ? ['hotspots'] : onlyTopics ? ['topics'] : ['music', 'topics', 'hotspots']).filter(kind => (kind !== 'topics' || !skipTopics) && (kind !== 'music' || !skipMusic)).map(kind => ({ kind, keyword: null, status: 'pending', ...(['music','topics'].includes(kind) ? { musicTag: [...musicTag] } : {}) }));
     groups.push(...keywords.map(keyword => ({ kind: 'videos', keyword, status: 'pending', ...structuredClone(videoQueries.find(query => query.keyword === keyword) || { categoryPath: [], tagPath: [] }) })));
-    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'weekly-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
+    const run = { id: randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, status: 'running', keywords, musicTag, groups, ...(keywords.length ? { videoWeek } : {}), ...(scheduledDate ? { scheduledDate, trigger: onlyVideos ? 'daily-videos' : 'daily-hotspots' } : trigger ? { trigger } : {}), message: onlyMusic ? '正在刷新 BGM' : onlyRankings ? '正在刷新 BGM 和话题榜单' : onlyHotspots ? '正在更新每日热点榜' : onlyVideos ? '正在更新关键词视频榜单' : '准备采集' };
     const previousRuns = this.data.runs;
     const previousTopicsCheck = this.data.lastTopicsCheck;
     const previousMusicCheck = this.data.lastMusicCheck;
@@ -530,11 +538,12 @@ export class FeiguaService {
     let stop = false, stopMessage = null;
     for (const [index, group] of run.groups.entries()) {
       if (signal.aborted || stop) { group.status = signal.aborted ? 'cancelled' : 'skipped'; if (!signal.aborted && stopMessage) group.message = stopMessage; continue; }
+      if (group.kind === 'videos' && !run.videoWeek) { group.status = 'skipped'; group.message = '本周尚无已结束日期，周二起更新本周 Top5；保留已有结果'; continue; }
       group.status = 'running'; group.attempts = 1;
       run.message = `正在采集${group.keyword ? `「${group.keyword}」` : FEIGUA_SOURCES[group.kind].label}（${index + 1}/${run.groups.length}）`;
       await this.persist();
       try {
-        const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [] };
+        const options = { musicTag: group.musicTag || [], categoryPath: group.categoryPath || [], tagPath: group.tagPath || [], ...(group.kind === 'videos' ? { videoWeek: run.videoWeek } : {}) };
         const capture = await this.collectWithRetry(run, group, signal, options, index);
         if (signal.aborted) { group.status = 'cancelled'; continue; }
         if (Object.hasOwn(detailStopMessages, capture.detailStopReason)) {

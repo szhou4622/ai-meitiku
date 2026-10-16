@@ -1,5 +1,6 @@
 import { VIDEO_DETAIL_ENDPOINTS } from './feigua-video-details.mjs';
 import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
+import { COLLECTION_WEEK_LABEL, isCollectionWeek } from './feigua-collection-period.mjs';
 export const FEIGUA_HOME = 'https://dy.feigua.cn/';
 export const FEIGUA_SOURCES = Object.freeze({
   music: { label: '本周爆款 BGM Top5', navigation: ['热门音乐'], sort: '昨日使用人数', period: '昨日使用人数', fields: ['title', 'author', 'totalUsers', 'yesterdayUsers'] },
@@ -108,7 +109,7 @@ function captureError(message) {
   return Object.assign(new Error(message), { publicMessage: message });
 }
 
-export function validateCaptureDates(kind, input, now = Date.now()) {
+export function validateCaptureDates(kind, input, now = Date.now(), videoWeek = null) {
   const raw = value(input, 100);
   if (kind === 'music') return { dateRange: raw, dateWarning: null };
   const match = raw?.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2})(?:\s*[-~～至]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2}))?$/);
@@ -122,6 +123,11 @@ export function validateCaptureDates(kind, input, now = Date.now()) {
   };
   const start = parse(match[1]), end = parse(match[2] || match[1]);
   const day = 86_400_000;
+  if (kind === 'videos' && videoWeek) {
+    const today = Math.floor((now + 8 * 60 * 60 * 1000) / day) * day;
+    if (!isCollectionWeek(videoWeek) || videoWeek.end >= new Date(today).toISOString().slice(0, 10) || new Date(start).toISOString().slice(0, 10) !== videoWeek.start || new Date(end).toISOString().slice(0, 10) !== videoWeek.end) throw captureError('视频统计日期与本次周一至昨天的任务日期不一致，本组未保存');
+    return { dateRange: `${videoWeek.start} - ${videoWeek.end}`, dateWarning: null };
+  }
   const expectedDays = kind === 'hotspots' ? 1 : 7;
   if ((end - start) / day + 1 !== expectedDays) throw captureError(`实际统计日期与${FEIGUA_SOURCES[kind].period}不一致，本组未保存`);
   const today = Math.floor((now + 8 * 60 * 60 * 1000) / day) * day;
@@ -150,7 +156,8 @@ export function isRankingMetric(kind, input) {
 export function validateCapture(kind, keyword, capture, options = {}) {
   const source = FEIGUA_SOURCES[kind];
   if (!source || !capture || !isFeiguaDataUrl(capture.url, options.sourceOrigin)) throw new Error('飞瓜来源校验失败');
-  if (capture.sort !== source.sort || capture.direction !== 'desc' || capture.period !== source.period || capture.filtersVerified !== true) {
+  const period = kind === 'videos' && options.videoWeek ? COLLECTION_WEEK_LABEL : source.period;
+  if (capture.sort !== source.sort || capture.direction !== 'desc' || capture.period !== period || capture.filtersVerified !== true) {
     throw new Error('未确认榜单筛选或降序排序，已停止本组采集');
   }
   if (kind === 'videos' && capture.keyword !== keyword) throw new Error('关键词筛选与当前采集组不一致');
@@ -161,7 +168,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
   const hasCategory = ['music', 'topics'].includes(kind);
   const musicTag = hasCategory ? normalizeMusicTag(options.musicTag) : [];
   if (hasCategory && (!Array.isArray(capture.musicTag) || JSON.stringify(normalizeMusicTag(capture.musicTag)) !== JSON.stringify(musicTag))) throw new Error('榜单实际分类与任务选择不一致，本组未保存');
-  const dates = validateCaptureDates(kind, capture.dateRange, options.now);
+  const dates = validateCaptureDates(kind, capture.dateRange, options.now, options.videoWeek);
   if (!Array.isArray(capture.rows) || (!capture.rows.length && capture.emptyVerified !== true)) throw new Error('未读到榜单，不能将未加载页面保存为空榜单');
   const seen = new Set();
   const rows = [];
@@ -196,7 +203,7 @@ export function validateCapture(kind, keyword, capture, options = {}) {
   return {
     kind, keyword: kind === 'videos' ? keyword : null,
     sourceUrl: capture.url, collectedAt: new Date().toISOString(),
-    sort: source.sort, direction: 'desc', period: source.period,
+    sort: source.sort, direction: 'desc', period,
     ...dates,
     ...(capture.provenance?.transport === 'provider-api' ? { provenance: {
       transport: 'provider-api', endpoint: value(capture.provenance.endpoint, 200), method: 'GET', responseCode: 200, dateCode: value(capture.provenance.dateCode, 30),

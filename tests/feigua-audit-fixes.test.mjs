@@ -9,8 +9,8 @@ const origin='https://dy.feigua.cn';
 const flush=async()=>{for(let n=0;n<12;n++)await new Promise(resolve=>setImmediate(resolve));};
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
 const catalog={categoryPath:[{label:'合成分类',children:[]}],tagPath:[{label:'合成标签',children:[]}]};
-const capture=(kind,keyword=null)=>({url:`${origin}/app/#/synthetic/${kind}`,keyword,sort:FEIGUA_SOURCES[kind].sort,direction:'desc',period:FEIGUA_SOURCES[kind].period,
-  filtersVerified:true,musicTag:[],categoryPath:[],tagPath:[],dateRange:kind==='hotspots'?'2026-10-07':kind==='topics'?'2026-09-28 - 2026-10-04':'2026-10-02 - 2026-10-08',
+const capture=(kind,keyword=null,options={})=>({url:`${origin}/app/#/synthetic/${kind}`,keyword,sort:FEIGUA_SOURCES[kind].sort,direction:'desc',period:kind==='videos'&&options.videoWeek?'本周周一至昨天':FEIGUA_SOURCES[kind].period,
+  filtersVerified:true,musicTag:[],categoryPath:[],tagPath:[],dateRange:kind==='videos'&&options.videoWeek?`${options.videoWeek.start} - ${options.videoWeek.end}`:kind==='hotspots'?'2026-10-07':kind==='topics'?'2026-09-28 - 2026-10-04':'2026-10-02 - 2026-10-08',
   rows:[0,1].map(i=>({id:`700000000000000000${i}`,url:`${origin}/app/#/synthetic/detail/${i}`,title:'合成结果',author:'合成作者',followers:'10',totalUsers:'100',yesterdayUsers:'10',participantGrowth:'10%',playGrowth:'20%',peakHeat:String(100-i),sales:'10w-25w',salesCount:'10',likes:'1',publishedAt:'2026/10/08 09:00',products:[{id:`synthetic-product-${i}`,title:'合成商品',commission:null}]}))});
 function fixture(browser={},write){
   let disk={version:1,loginEntryUrl:origin+'/',keywords:[],runs:[]},writes=0;
@@ -134,7 +134,7 @@ async function withDetailTerminal(response,operation){
 test('detail quota, rate limit and expiry preserve verified rows but terminate later keyword groups',async()=>{
   for(const response of [{Code:403,Data:{Remainder:0}},{Code:429},{Code:401}])for(const invalid of [false,true]){
     await withDetailTerminal(response,async(browser,detailCalls)=>{
-      const calls=[];browser.checkLogin=async()=>({status:'authenticated'});browser.collect=async(kind,keyword,signal)=>{calls.push(keyword);const value=capture(kind,keyword);await browser.enrichVideoFields(value,signal);if(invalid)value.rows[0].sales='--';return value;};
+      const calls=[];browser.checkLogin=async()=>({status:'authenticated'});browser.collect=async(kind,keyword,signal,options)=>{calls.push(keyword);const value=capture(kind,keyword,options);await browser.enrichVideoFields(value,signal);if(invalid)value.rows[0].sales='--';return value;};
       const f=fixture(browser);await f.service.saveAndRefreshVideoQueries([{keyword:'合成甲',categoryPath:[],tagPath:[]},{keyword:'合成乙',categoryPath:[],tagPath:[]}]);await f.service.job;
       const s=await f.service.state();assert.deepEqual(calls,['合成甲']);assert.equal(detailCalls(),1);assert.equal(s.runs[0].groups[1].status,'skipped');
       assert.match(s.runs[0].groups[1].message,/停止后续/);assert.equal(s.runs[0].status,invalid?'failed':'partial');

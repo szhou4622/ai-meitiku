@@ -1,4 +1,5 @@
-// Source periods remain seven days; weekly archives use Monday labels in Beijing.
+import { COLLECTION_WEEK_LABEL, isCollectionWeek } from './feigua-collection-period.mjs';
+// Weekly archives use Monday labels in Beijing; retain actual source dates.
 export function videoCollectionWeek(value) {
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) return null;
@@ -8,11 +9,12 @@ export function videoCollectionWeek(value) {
 }
 
 // Never relabel a rolling source period as a calendar week.
-export function videoRankingPeriod(value) {
+export function videoRankingPeriod(value, period = '近7天') {
   const match = typeof value === 'string' && value.match(/^(\d{4}-\d{2}-\d{2}) - (\d{4}-\d{2}-\d{2})$/);
   if (!match) return null;
   const start = Date.parse(match[1]), end = Date.parse(match[2]);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || new Date(start).toISOString().slice(0, 10) !== match[1] || new Date(end).toISOString().slice(0, 10) !== match[2] || end - start !== 6 * 86400000) return null;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || new Date(start).toISOString().slice(0, 10) !== match[1] || new Date(end).toISOString().slice(0, 10) !== match[2]) return null;
+  if (period === COLLECTION_WEEK_LABEL ? !isCollectionWeek({ start: match[1], end: match[2] }) : end - start !== 6 * 86400000) return null;
   return value;
 }
 
@@ -21,7 +23,7 @@ export function videoRankingPeriod(value) {
 export function recoverVideoHistory(runs = [], cached = [], history = []) {
   const found = new Map();
   const candidates = [...runs.flatMap(run => run.groups || []), ...cached, ...history]
-    .filter(group => group.kind === 'videos' && group.status === 'completed' && group.result && Array.isArray(group.result.rows) && Number.isFinite(Date.parse(group.result.collectedAt)) && videoRankingPeriod(group.result.dateRange))
+    .filter(group => group.kind === 'videos' && group.status === 'completed' && group.result && Array.isArray(group.result.rows) && Number.isFinite(Date.parse(group.result.collectedAt)) && videoRankingPeriod(group.result.dateRange, group.result.period))
     .sort((a, b) => Date.parse(b.result.collectedAt) - Date.parse(a.result.collectedAt));
   const periods = new Set();
   for (const group of candidates) {
