@@ -1,10 +1,10 @@
+import { currentCollectionWeek, collectionUpdateDate, COLLECTION_WEEK_LABEL } from './feigua-collection-period.mjs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { normalizeLoginEntryUrl, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
-import { recoverVideoHistory } from './feigua-video-history.mjs';
-import { currentCollectionWeek, collectionUpdateDate, COLLECTION_WEEK_LABEL } from './feigua-collection-period.mjs';
+import { recoverVideoHistory, videoCollectionWeek } from './feigua-video-history.mjs';
 import { pendingTopicCheck, settledTopicPeriod } from './feigua-topic-schedule.mjs';
 import { pendingMusicCheck } from './feigua-music-schedule.mjs';
 import { retainProductFields, restoreProductFieldsInState } from './feigua-product-cache.mjs';
@@ -109,7 +109,7 @@ export class FeiguaService {
       musicTagOptions: data.musicTagOptions?.length ? normalizeMusicTagOptions(data.musicTagOptions) : [],
       musicTagRestricted: data.musicTagRestricted === true,
       lastHotspotsScheduleDate: typeof data.lastHotspotsScheduleDate === 'string' ? data.lastHotspotsScheduleDate : null,
-      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.lastVideosScheduleDate) ? data.lastVideosScheduleDate : null,
+      lastVideosScheduleDate: typeof data.lastVideosScheduleDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.lastVideosScheduleDate) && videoCollectionWeek(`${data.lastVideosScheduleDate}T04:00:00Z`) ? data.lastVideosScheduleDate : null,
       lastTopicsCheck: data.lastTopicsCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastTopicsCheck.slot) && typeof data.lastTopicsCheck.expectedPeriod === 'string'
         ? { slot: data.lastTopicsCheck.slot, expectedPeriod: data.lastTopicsCheck.expectedPeriod, checkedAt: data.lastTopicsCheck.checkedAt, musicTag: normalizeMusicTag(data.lastTopicsCheck.musicTag) } : null,
       lastMusicCheck: data.lastMusicCheck && /^\d{4}-\d{2}-\d{2}$/.test(data.lastMusicCheck.date)

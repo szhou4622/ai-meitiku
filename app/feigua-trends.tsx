@@ -241,10 +241,10 @@ export function FeiguaTrends() {
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
-    <p>北京时间：品类 Top5 与监控店铺共用本周周一至昨天，每天 07:00 后顺序更新，周一保留已有结果；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
 
     <nav className={styles.sectionNav} aria-label="采集区块导航"><button onClick={() => rankingsSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>查看热点与视频采集</button><button onClick={() => shopsSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>查看竞对店铺监控</button></nav>
     <div ref={rankingsSection} className={styles.sectionAnchor} />
+    <p>北京时间：品类 Top5 与监控店铺共用本周周一至昨天，每天 07:00 后顺序更新，周一保留已有结果；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">
