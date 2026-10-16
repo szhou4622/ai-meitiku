@@ -101,7 +101,6 @@
 .querySettings span { color: #73868b; }
 .querySettings button:first-of-type { margin-left: auto; }
 
-.moduleTabs { display: flex; gap: 8px; margin: 0 0 20px; border-bottom: 1px solid #dee7e7; padding-bottom: 10px; }
-.moduleTabs button[aria-pressed="true"] { background: #edf6f5; color: #238e86; border-color: #9acdc5; }
-
-.shopMode > p { display: none; }
+.sectionNav { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.sectionAnchor,.shopMonitoringSection { scroll-margin-top: 20px; }
+.shopMonitoringSection { margin-top: 34px; padding-top: 26px; border-top: 1px solid #d5e1e2; }
