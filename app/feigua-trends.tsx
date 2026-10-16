@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Globe2, Music2, TrendingUp, Plus, X, RefreshCw, LogIn, Square, Search } from 'lucide-react';
 import styles from './feigua-trends.module.css';
+import { FeiguaShopMonitoring } from './feigua-shops';
 import { displayedFeiguaGroups } from './feigua-results.mjs';
 import { recoverVideoHistory, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
 import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
@@ -115,6 +116,7 @@ function CategorySelect({ label, options, path, disabled, onChange }: { label: s
 }
 
 export function FeiguaTrends() {
+  const [panel, setPanel] = useState<'rankings' | 'shops'>('rankings');
   const [state, setState] = useState<State>(emptyState);
   const [loginEntryUrl, setLoginEntryUrl] = useState('');
   const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
@@ -232,6 +234,8 @@ export function FeiguaTrends() {
       <small>{loginEntryDirty ? '网址有修改，请先保存再登录。' : state.loginEntryUrl ? '网址已保存，可随时修改。先在入口登录，再进入飞瓜工作台。' : '先填写并保存入口网址，然后打开入口登录。'}</small>
     </form>
     <div className={styles.connection} role="status"><span className={state.auth.status === 'authenticated' ? styles.online : styles.dot} />{!loaded ? '正在读取本地数据…' : !desktop ? '请在桌面版登录飞瓜并采集，网页版仅展示入口。' : ['expired', 'error', 'checking','verification_required'].includes(state.auth.status) ? state.auth.message : displayedCount > 0 && !state.busy && state.auth.status !== 'authenticated' ? '已加载本地采集结果，登录后可更新' : state.auth.message}<span>登录后自动采集 · 数据保存在当前电脑</span></div>
+    <nav className={styles.moduleTabs} aria-label="采集功能"><button aria-pressed={panel === 'rankings'} onClick={() => setPanel('rankings')}>热点榜单</button><button aria-pressed={panel === 'shops'} onClick={() => setPanel('shops')}>竞对店铺</button></nav>
+    {panel === 'shops' ? <FeiguaShopMonitoring /> : <>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {state.storageMessage && <div className={styles.error} role="alert">{state.storageMessage}</div>}
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
@@ -313,5 +317,6 @@ export function FeiguaTrends() {
       {!!videoPeriod && state.keywords.some(keyword => !videoGroups.some(group => group.keyword === keyword)) && <p className={styles.videoPeriodNotice}>这一周未保存以下关键词的榜单：{state.keywords.filter(keyword => !videoGroups.some(group => group.keyword === keyword)).join('、')}</p>}
       {!videoGroups.length && <div className={styles.empty}>{videoPeriod ? '这一周没有已保存的带货榜单，请选择其他周或最新结果。' : state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>
+    </>}
   </section>;
 }

@@ -1,0 +1,114 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import { Search, Plus, RefreshCw, Square, X, Store } from 'lucide-react';
+import styles from './feigua-shops.module.css';
+
+type Shop = { id: string; name: string };
+type Period = { start: string; end: string };
+type Metrics = Record<string, string | null>;
+type ShopEvent = { date: string; kind: string; product: string | null; creator: string | null; fans: string | null; changes: { type: number; title: string | null; before: string | null; after: string | null }[] };
+type Snapshot = { shop: Shop; weekStart: string; through: string; collectedAt: string; metrics: Metrics; days: ({ date: string } & Metrics)[]; newGoods: { id: string; title: string; listedAt: string | null; sales: string | null; salesCount: string | null }[]; trend: { date: string; count: string }[]; events: ShopEvent[] };
+type ShopState = { shops: Shop[]; snapshots: Snapshot[]; busy: boolean; progress: string | null; currentWeek: Period | null; error: string | null; lastRun: { status: string; message: string; shops: { id: string; status: string; message?: string }[] } | null };
+export type FeiguaShopsBridge = {
+  state: () => Promise<ShopState>;
+  search: (query: string) => Promise<Shop[]>;
+  save: (shops: Shop[]) => Promise<ShopState>;
+  start: (options?: { ids: string[] }) => Promise<ShopState>;
+  cancel: () => Promise<ShopState>;
+};
+const fields = { sales: '销售额', salesCount: '销量', goods: '带货商品', videos: '带货视频', lives: '带货直播', creators: '带货达人', newGoods: '上架商品', changedGoods: '信息变更商品', newCreators: '首次合作达人' };
+const kinds: Record<string, string> = { 'new-product': '商品上架', 'product-change': '商品信息变更', 'new-creator': '首次合作达人' };
+const value = (v: string | null | undefined) => v ?? '来源未提供';
+const initial: ShopState = { shops: [], snapshots: [], busy: false, progress: null, currentWeek: null, error: null, lastRun: null };
+
+export function FeiguaShopMonitoring() {
+  const [state, setState] = useState<ShopState>(initial);
+  const [query, setQuery] = useState('');
+  const [matches, setMatches] = useState<Shop[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState('');
+  const [week, setWeek] = useState('');
+  const [action, setAction] = useState('');
+  const [error, setError] = useState('');
+  const [ready, setReady] = useState(false);
+  const [eventTypes, setEventTypes] = useState(Object.keys(kinds));
+  const [filter, setFilter] = useState('');
+  const [limit, setLimit] = useState(100);
+  useEffect(() => {
+    let alive = true, pending = false;
+    const read = async () => {
+      if (pending) return;
+      const api = window.desktopBridge?.feiguaShops;
+      if (!api) { if (alive) setError('请在媒体库桌面版使用竞对店铺采集'); return; }
+      pending = true;
+      try { const next = await api.state(); if (alive) { setState(next); setReady(true); } }
+      catch { if (alive) setError('店铺数据读取失败，已有周数据保留，请重试'); }
+      finally { pending = false; }
+    };
+    void read(); const timer = setInterval(() => void read(), 1800);
+    return () => { alive = false; clearInterval(timer); };
+  }, []);
+  const active = state.shops.find(s => s.id === selected) || state.shops[0];
+  const weeks = [...new Set([...(state.currentWeek ? [state.currentWeek.start] : []), ...state.snapshots.filter(s => s.shop.id === active?.id).map(s => s.weekStart)])].sort().reverse();
+  const activeWeek = weeks.includes(week) ? week : weeks[0] || '';
+  const snapshot = state.snapshots.find(s => s.shop.id === active?.id && s.weekStart === activeWeek);
+  const failed = state.lastRun?.shops.find(s => s.id === active?.id && s.status === 'failed');
+  const disabled = !ready || state.busy || !!action;
+  const events = (snapshot?.events || []).filter(e => eventTypes.includes(e.kind) && (!filter.trim() || [e.product, e.creator, ...e.changes.map(c => c.title)].some(v => v?.includes(filter.trim()))));
+  async function perform(name: string, operation: (api: FeiguaShopsBridge) => Promise<ShopState>) {
+    const api = window.desktopBridge?.feiguaShops; if (!api) return;
+    setAction(name); setError('');
+    try { const next = await operation(api); setState(next); return true; }
+    catch (e) { setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '操作未完成，已有数据保留'); return false; }
+    finally { setAction(''); }
+  }
+  async function search() {
+    const api = window.desktopBridge?.feiguaShops; if (!api || disabled || !query.trim()) return;
+    setAction('search'); setError(''); setMatches([]); setSearched(false);
+    try { setMatches(await api.search(query)); setSearched(true); }
+    catch (e) { setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '') : '搜索未完成，请重试'); }
+    finally { setAction(''); }
+  }
+  async function add(shop: Shop) {
+    const ok = await perform('add', async api => {
+      const saved = await api.save([...state.shops, shop]); setState(saved); setSelected(shop.id); setWeek('');
+      return api.start({ ids: [shop.id] });
+    });
+    if (ok) { setQuery(''); setMatches([]); setSearched(false); }
+  }
+  return <div className={styles.monitor}>
+    <header className={styles.heading}><div><h2><Store size={18} />竞对店铺监控</h2><p>本周周一至昨天 · 最多 10 个店铺 · 每天北京时间 07:00 后自动更新一次</p></div>
+      {state.busy ? <button disabled={!!action} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止店铺采集</button>
+        : <button disabled={disabled || !state.shops.length || !state.currentWeek} onClick={() => void perform('start', api => api.start())}><RefreshCw size={14} />刷新全部店铺本周数据</button>}
+    </header>
+    {error && <div className={styles.error} role="alert">{error}</div>}
+    {state.error && <div className={styles.error} role="alert">{state.error}</div>}
+    {state.busy && <div role="status" className={styles.progress}>{state.progress || '正在准备店铺采集…'}</div>}
+    {!state.busy && state.lastRun && <p role="status">{state.lastRun.message}</p>}
+    <section className={styles.search} aria-label="添加竞对店铺">
+      <div className={styles.searchTop}><h3>监控店铺 <small>{state.shops.length}/10</small></h3><p>搜索后确认具体店铺，同名店铺按独立标识区分。</p></div>
+      <form onSubmit={e => { e.preventDefault(); void search(); }}><input aria-label="店铺名称" value={query} onChange={e => { setQuery(e.target.value); setMatches([]); setSearched(false); }} maxLength={100} placeholder="输入要监控的店铺名称" disabled={disabled || state.shops.length >= 10} /><button disabled={disabled || !query.trim() || state.shops.length >= 10}><Search size={14} />{action === 'search' ? '搜索中…' : '搜索店铺'}</button></form>
+      <p>周明细与动态需具备飞瓜「关注的小店」访问权限。若提示未关注或权限不足，请先在飞瓜处理，再刷新；已有数据会保留。</p>
+      {searched && !matches.length && <p>没有找到店铺，请换一个更完整的名称。</p>}
+      {!!matches.length && <ul className={styles.matches}>{matches.map(shop => <li key={shop.id}><span>{shop.name}<small>店铺标识 {shop.id}</small></span><button disabled={disabled || state.shops.length >= 10 || state.shops.some(s => s.id === shop.id)} onClick={() => void add(shop)}><Plus size={13} />{state.shops.some(s => s.id === shop.id) ? '已监控' : '添加并采集'}</button></li>)}</ul>}
+    </section>
+    {!state.shops.length ? <div className={styles.empty}><h3>添加第一个竞对店铺</h3><p>保存后将采集本周汇总、逐日数据和小店动态，每周记录独立保留。</p></div> : <>
+      <nav className={styles.shops} aria-label="选择监控店铺">{state.shops.map(shop => <div key={shop.id} className={active?.id === shop.id ? styles.selected : ''}><button aria-pressed={active?.id === shop.id} onClick={() => { setSelected(shop.id); setWeek(''); setLimit(100); }}>{shop.name}</button><button disabled={disabled} aria-label={`移除监控 ${shop.name}`} title="移除监控，保留历史数据" onClick={() => void perform('remove', api => api.save(state.shops.filter(s => s.id !== shop.id)))}><X size={13} /></button></div>)}</nav>
+      <div className={styles.period}><h3>{active?.name}</h3><label>查看周数据 <select aria-label="店铺周记录" value={activeWeek} onChange={e => { setWeek(e.target.value); setLimit(100); }}>{weeks.map(date => <option key={date} value={date}>{date} 起{date === state.currentWeek?.start ? '（本周）' : ''}</option>)}</select></label><button disabled={disabled || !state.currentWeek || !active} onClick={() => void perform('refresh', api => api.start({ ids: [active!.id] }))}>刷新该店本周</button></div>
+      {!state.currentWeek && <p>本周尚无已结束日期，周二起更新本周数据；已保存的历史周仍可查看。</p>}
+      {failed && <div className={styles.error} role="status">{failed.message}。{snapshot ? '下方保留上次成功保存的周数据。' : '本周尚无已保存数据。'}</div>}
+      {!snapshot ? <div className={styles.empty}>该店本周尚未采集成功，或该历史周没有记录。</div> : <>
+        <p className={styles.source}>统计日期：{snapshot.weekStart} — {snapshot.through} · 更新于 {new Date(snapshot.collectedAt).toLocaleString('zh-CN', { hour12: false })} · 数值保留飞瓜原始区间</p>
+        <div className={styles.metrics}>{Object.entries(fields).map(([key, label]) => <div key={key}><span>{label}</span><strong>{value(snapshot.metrics[key])}</strong></div>)}</div>
+        <section className={styles.block}><h3>每日数据</h3><div className={styles.table}><table><thead><tr><th>日期</th>{Object.entries(fields).map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead><tbody>{snapshot.days.map(row => <tr key={row.date}><td>{row.date}</td>{Object.keys(fields).map(key => <td key={key}>{value(row[key])}</td>)}</tr>)}</tbody></table></div></section>
+        <div className={styles.twoColumns}><section className={styles.block}><h3>商品上架节奏</h3><div className={styles.bars}>{snapshot.trend.map(row => <div key={row.date}><span>{row.date.slice(5)}</span><i style={{ height: `${Math.max(2, Number(row.count) / Math.max(1, ...snapshot.trend.map(r => Number(r.count))) * 90)}px` }} /><b>{row.count}</b></div>)}</div></section><section className={styles.block}><h3>上架商品 Top10</h3><div className={styles.table}><table><thead><tr><th>商品</th><th>上架日期</th><th>销售额</th><th>销量</th></tr></thead><tbody>{snapshot.newGoods.map(row => <tr key={row.id}><td>{row.title}</td><td>{value(row.listedAt)}</td><td>{value(row.sales)}</td><td>{value(row.salesCount)}</td></tr>)}</tbody></table>{!snapshot.newGoods.length && <p>本周没有新增上架商品。</p>}</div></section></div>
+        <section className={styles.block}><div className={styles.eventHeader}><h3>小店动态</h3><input aria-label="筛选店铺动态" value={filter} onChange={e => { setFilter(e.target.value); setLimit(100); }} placeholder="筛选商品名称、达人或动态内容" /></div><div className={styles.filters}>{Object.entries(kinds).map(([key, label]) => <label key={key}><input type="checkbox" checked={eventTypes.includes(key)} onChange={e => { setEventTypes(e.target.checked ? [...eventTypes, key] : eventTypes.filter(t => t !== key)); setLimit(100); }} />{label}（{snapshot.events.filter(e => e.kind === key).length}）</label>)}</div>
+          <p>已保存 {snapshot.events.length} 条动态，当前筛选 {events.length} 条</p>
+          <ol className={styles.events}>{events.slice(0, limit).map((event, i) => <li key={`${event.date}-${i}`}><time>{event.date}</time><article><div className={styles.eventTitle}><strong>{event.creator || event.product}</strong><span>{kinds[event.kind]}</span></div>{event.creator && <p>粉丝数：{value(event.fans)}</p>}{event.product && event.creator && <p>{event.product}</p>}{event.changes.map((change, j) => <div key={j} className={styles.change}><p>{change.type === 40 ? '首次带货直播' : change.type === 41 ? '首次带货视频' : change.type === 20 ? '主图变更' : change.type === 10 ? '商品上架' : '商品信息变更'}{change.title ? `：${change.title}` : ''}</p>{(change.before || change.after) && <p>{value(change.before)} → {value(change.after)}</p>}</div>)}</article></li>)}</ol>
+          {!events.length && <p>当前条件没有动态。</p>}{events.length > limit && <button onClick={() => setLimit(limit + 100)}>再显示 100 条</button>}
+        </section>
+      </>}
+    </>}
+  </div>;
+}

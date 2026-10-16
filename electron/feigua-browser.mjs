@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { FEIGUA_HOME, FEIGUA_SOURCES, isFeiguaDataUrl, normalizeMusicTag, normalizeVideoPath } from './feigua-contract.mjs';
 import { feiguaPage } from './feigua-page.mjs';
+import { observeShopRequest } from './feigua-shop-api.mjs';
 import { normalizeLoginEntryUrl, isLoginEntryNavigation, isLoginEntryHandoff, normalizeWorkspaceHint } from './feigua-login-entry.mjs';
 import { FEIGUA_ENDPOINTS, observeFeiguaRequest, validateFeiguaRequest, readFeiguaApi, captureFeiguaResponse } from './feigua-api.mjs';
 import { normalizeLoginCredentials, loginFormMemory } from './feigua-login-credentials.mjs';
@@ -164,6 +165,10 @@ export class FeiguaBrowser {
       this.partition.webRequest.onBeforeRequest((details, callback) => {
         if (isCollectionLoadingRequest(details, this.window?.webContents.id, this.verifiedSourceOrigin)) { this.pending.add(details.id); this.lastNetwork = Date.now(); }
         if (this.window && details.webContentsId === this.window.webContents.id) {
+          const currentUrl = this.window.webContents.getURL();
+          const shopOrigin = this.isProviderUrl(currentUrl) ? new URL(currentUrl).origin : null;
+          const shopRequest = observeShopRequest(details, shopOrigin);
+          if (shopRequest) this.shopRequests = [...(this.shopRequests || []), { ...shopRequest, sequence: ++this.requestSequence }].slice(-100);
           const request = observeFeiguaRequest(details, this.verifiedSourceOrigin);
           if (request) this.rankingRequests = [...this.rankingRequests, { ...request, sequence: ++this.requestSequence }].slice(-30);
           const detailRequest = observeVideoDetailRequest(details, this.verifiedSourceOrigin);

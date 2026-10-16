@@ -1,0 +1,51 @@
+.monitor { display: grid; gap: 18px; }
+.monitor h2 { display: flex; align-items: center; gap: 8px; }
+.monitor h3 { font-size: 14px; }
+.heading,.searchTop,.period,.eventHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.heading p { margin-top: 7px; }
+.search,.block { background: white; border: 1px solid #dee7e7; border-radius: 8px; padding: 18px; min-width: 0; }
+.search form { display: flex; gap: 8px; margin: 14px 0 10px; }
+.monitor input:not([type=checkbox]),.monitor select { min-width: 0; border: 1px solid #d5e1e2; background: #fbfdfd; padding: 9px 10px; border-radius: 5px; color: #34595c; font: inherit; font-size: 12px; }
+.search form input { flex: 1; max-width: 460px; }
+.searchTop small { color: #6f8688; margin-left: 8px; }
+.matches { list-style: none; margin: 12px 0 0; padding: 0; }
+.matches li { display: flex; gap: 14px; justify-content: space-between; align-items: center; border-top: 1px solid #eef2f2; padding: 10px 0; font-size: 13px; }
+.matches small { display: block; color: #7f9294; font-size: 11px; margin-top: 4px; }
+.shops { display: flex; flex-wrap: wrap; gap: 8px; }
+.shops > div { display: flex; border: 1px solid #d5e1e2; background: white; border-radius: 6px; }
+.shops .selected { border-color: #238e86; background: #edf6f5; }
+.shops button { border: 0; background: transparent; }
+.period label { color: #708587; font-size: 12px; }
+.period select { margin-left: 8px; }
+.source { color: #73868b; }
+.metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.metrics > div { border: 1px solid #dee7e7; background: white; border-radius: 6px; padding: 14px 16px; }
+.metrics span { display: block; font-size: 12px; color: #78898c; }
+.metrics strong { display: block; margin-top: 8px; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.table { overflow-x: auto; margin-top: 14px; }
+.table table { border-collapse: collapse; min-width: 100%; font-size: 12px; text-align: left; }
+.table th,.table td { border-bottom: 1px solid #edf1f1; padding: 12px 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.table th { color: #75898b; font-weight: 500; background: #f7f9f9; }
+.table td:first-child { white-space: normal; min-width: 100px; max-width: 330px; line-height: 1.6; }
+.twoColumns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; }
+.bars { display: flex; height: 145px; gap: 12px; align-items: end; padding-top: 14px; }
+.bars > div { display: flex; flex: 1; align-items: center; flex-direction: column-reverse; gap: 5px; color: #75898b; font-size: 11px; }
+.bars i { display: block; width: min(26px,90%); background: #65b5aa; border-radius: 3px 3px 0 0; }
+.bars b { font-weight: 500; }
+.filters { display: flex; flex-wrap: wrap; gap: 18px; margin: 16px 0; font-size: 12px; }
+.filters label { display: flex; align-items: center; gap: 5px; }
+.filters input { accent-color: #238e86; }
+.events { list-style: none; margin: 18px 0 0; padding: 0; }
+.events > li { border-left: 2px solid #d6ebe6; padding: 0 0 18px 18px; position: relative; }
+.events > li::before { content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #65b5aa; left: -5px; top: 3px; }
+.events time { font-size: 12px; color: #75898b; }
+.events article { border: 1px solid #e4eceb; border-radius: 6px; padding: 14px; margin-top: 8px; }
+.eventTitle { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 13px; }
+.eventTitle span { color: #238e86; background: #edf6f5; border-radius: 4px; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
+.change { border-top: 1px solid #edf1f1; margin-top: 10px; padding-top: 8px; overflow-wrap: anywhere; }
+.empty { padding: 44px 16px; text-align: center; color: #7a8d90; border: 1px dashed #d4e1df; border-radius: 7px; }
+.empty p { margin-top: 10px; }
+.error { border-left: 3px solid #b9633c; background: #fff2eb; padding: 12px; color: #8a4525; font-size: 12px; }
+.progress { color: #238e86; background: #edf6f5; padding: 12px; border-radius: 5px; font-size: 13px; }
+@media(max-width:1100px) { .twoColumns { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media(max-width:750px) { .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .eventHeader input { width: 100%; } }
