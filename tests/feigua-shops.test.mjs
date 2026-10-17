@@ -122,19 +122,19 @@ test('complete dynamic pagination is required and a mismatching shop product can
   wrongShop = true; await assert.rejects(collector.collect(shop, week), /不属于/);
 });
 
-function fixture({ stored, collect, write, auth = { status: 'authenticated' }, time = now } = {}) {
-  let disk = structuredClone(stored || { version: 1, shops: [shop], snapshots: [], lastRun: null, lastScheduledDate: null }), calls = 0, authCalls = 0;
+function fixture({ stored, collect, unfollow, write, auth = { status: 'authenticated' }, time = now } = {}) {
+  let disk = structuredClone(stored || { version: 1, shops: [shop], snapshots: [], lastRun: null, lastScheduledDate: null }), calls = 0, authCalls = 0, unfollows = 0;
   const gateway = { controller: null, operation: null, browser: { checkLogin: async () => { authCalls++; return auth; }, stop() {} },
     exclusive: async action => { if (gateway.controller || gateway.operation) throw new Error('busy'); gateway.operation = Promise.resolve().then(action); try { return await gateway.operation; } finally { gateway.operation = null; } } };
   const service = new FeiguaShopService({ userDataPath: '/unused', gateway, now: () => time,
-    collector: { search: async () => [shop], collect: async (...args) => { calls++; return collect ? collect(...args) : snapshot(args[0], args[1]); } },
+    collector: { search: async () => [shop], collect: async (...args) => { calls++; return collect ? collect(...args) : snapshot(args[0], args[1]); }, unfollow: async (...args) => { unfollows++; return unfollow ? unfollow(...args) : { remaining: 9 }; } },
     storage: { read: async () => structuredClone(disk), write: async data => { await write?.(data); disk = structuredClone(data); } } });
-  return { service, gateway, disk: () => disk, calls: () => calls, authCalls: () => authCalls };
+  return { service, gateway, disk: () => disk, calls: () => calls, authCalls: () => authCalls, unfollows: () => unfollows };
 }
 test('settings enforce the limit before writing and removal preserves all saved weeks', async () => {
   const saved = snapshot(), f = fixture({ stored: { version: 1, shops: [shop], snapshots: [saved] } });
   await assert.rejects(f.service.save(Array.from({ length: 11 }, (_, i) => ({ id: `s-${i}`, name: '店' }))), /10/);
-  await f.service.save([]); assert.deepEqual(f.disk().snapshots, [saved]); assert.equal(f.calls(), 0);
+  await f.service.remove(shop.id); assert.deepEqual(f.disk().snapshots, [saved]); assert.equal(f.calls(), 0);
 });
 test('results are published only after durable writing and a failed refresh preserves prior data', async () => {
   const old = snapshot(); old.metrics.sales = '上次来源值';
@@ -387,7 +387,7 @@ test('initialization retries record intent before provider I/O, preserve snapsho
   const stored = { version: 1, shops: [shop], snapshots: [snapshot()], waitingShops };
   const failed = fixture({ stored, write: async () => { throw new Error('disk failure'); } });
   await assert.rejects(failed.service.checkSchedule(now, () => true), /disk failure/); assert.equal(failed.calls(), 0);
-  const f = fixture({ stored }); await f.service.save([]);
+  const f = fixture({ stored }); await f.service.remove(shop.id);
   assert.deepEqual(f.disk().waitingShops, []); assert.equal(f.disk().snapshots.length, 1);
   await f.service.checkSchedule(now, () => true); assert.equal(f.calls(), 0);
 });
@@ -402,4 +402,116 @@ test('cancel and expired login clear automatic initialization retries instead of
   const cancelled = fixture({ stored, collect: async () => { await gate; return snapshot(); } });
   await cancelled.service.start(); await flush(); await cancelled.service.cancel(); release(); await cancelled.service.job;
   assert.deepEqual(cancelled.disk().waitingShops, []);
+});
+
+function removalFixture({ followed = true, removable = true, confirm = true, remaining = 8, released = 9, ready = false, uncertain = false } = {}) {
+  const collector = new FeiguaShopCollector({}), calls = [];
+  collector.request = async (kind, params) => {
+    calls.push({ kind, params });
+    if (kind === 'focusList') return { total: followed ? 1 : 0, rows: followed ? [{ ...shop, focusId: 123 }] : [] };
+    if (kind === 'focusInfo') return { shopId: shop.id, ready, removable, followedAt: '2026/10/17 09:36:13' };
+    if (kind === 'focusCount') return { remaining: followed ? remaining : released };
+    assert.equal(kind, 'unfollow'); assert.deepEqual(params, { focusId: 123 });
+    if (confirm) followed = false;
+    if (uncertain) throw Object.assign(new Error('uncertain outcome'), { code: 'FEIGUA_NETWORK' });
+    return { acknowledged: true };
+  };
+  return { collector, calls };
+}
+
+test('sync removal uses the confirmed focus ID and verifies absence plus a released quota slot', async () => {
+  const f = removalFixture();
+  assert.deepEqual(await f.collector.unfollow(shop, undefined, () => {}, now), { remaining: 9 });
+  assert.deepEqual(f.calls.map(x => x.kind), ['focusList', 'focusInfo', 'focusCount', 'unfollow', 'focusList', 'focusCount']);
+  assert.equal(f.calls.filter(x => x.kind === 'unfollow').length, 1);
+  // Product-data readiness does not prevent a source-authorized removal.
+  assert.equal(f.calls[3].params.focusId, 123);
+});
+
+test('the source 24-hour restriction and unknown removal eligibility prevent every delete write', async () => {
+  for (const removable of [false, undefined, null]) {
+    const f = removalFixture({ removable });
+    if (removable === undefined) { const request = f.collector.request.bind(f.collector); f.collector.request = async (...args) => { const data = await request(...args); if (args[0] === 'focusInfo') delete data.removable; return data; }; }
+    await assert.rejects(f.collector.unfollow(shop), removable === false ? { code: 'FEIGUA_SHOP_REMOVE_LOCKED' } : /移除权限/);
+    assert.ok(!f.calls.some(x => x.kind === 'unfollow'));
+  }
+  const blocked = removalFixture({ removable: false });
+  await assert.rejects(blocked.collector.unfollow(shop), /2026-10-18 09:36/);
+});
+
+test('absent follows remove idempotently and uncertain writes are read back before any retry', async () => {
+  const absent = removalFixture({ followed: false });
+  assert.equal((await absent.collector.unfollow(shop)).remaining, 9);
+  assert.deepEqual(absent.calls.map(x => x.kind), ['focusList', 'focusCount']);
+  const uncertain = removalFixture({ uncertain: true });
+  await assert.rejects(uncertain.collector.unfollow(shop), { code: 'FEIGUA_NETWORK' });
+  assert.equal((await uncertain.collector.unfollow(shop)).remaining, 9);
+  assert.equal(uncertain.calls.filter(x => x.kind === 'unfollow').length, 1);
+});
+
+test('an unconfirmed cancellation of attention or unreleased slot is never treated as completed removal', async () => {
+  const unconfirmed = removalFixture({ confirm: false }); await assert.rejects(unconfirmed.collector.unfollow(shop), /尚未确认/);
+  const quota = removalFixture({ released: 8 }); await assert.rejects(quota.collector.unfollow(shop), /名额尚未确认释放/);
+  const unknown = removalFixture({ remaining: null }); await assert.rejects(unknown.collector.unfollow(shop), /关注名额/);
+  assert.ok(!unknown.calls.some(x => x.kind === 'unfollow'));
+  const mismatch = removalFixture(); const request = mismatch.collector.request.bind(mismatch.collector);
+  mismatch.collector.request = async (...args) => { const data = await request(...args); return args[0] === 'focusInfo' ? { ...data, shopId: 'another' } : data; };
+  await assert.rejects(mismatch.collector.unfollow(shop), /移除权限/); assert.ok(!mismatch.calls.some(x => x.kind === 'unfollow'));
+});
+
+test('sync removal works on Monday and cancel before submitting the write prevents deletion', async () => {
+  const monday = removalFixture(); await monday.collector.unfollow(shop, undefined, () => {}, Date.parse('2026-10-12T00:00:00Z'));
+  assert.deepEqual(monday.calls[0].params, { beginDateCode: '20260912', endDateCode: '20261011', groupId: 0, shopStatSort: 1, sortDirection: 1, pageIndex: 1, pageSize: 10 });
+  const f = removalFixture(), controller = new AbortController(), request = f.collector.request.bind(f.collector);
+  f.collector.request = async (...args) => { const data = await request(...args); if (args[0] === 'focusCount') controller.abort(); return data; };
+  await assert.rejects(f.collector.unfollow(shop, controller.signal), { code: 'FEIGUA_CANCELLED' });
+  assert.ok(!f.calls.some(x => x.kind === 'unfollow'));
+});
+
+test('local removal requires successful provider synchronization and preserves history and other monitors', async () => {
+  const other = { id: 'other', name: '其他店铺' }, historical = snapshot();
+  const waitingShops = [{ id: shop.id, attempts: 1, nextCheckAt: new Date(now).toISOString() }];
+  const f = fixture({ stored: { version: 1, shops: [shop, other], snapshots: [historical], waitingShops } });
+  await assert.rejects(f.service.save([other]), /同步移除/); assert.equal(f.unfollows(), 0);
+  const result = await f.service.remove(shop.id);
+  assert.equal(result.busy, false); assert.match(result.notice, /剩余 9/);
+  assert.deepEqual(f.disk().shops, [other]); assert.deepEqual(f.disk().snapshots, [historical]); assert.deepEqual(f.disk().waitingShops, []);
+  await assert.rejects(f.service.remove('not-configured'), /不在当前监控/); assert.equal(f.unfollows(), 1);
+});
+
+test('source rejection, expired login and local save failure all retain the local monitor and history', async () => {
+  const stored = { version: 1, shops: [shop], snapshots: [snapshot()] };
+  const blocked = fixture({ stored, unfollow: async () => { throw Object.assign(new Error('24小时限制'), { code: 'FEIGUA_SHOP_REMOVE_LOCKED' }); } });
+  await assert.rejects(blocked.service.remove(shop.id), { code: 'FEIGUA_SHOP_REMOVE_LOCKED' }); assert.deepEqual(blocked.disk(), stored);
+  const expired = fixture({ stored, auth: { status: 'expired', message: '请重新登录' } });
+  await assert.rejects(expired.service.remove(shop.id), /重新登录/); assert.equal(expired.unfollows(), 0);
+  const diskFailure = fixture({ stored, write: async () => { throw new Error('disk unavailable'); } });
+  await assert.rejects(diskFailure.service.remove(shop.id), { code: 'FEIGUA_SHOP_REMOVE_SAVE' });
+  assert.deepEqual(diskFailure.disk(), stored); assert.equal((await diskFailure.service.state()).busy, false);
+});
+
+test('in-flight removal locks settings, collection and other source operations; cancellation preserves the monitor', async () => {
+  let entered, release; const started = new Promise(r => { entered = r; }), gate = new Promise(r => { release = r; });
+  const f = fixture({ unfollow: async (_shop, signal) => { entered(); await gate; assert.equal(signal.aborted, true); return { remaining: 9 }; } });
+  const removing = f.service.remove(shop.id); await started;
+  await assert.rejects(f.service.save([shop]), /保存/); await assert.rejects(f.service.start(), /正在执行/); await assert.rejects(f.service.search('合成'), /等待/);
+  await f.service.checkSchedule(now, () => true); assert.equal(f.calls(), 0);
+  await f.service.cancel(); release(); await assert.rejects(removing, { code: 'FEIGUA_CANCELLED' });
+  assert.deepEqual(f.disk().shops, [shop]); assert.equal((await f.service.state()).busy, false);
+});
+
+test('unfollow observation and provider client accept only the exact single-record POST', async () => {
+  const details = params => ({ method: 'POST', url: 'https://dy.feigua.cn' + SHOP_ENDPOINTS.unfollow, uploadData: [{ bytes: Buffer.from(JSON.stringify(params)) }] });
+  assert.deepEqual(observeShopRequest(details({ focusId: 123 }), 'https://dy.feigua.cn'), { kind: 'unfollow', params: { focusId: '123' } });
+  for (const p of [{ focusId: 0 }, { focusId: '123' }, { focusId: 123, groupId: 0 }, { shopId: shop.id }]) assert.equal(observeShopRequest(details(p), 'https://dy.feigua.cn'), null);
+  assert.equal(observeShopRequest({ ...details({ focusId: 123 }), method: 'GET' }, 'https://dy.feigua.cn'), null);
+  const old = globalThis.document, calls = []; let response = { Code: 200, Status: true, Data: null };
+  globalThis.document = { querySelector: () => ({ __vue__: { $api: { shops: { remove: { url: SHOP_ENDPOINTS.unfollow, POST: async args => { calls.push(args); return response; } } } } } }) };
+  try {
+    assert.equal((await readShopApi({ kind: 'unfollow', params: { focusId: 123, extra: true } })).code, 0); assert.equal(calls.length, 0);
+    assert.equal((await readShopApi({ kind: 'unfollow', params: { focusId: 123 } })).data.acknowledged, true);
+    assert.deepEqual(calls[0], { data: { focusId: 123 } });
+    response = { Code: -200, Status: false, Msg: '新添加的小店需满24小时方可删除', Data: null };
+    assert.equal((await readShopApi({ kind: 'unfollow', params: { focusId: 123 } })).removalLocked, true);
+  } finally { globalThis.document = old; }
 });

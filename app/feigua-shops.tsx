@@ -10,11 +10,12 @@ type Period = { start: string; end: string };
 type Metrics = Record<string, string | null>;
 type ShopEvent = { date: string; kind: string; product: string | null; creator: string | null; fans: string | null; changes: { type: number; title: string | null; before: string | null; after: string | null }[] };
 type Snapshot = { shop: Shop; weekStart: string; through: string; collectedAt: string; metrics: Metrics; days: ({ date: string } & Metrics)[]; newGoods: { id: string; title: string; listedAt: string | null; sales: string | null; salesCount: string | null }[]; trend: { date: string; count: string }[]; events: ShopEvent[] };
-type ShopState = { shops: Shop[]; snapshots: Snapshot[]; waitingShops?: { id: string; nextCheckAt: string; attempts: number }[]; busy: boolean; progress: string | null; currentWeek: Period | null; error: string | null; lastRun: { status: string; message: string; shops: { id: string; status: string; message?: string }[] } | null };
+type ShopState = { shops: Shop[]; snapshots: Snapshot[]; waitingShops?: { id: string; nextCheckAt: string; attempts: number }[]; busy: boolean; progress: string | null; currentWeek: Period | null; error: string | null; notice?: string | null; lastRun: { status: string; message: string; shops: { id: string; status: string; message?: string }[] } | null };
 export type FeiguaShopsBridge = {
   state: () => Promise<ShopState>;
   search: (query: string) => Promise<Shop[]>;
   save: (shops: Shop[]) => Promise<ShopState>;
+  remove: (id: string) => Promise<ShopState>;
   start: (options?: { ids: string[] }) => Promise<ShopState>;
   cancel: () => Promise<ShopState>;
 };
@@ -84,7 +85,7 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
     if (ok) { setQuery(''); setMatches([]); setSearched(false); }
   }
   async function remove(shop: Shop) {
-    if (await perform('remove', api => api.save(state.shops.filter(s => s.id !== shop.id)))) { setPage(1); setWeek(''); }
+    if (await perform(`remove:${shop.id}`, api => api.remove(shop.id))) { setPage(1); setWeek(''); }
   }
   return <div className={styles.monitor}>
     {settingsContainer && createPortal(<div className={`${styles.monitor} ${styles.settingsContent}`}>
@@ -96,13 +97,14 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
     {state.error && <div className={styles.error} role="alert">{state.error}</div>}
     {state.busy && <div role="status" className={styles.progress}>{state.progress || '正在准备店铺采集…'}</div>}
     {!state.busy && state.lastRun && <p role="status">{state.lastRun.message}</p>}
+    {state.notice && <p role="status">{state.notice}</p>}
     <section className={styles.search} aria-label="添加竞对店铺">
       <div className={styles.searchTop}><h3>监控店铺 <small>{state.shops.length}/10</small></h3><p>搜索后确认具体店铺，同名店铺按独立标识区分。</p></div>
       <form onSubmit={e => { e.preventDefault(); void search(); }}><input aria-label="店铺名称" value={query} onChange={e => { setQuery(e.target.value); setMatches([]); setSearched(false); }} maxLength={100} placeholder="输入要监控的店铺名称" disabled={disabled || state.shops.length >= 10} /><button disabled={disabled || !query.trim() || state.shops.length >= 10}><Search size={14} />{action === 'search' ? '搜索中…' : '搜索店铺'}</button></form>
-      <p>添加并采集或手动刷新时，会自动同步关注到当前飞瓜账号，占用该账号的小店关注名额；已关注的店铺不会重复添加。名额或访问权限不足时保留已有数据。移除仅停止本软件监控，飞瓜关注仍保留。</p>
+      <p>添加并采集或手动刷新时，会自动同步关注到当前飞瓜账号，占用该账号的小店关注名额；已关注的店铺不会重复添加。“同步移除”会取消飞瓜关注并释放名额，保留本地历史周数据。飞瓜规定新关注的小店满 24 小时才可移除，受限或同步失败时保留本地监控并提示原因。</p>
       {searched && !matches.length && <p>没有找到店铺，请换一个更完整的名称。</p>}
       {!!matches.length && <ul className={styles.matches}>{matches.map(shop => <li key={shop.id}><span>{shop.name}<small>店铺标识 {shop.id}</small></span><button disabled={disabled || state.shops.length >= 10 || state.shops.some(s => s.id === shop.id)} onClick={() => void add(shop)}><Plus size={13} />{state.shops.some(s => s.id === shop.id) ? '已监控' : '添加并采集'}</button></li>)}</ul>}
-      {!!state.shops.length && <ul className={styles.matches} aria-label="已监控店铺设置">{state.shops.map(shop => <li key={shop.id}><strong>{shop.name}</strong><div className={styles.shopActions}><button disabled={disabled || !state.currentWeek} onClick={() => void perform('refresh', api => api.start({ ids: [shop.id] }))}>刷新本周数据</button><button disabled={disabled} aria-label={`移除监控 ${shop.name}`} title="移除监控，保留历史数据" onClick={() => void remove(shop)}><X size={13} />移除</button></div></li>)}</ul>}
+      {!!state.shops.length && <ul className={styles.matches} aria-label="已监控店铺设置">{state.shops.map(shop => <li key={shop.id}><strong>{shop.name}</strong><div className={styles.shopActions}><button disabled={disabled || !state.currentWeek} onClick={() => void perform('refresh', api => api.start({ ids: [shop.id] }))}>刷新本周数据</button><button disabled={disabled} aria-label={`移除监控 ${shop.name}`} title="同步取消飞瓜关注并释放名额，保留本地历史周数据" onClick={() => void remove(shop)}><X size={13} />{action === `remove:${shop.id}` ? '正在同步移除…' : '同步移除'}</button></div></li>)}</ul>}
     </section>
     </div>, settingsContainer)}
     <header className={styles.heading}><div><h2><Store size={18} />竞对店铺监控结果</h2><p>本周周一至昨天 · 在上方“采集设置”中管理监控店铺</p></div></header>

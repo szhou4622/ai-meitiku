@@ -35,19 +35,43 @@ export class FeiguaShopService {
   }
   async state() {
     await this.ready;
-    return structuredClone({ ...this.data, busy: !!this.controller, progress: this.progress, currentWeek: currentShopWeek(this.now()), error: this.error || null });
+    return structuredClone({ ...this.data, busy: !!this.controller, progress: this.progress, currentWeek: currentShopWeek(this.now()), error: this.error || null, notice: this.notice || null });
   }
   async save(shops) {
     await this.ready;
     if (this.controller || this.configPending || this.disposed) throw shopError('店铺采集中或设置正在保存，请稍后再试');
     const next = normalizeShops(shops);
+    if (this.data.shops.some(shop => !next.some(item => item.id === shop.id))) throw shopError('移除店铺需要同步取消飞瓜关注，请使用“同步移除”');
     this.configPending = true;
     try { await this.commit({ ...this.data, shops: next, waitingShops: this.data.waitingShops.filter(row => next.some(shop => shop.id === row.id)) }); } finally { this.configPending = false; }
     return this.state();
   }
+  async remove(id) {
+    await this.ready; await this.queue;
+    if (this.controller || this.configPending || this.gateway.controller || this.gateway.operation || this.disposed) throw shopError('正在执行飞瓜操作，请稍后再同步移除');
+    const shop = this.data.shops.find(shop => shop.id === id);
+    if (!shop) throw shopError('该店铺不在当前监控列表中');
+    const controller = new AbortController(); this.controller = controller; this.configPending = true; this.error = null; this.notice = null;
+    try {
+      await this.gateway.exclusive(async () => {
+        this.gateway.controller = controller;
+        try {
+          if (controller.signal.aborted || this.disposed) throw shopError('已停止同步移除，本地监控保留', 'FEIGUA_CANCELLED');
+          const auth = await this.gateway.browser.checkLogin(); this.gateway.auth = auth;
+          if (auth.status !== 'authenticated') throw shopError(auth.message || '请先登录飞瓜');
+          const result = await this.collector.unfollow(shop, controller.signal, text => { this.progress = `${shop.name} · ${text}`; }, this.now());
+          if (controller.signal.aborted || this.disposed) throw shopError('已停止同步移除，请重试确认飞瓜状态；本地监控和历史数据保留', 'FEIGUA_CANCELLED');
+          try { await this.commit({ ...this.data, shops: this.data.shops.filter(item => item.id !== id), waitingShops: this.data.waitingShops.filter(item => item.id !== id) }); }
+          catch { throw shopError('飞瓜同步移除已确认，但本地保存失败，请再次同步移除完成保存；历史数据保留', 'FEIGUA_SHOP_REMOVE_SAVE'); }
+          this.notice = `已同步移除「${shop.name}」，飞瓜当前剩余 ${result.remaining} 个关注名额；本地历史周数据保留。`;
+        } finally { if (this.gateway.controller === controller) this.gateway.controller = null; }
+      });
+    } finally { if (this.controller === controller) this.controller = null; this.configPending = false; this.progress = null; }
+    return this.state();
+  }
   async search(query) {
     await this.ready;
-    if (this.controller || this.disposed) throw shopError('请等待当前店铺采集完成');
+    if (this.controller || this.configPending || this.disposed) throw shopError('请等待当前店铺操作完成');
     return this.gateway.exclusive(async () => {
       const auth = await this.gateway.browser.checkLogin(); this.gateway.auth = auth;
       if (auth.status !== 'authenticated') throw shopError(auth.message || '请先登录飞瓜');
@@ -57,12 +81,12 @@ export class FeiguaShopService {
   async start({ ids, allowFollow = true } = {}) {
     await this.ready;
     await this.queue;
-    if (this.controller || this.gateway.controller || this.gateway.operation || this.disposed) throw shopError('正在执行采集操作，请稍后再试');
+    if (this.controller || this.configPending || this.gateway.controller || this.gateway.operation || this.disposed) throw shopError('正在执行采集操作，请稍后再试');
     const period = currentShopWeek(this.now());
     if (!period) throw shopError('本周尚无已结束日期，周二起可采集本周数据');
     const shops = structuredClone(this.data.shops.filter(shop => !ids || ids.includes(shop.id)));
     if (!shops.length) throw shopError('请先添加要监控的店铺');
-    const controller = new AbortController(); this.controller = controller; this.error = null;
+    const controller = new AbortController(); this.controller = controller; this.error = null; this.notice = null;
     const run = { id: randomUUID(), week: period, startedAt: new Date(this.now()).toISOString(), finishedAt: null, status: 'running', message: '正在检查飞瓜登录状态', shops: shops.map(shop => ({ id: shop.id, name: shop.name, status: 'pending' })) };
     try { await this.commit({ ...this.data, lastRun: run }); } catch (e) { this.controller = null; throw e; }
     this.job = this.gateway.exclusive(async () => {
@@ -110,7 +134,7 @@ export class FeiguaShopService {
     await this.ready;
     const date = collectionUpdateDate(now);
     const week = currentShopWeek(now);
-    if (this.disposed || !canRun() || !week || !this.data.shops.length || this.controller || this.gateway.controller || this.gateway.operation) return;
+    if (this.disposed || !canRun() || !week || !this.data.shops.length || this.controller || this.configPending || this.gateway.controller || this.gateway.operation) return;
     const due = this.data.waitingShops.filter(row => Date.parse(row.nextCheckAt) <= now);
     if (due.length) {
       await this.commit({ ...this.data, waitingShops: this.data.waitingShops.map(row => due.some(item => item.id === row.id) ? { ...row, nextCheckAt: new Date(now + 300_000).toISOString() } : row) });

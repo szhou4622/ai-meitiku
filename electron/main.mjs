@@ -2667,7 +2667,7 @@ if (hasSingleInstanceLock) {
   }
   for (const [channel, method] of Object.entries({
     "feigua-shops-state": "state", "feigua-shops-save": "save", "feigua-shops-search": "search",
-    "feigua-shops-start": "start", "feigua-shops-cancel": "cancel",
+    "feigua-shops-start": "start", "feigua-shops-cancel": "cancel", "feigua-shops-remove": "remove",
   })) {
     registerProtectedHandle(channel, async (event, ...args) => {
       if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("竞对店铺采集只允许从媒体库主界面调用");

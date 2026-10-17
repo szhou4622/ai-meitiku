@@ -30,6 +30,7 @@ export class FeiguaShopCollector {
     if (result?.code === 430) browser.requireVerification();
     if (result?.code === 401) throw shopError('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
     if (result?.quota) throw shopError('飞瓜查询额度已用完，已保留原周数据', 'FEIGUA_QUOTA');
+    if (result?.removalLocked) throw shopError('飞瓜规定新关注的小店需满 24 小时才能移除；本地监控和历史数据保留', 'FEIGUA_SHOP_REMOVE_LOCKED');
     if (result?.code === 403) throw shopError('飞瓜拒绝访问该店数据，请检查当前账号的访问权限', 'FEIGUA_PERMISSION');
     if (result?.code === 429) throw shopError('飞瓜请求频率受限，请稍后重试', 'FEIGUA_RATE_LIMIT');
     if (result?.code !== 200 || !result.success || result.example || result.data == null) throw shopError('飞瓜未返回可核验的真实店铺数据，已保留原结果');
@@ -88,6 +89,40 @@ export class FeiguaShopCollector {
     await this.request('follow', { groupId: 0, shopId: shop.id }, signal);
     check(signal);
     if (!await this.isFollowed(shop, period, signal)) throw shopError('飞瓜关注尚未确认，请稍后刷新重试；已有店铺和周数据保留');
+  }
+
+  async unfollow(shop, signal, progress = () => {}, now = Date.now()) {
+    normalizeShops([shop]); check(signal);
+    const end = Math.floor((now + 8 * 3_600_000) / 86_400_000) * 86_400_000 - 86_400_000;
+    const period = { start: new Date(end - 29 * 86_400_000).toISOString().slice(0, 10), end: new Date(end).toISOString().slice(0, 10) };
+    progress('核对飞瓜关注记录');
+    const followed = await this.isFollowed(shop, period, signal);
+    let before = null;
+    const capacity = async () => {
+      const data = await this.request('focusCount', {}, signal);
+      if (!Number.isSafeInteger(data.remaining) || data.remaining < 0) throw shopError('未能确认飞瓜关注名额，本地监控保留，请重试移除');
+      return data.remaining;
+    };
+    if (followed) {
+      const focusId = this.focusIds.get(shop.id);
+      const info = await this.request('focusInfo', { focusId }, signal);
+      if (info.shopId !== shop.id || typeof info.removable !== 'boolean') throw shopError('未能核验该店的移除权限，本地监控保留');
+      if (!info.removable) {
+        const match = info.followedAt?.match(/^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+        const timestamp = match && Date.parse(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}+08:00`);
+        const validTime = Number.isFinite(timestamp) && new Date(timestamp + 8 * 3_600_000).toISOString().slice(0, 19) === info.followedAt.replaceAll('/', '-').replace(' ', 'T');
+        const available = validTime ? new Date(timestamp + 86_400_000 + 8 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ') : null;
+        throw shopError(`飞瓜规定新关注的小店需满 24 小时才能移除${available ? `，预计 ${available}（北京时间）后可重试` : ''}；本地监控和历史数据保留`, 'FEIGUA_SHOP_REMOVE_LOCKED');
+      }
+      before = await capacity(); check(signal);
+      progress('正在同步取消飞瓜关注');
+      await this.request('unfollow', { focusId }, signal); check(signal);
+      if (await this.isFollowed(shop, period, signal)) throw shopError('飞瓜尚未确认取消关注，本地监控保留，请重试移除');
+    }
+    progress('确认飞瓜剩余名额');
+    const remaining = await capacity();
+    if (before !== null && remaining < before + 1) throw shopError('飞瓜已取消关注，但名额尚未确认释放；本地监控保留，请稍后重试移除');
+    check(signal); return { remaining };
   }
 
   async collect(shop, period, signal, progress = () => {}, { allowFollow = true } = {}) {
@@ -159,4 +194,4 @@ export class FeiguaShopCollector {
   }
 }
 
-export const shopReadPaths = Object.entries(SHOP_ENDPOINTS).filter(([kind]) => kind !== 'follow').map(([, path]) => path);
+export const shopReadPaths = Object.entries(SHOP_ENDPOINTS).filter(([kind]) => !['follow', 'unfollow'].includes(kind)).map(([, path]) => path);
