@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Globe2, Music2, TrendingUp, Plus, X, RefreshCw, LogIn, Square, Search } from 'lucide-react';
 import styles from './feigua-trends.module.css';
+import { FeiguaShopMonitoring } from './feigua-shops';
 import { displayedFeiguaGroups } from './feigua-results.mjs';
 import { recoverVideoHistory, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
 import { feiguaVideoLink, feiguaProductLink } from '../electron/feigua-links.mjs';
@@ -34,7 +35,7 @@ const savedVideoQueries = (state: State): VideoQuery[] => state.videoQueries || 
 const pathLabel = (path?: string[]) => path?.join(' > ') || '全部';
 const names: Record<string, string> = { pending: '等待采集', running: '采集中', retrying: '自动重试中', waiting: '等待新周榜', completed: '采集完成', partial: '部分完成', failed: '采集失败', interrupted: '采集中断', skipped: '未采集', cancelled: '已取消' };
 const labels: Record<Kind, string> = { music: '本周爆款 BGM', topics: '本周话题热点', hotspots: '全网热点', videos: '关键词带货视频' };
-const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '近7天 · 视频销售额降序' };
+const rules: Record<Kind, string> = { music: '热门音乐 · 昨日使用人数降序', topics: '话题周榜 · 参与人数增长率降序', hotspots: '抖音热点榜 · 日榜 · 峰值热度降序', videos: '本周周一至昨天 · 视频销售额降序' };
 const display = (value?: string | null) => value || '未取得';
 const unavailable = (state?: string) => state === 'source_unavailable' ? '来源未提供' : state === 'restricted' ? '来源访问受限' : state === 'lookup_failed' ? '详情暂未核验' : '未取得';
 const missingLabels: Record<string,string> = {products:'商品 / 佣金率',author:'达人名称',followers:'粉丝数',likes:'点赞数',sales:'视频销售额',salesCount:'视频销量',publishedAt:'发布时间',title:'视频标题'};
@@ -115,6 +116,9 @@ function CategorySelect({ label, options, path, disabled, onChange }: { label: s
 }
 
 export function FeiguaTrends() {
+  const rankingsSection = useRef<HTMLDivElement>(null);
+  const shopsSection = useRef<HTMLElement>(null);
+  const [shopSettingsContainer, setShopSettingsContainer] = useState<HTMLDivElement | null>(null);
   const [state, setState] = useState<State>(emptyState);
   const [loginEntryUrl, setLoginEntryUrl] = useState('');
   const [videoQueries, setVideoQueries] = useState<VideoQuery[]>([]);
@@ -237,8 +241,10 @@ export function FeiguaTrends() {
     {state.scheduleMessage && <div className={styles.error} role="alert">{state.scheduleMessage}</div>}
     {state.catalogMessage && <div className={styles.error} role="status">{state.catalogMessage}</div>}
     {state.credentialMessage && <div className={styles.error} role="status">{state.credentialMessage}</div>}
-    <p>北京时间：带货视频每周一 06:30 采集；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
 
+    <nav className={styles.sectionNav} aria-label="采集区块导航"><button onClick={() => rankingsSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>查看热点与视频采集</button><button onClick={() => shopsSection.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>查看竞对店铺监控</button></nav>
+    <div ref={rankingsSection} className={styles.sectionAnchor} />
+    <p>北京时间：品类 Top5 与监控店铺共用本周周一至昨天，每天 07:00 后顺序更新，周一保留已有结果；全网热点每天 07:00 采集；BGM 每天 08:00 采集；话题周榜每周一 09:00 检查最新已发布周，未发布或失败时每天 09:00 再检查，成功后本周不再自动重复采集。保持应用运行并登录飞瓜，错过时间后打开或恢复运行会补采；BGM 当天成功后不再自动重复采集。</p>
     <details ref={settingsPanel} className={styles.settings}>
       <summary>采集设置 <span>BGM / 话题：{state.musicTag.join(' > ') || '全部标签'} · {state.keywords.length} 个关键词{dirty || musicDirty || editorDirty ? ' · 有未保存修改' : ''}</span></summary>
     <section className={`${styles.configuration} ${styles.musicConfiguration}`} aria-label="BGM 与话题分类配置">
@@ -260,7 +266,7 @@ export function FeiguaTrends() {
     </section>
 
     <section className={styles.configuration} aria-label="关键词配置">
-      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组 · 每周一 06:30 更新近7天销售额前 5 · 新增或修改分类后立即采集该组</p></div>
+      <div><h2>本周品类新发布 · 关键词与分类</h2><p>每个关键词一组 · 与监控店铺共用本周周一至昨天，每天 07:00 后更新销售额前 5 · 新增或修改分类后立即采集该组</p></div>
       <form className={styles.queryEditor} onSubmit={event => { event.preventDefault(); void addKeyword(); }}>
         <label className={styles.queryField}>关键词<input aria-label="视频关键词" placeholder="输入关键词" maxLength={60} value={input} onChange={event => setInput(event.target.value)} disabled={disabled} /></label>
         <CategorySelect label="带货品类" options={state.videoFilterOptions.categoryPath} path={inputCategoryPath} disabled={disabled} onChange={setInputCategoryPath} />
@@ -277,8 +283,9 @@ export function FeiguaTrends() {
         <button disabled={disabled || editorDirty} aria-label={`修改关键词${query.keyword}`} onClick={() => editQuery(query, index)}>修改</button>
         <button disabled={disabled || state.busy || editorDirty} aria-label={`删除关键词${query.keyword}`} onClick={() => void perform('video-change', api => api.saveAndRefreshVideoQueries(videoQueries.filter((_, current) => current !== index), { changedOnly: true }))}><X size={13} />删除</button>
       </section>)}
-      <small>{editing !== null ? '确认后自动保存，并立即采集有变化的这一组。' : editorDirty ? '选择带货品类和视频标签后点击“添加并采集”，自动保存并立即采集这一组。' : keywords.length ? `已保存 ${keywords.length} 组，每周一 06:30 自动采集；也可手动刷新。` : '输入关键词，选择带货品类和视频标签，再点击“添加并采集”。'}</small>
+      <small>{editing !== null ? '确认后自动保存，并立即采集有变化的这一组。' : editorDirty ? '选择带货品类和视频标签后点击“添加并采集”，自动保存并立即采集这一组。' : keywords.length ? `已保存 ${keywords.length} 组，每天 07:00 后自动更新本周数据；周一保留已有结果，也可手动刷新。` : '输入关键词，选择带货品类和视频标签，再点击“添加并采集”。'}</small>
     </section>
+    <section className={styles.configuration} aria-label="竞对店铺监控配置"><div ref={setShopSettingsContainer} /></section>
     </details>
 
     <div className={styles.history}>
@@ -292,19 +299,19 @@ export function FeiguaTrends() {
         return <section key={kind} className={styles.board}><header><h3><Icon size={17} />{labels[kind]} <small>TOP 5</small></h3>{(kind === 'music' || kind === 'topics') ? <MusicCaption kind={kind} group={group} selection={musicTag} dirty={musicDirty} /> : <p>{rules[kind]}</p>}{kind === 'hotspots' && group?.result && group.result.period !== '日榜' && <p>当前显示：{group.result.period} · 之前采集结果</p>}{kind === 'hotspots' && (group?.refreshStatus || group?.status) === 'retrying' && <p role="status">{group?.refreshMessage || group?.message || '正在自动重试'}</p>}{kind === 'hotspots' && group?.showingPrevious && <p>本次更新尚未成功，显示上次已采集结果</p>}</header><ResultBody group={group} kind={kind} />{group?.result && <ResultFooter result={group.result} />}</section>;
       })}
     </div>
-    <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 近7天统计周期，不额外限制视频发布时间</p>
+    <section className={styles.videoSection}><header><h2><Search size={18} />本周品类新发布 Top5 带货视频</h2><p>按关键词分组 · 与监控店铺共用本周周一至昨天，不额外限制视频发布时间</p>
       <div className={styles.videoPeriods} role="group" aria-label="带货榜单周日期">
         <span>周榜日期</span><button type="button" aria-pressed={!videoPeriod} onClick={() => setVideoPeriod('')}>最新</button>
         {videoPeriods.map(period => <button type="button" key={period} aria-pressed={videoPeriod === period} onClick={() => setVideoPeriod(period)}>{period}</button>)}
       </div>
-      <p>{videoPeriod ? `查看 ${videoPeriod} 这一周保存的榜单` : '显示最新结果'} · 按周保存；实际近7天统计周期见各组底部</p>
+      <p>{videoPeriod ? `查看 ${videoPeriod} 这一周保存的榜单` : '显示最新结果'} · 按周保存并持续更新；实际统计日期见各组底部，历史近7天记录保留原口径</p>
     </header>
       {videoGroups.map(group => {
         const configured = savedVideoQueries(state).find(query => query.keyword === group.keyword);
         const actual = group.result ? group.result.filters : group;
         const changed = !videoPeriod && configured && (JSON.stringify(configured.categoryPath) !== JSON.stringify(actual?.categoryPath || []) || JSON.stringify(configured.tagPath) !== JSON.stringify(actual?.tagPath || []));
         const status = group.refreshStatus || group.status;
-        return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{rules.videos} · {group.showingPrevious ? '上次已采集结果' : group.result?.rows.some(row=>videoMissingFields(row).length) ? '榜单已采集 · 部分信息不可用' : names[group.status]}</small></h3>
+        return <section className={styles.videoGroup} key={group.keyword}><h3>{group.keyword}<small>{group.result ? `${group.result.period} · 视频销售额降序` : rules.videos} · {group.showingPrevious ? '上次已采集结果' : group.result?.rows.some(row=>videoMissingFields(row).length) ? '榜单已采集 · 部分信息不可用' : names[group.status]}</small></h3>
           <p>{group.result ? '当前结果' : '本组设置'} · 带货品类：{pathLabel(actual?.categoryPath)} · 视频标签：{pathLabel(actual?.tagPath)}</p>
           {changed && <p>已保存设置 · 带货品类：{pathLabel(configured.categoryPath)} · 视频标签：{pathLabel(configured.tagPath)}（当前结果尚未更新）</p>}
           {(['pending', 'running', 'retrying', 'failed', 'cancelled', 'interrupted','skipped'].includes(status) || status === 'completed' && !!group.message) && <p role="status">{names[status]}{group.refreshMessage || group.message ? `：${group.refreshMessage || group.message}` : ''}</p>}
@@ -313,5 +320,6 @@ export function FeiguaTrends() {
       {!!videoPeriod && state.keywords.some(keyword => !videoGroups.some(group => group.keyword === keyword)) && <p className={styles.videoPeriodNotice}>这一周未保存以下关键词的榜单：{state.keywords.filter(keyword => !videoGroups.some(group => group.keyword === keyword)).join('、')}</p>}
       {!videoGroups.length && <div className={styles.empty}>{videoPeriod ? '这一周没有已保存的带货榜单，请选择其他周或最新结果。' : state.keywords.length ? '下一次采集将按已保存的关键词生成视频榜单。' : '添加并保存关键词后，这里将显示各组视频 Top5。'}</div>}
     </section>
+    <section ref={shopsSection} className={styles.shopMonitoringSection} aria-label="竞对店铺监控"><FeiguaShopMonitoring settingsContainer={shopSettingsContainer} /></section>
   </section>;
 }

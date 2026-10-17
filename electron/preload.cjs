@@ -2,6 +2,14 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("desktopBridge", {
+  feiguaShops: {
+    state: () => ipcRenderer.invoke("feigua-shops-state"),
+    save: (shops) => ipcRenderer.invoke("feigua-shops-save", shops),
+    remove: (id) => ipcRenderer.invoke("feigua-shops-remove", id),
+    search: (query) => ipcRenderer.invoke("feigua-shops-search", query),
+    start: (options) => ipcRenderer.invoke("feigua-shops-start", options),
+    cancel: () => ipcRenderer.invoke("feigua-shops-cancel"),
+  },
   feigua: {
     state: () => ipcRenderer.invoke("feigua-state"),
     saveLoginEntryUrl: (url) => ipcRenderer.invoke("feigua-save-login-entry", url),
