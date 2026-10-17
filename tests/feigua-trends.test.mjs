@@ -6,9 +6,68 @@ import { FeiguaService, dueHotspotsDate, dueVideosDate } from '../electron/feigu
 import { FeiguaBrowser, isFeiguaNavigation, isCollectionLoadingRequest } from '../electron/feigua-browser.mjs';
 import { featureRegistry, requireFeatureAccess } from '../electron/feature-registry.mjs';
 import { displayedFeiguaGroups } from '../app/feigua-results.mjs';
+import { COLLECTION_WEEK_LABEL, currentCollectionWeek, collectionUpdateDate } from '../electron/feigua-collection-period.mjs';
+import { currentShopWeek } from '../electron/feigua-shop-contract.mjs';
 import { recoverVideoHistory, videoRankingPeriod, videoCollectionWeek, videoHistoryPeriods, videoGroupsForPeriod } from '../electron/feigua-video-history.mjs';
 
 const historyVideo = (keyword, collectedAt, rows = [{ id: collectedAt }], dateRange = '2026-09-25 - 2026-10-01') => ({ kind: 'videos', keyword, status: 'completed', result: { collectedAt, rows, dateRange, filters: { categoryPath: ['历史分类'], tagPath: [] } } });
+
+test('shops and Top5 share a Beijing week and update slot across calendar boundaries', () => {
+  for (const at of ['2026-10-11T16:00:00Z','2026-10-12T23:00:00Z','2026-12-31T23:00:00Z','2027-01-03T15:59:59Z']) {
+    const now=Date.parse(at);
+    assert.deepEqual(currentShopWeek(now),currentCollectionWeek(now));
+    assert.equal(dueVideosDate(now),collectionUpdateDate(now));
+  }
+  assert.deepEqual(currentCollectionWeek(Date.parse('2026-12-31T23:00:00Z')),{start:'2026-12-28',end:'2026-12-31'});
+});
+
+test('partial-week Top5 requires the frozen exact dates and preserves older seven-day archives', () => {
+  const now=Date.parse('2026-10-16T00:00:00Z'), week=currentCollectionWeek(now);
+  const expected='2026-10-12 - 2026-10-15';
+  assert.equal(validateCaptureDates('videos',expected,now,week).dateRange,expected);
+  for(const dates of ['2026-10-09 - 2026-10-15','2026-10-12 - 2026-10-14','2026-10-12 - 2026-10-16']) assert.throws(()=>validateCaptureDates('videos',dates,now,week),/不一致/);
+  const old=historyVideo('甲','2026-10-08T01:00:00Z',undefined,'2026-10-02 - 2026-10-08');
+  const fresh=historyVideo('甲','2026-10-16T01:00:00Z',[],expected);fresh.result.period=COLLECTION_WEEK_LABEL;
+  assert.equal(videoRankingPeriod(expected),null);
+  assert.equal(videoRankingPeriod(expected,COLLECTION_WEEK_LABEL),expected);
+  const recovered=recoverVideoHistory([],[],[old,fresh]);
+  assert.equal(recovered.length,2);assert.equal(recovered.find(g=>g===old).result.dateRange,old.result.dateRange);
+});
+
+test('new video runs freeze week dates, deduplicate manual success and update through the next day', async t => {
+  let now=Date.parse('2026-10-16T00:00:00Z');t.mock.method(Date,'now',()=>now);
+  const {service,calls,disk}=fixture({stored:{...topicReadyState(),keywords:['甲'],lastHotspotsScheduleDate:'2026-10-31'},collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-10-05 - 2026-10-11'}:{})})});
+  await service.start();await service.job;
+  const first=disk().latestResults.find(g=>g.kind==='videos').result;
+  assert.equal(first.period,COLLECTION_WEEK_LABEL);assert.equal(first.dateRange,'2026-10-12 - 2026-10-15');
+  calls.length=0;await service.checkDailySchedule(now,()=>true);await service.job;
+  assert.deepEqual(calls,[]);assert.equal(disk().lastVideosScheduleDate,'2026-10-16');
+  now+=86400000;await service.checkDailySchedule(now,()=>true);await service.job;
+  assert.deepEqual(calls,[['videos','甲']]);assert.equal(disk().latestResults.find(g=>g.kind==='videos').result.dateRange,'2026-10-12 - 2026-10-16');
+  assert.equal(disk().videoHistory.length,1);
+});
+
+test('Monday manual collection preserves prior Top5 without sending unsettled video requests', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-18T23:00:00Z'));
+  const old=historyVideo('甲','2026-10-16T00:00:00Z');
+  const {service,calls,disk}=fixture({stored:{...topicReadyState(),keywords:['甲'],latestResults:[old]}});
+  await service.start();await service.job;
+  assert.ok(calls.every(([kind])=>kind!=='videos'));
+  assert.equal(disk().runs[0].groups.find(g=>g.kind==='videos').status,'skipped');
+  assert.equal(disk().latestResults.find(g=>g.kind==='videos').result.dateRange,old.result.dateRange);
+});
+
+test('crossing Beijing midnight during a keyword run cannot change the second group period', async t => {
+  let now=Date.parse('2026-10-16T15:59:59Z');t.mock.method(Date,'now',()=>now);
+  const periods=[];
+  const {service,disk}=fixture({collect:async(kind,keyword,_signal,options)=>{
+    if(kind==='videos') { periods.push(structuredClone(options.videoWeek));now=Date.parse('2026-10-16T16:00:01Z'); }
+    return capture(kind,keyword,options);
+  }});
+  await service.saveKeywords(['甲','乙']);await service.start();await service.job;
+  assert.deepEqual(periods,[{start:'2026-10-12',end:'2026-10-15'},{start:'2026-10-12',end:'2026-10-15'}]);
+  assert.ok(disk().latestResults.filter(g=>g.kind==='videos').every(g=>g.result.dateRange==='2026-10-12 - 2026-10-15'));
+});
 
 test('opening a ranking ignores home widget loading only until its menu navigation completes',async()=>{
   const browser=new FeiguaBrowser({});const waits=[];let navigations=0;
@@ -114,6 +173,7 @@ const capture = (kind, keyword = null, extra = {}) => ({
   musicTag: [], categoryPath: [], tagPath: [], filtersVerified: true, dateRange: kind === 'hotspots' ? '2026-10-01' : kind === 'topics' ? '2026-09-21 - 2026-09-27' : '2026-09-25 - 2026-10-01',
   rows: Array.from({ length: 7 }, (_, index) => ({ id: `${kind}-${index}`, title: `合成测试标题${index}`, author: '合成测试作者', yesterdayUsers: '10w', participantGrowth: '20%', peakHeat: '100w', sales: '10w~25w', products: [{ title: '合成测试商品', commission: '5.00%' }] })),
   ...extra,
+  ...(kind === 'videos' && extra.videoWeek ? { period: COLLECTION_WEEK_LABEL, dateRange: extra.dateRange || `${extra.videoWeek.start} - ${extra.videoWeek.end}` } : {}),
 });
 
 function fixture({ stored, collect, auth, write } = {}) {
@@ -467,41 +527,44 @@ test('daily hotspots use 07:00 Beijing time across UTC date boundaries', () => {
   assert.equal(dueHotspotsDate(Date.parse('2026-10-02T16:00:00Z')), null);
 });
 
-test('weekly videos become due Monday at 06:30 Beijing time and remain catch-up eligible until Sunday',()=>{
-  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:29:59Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:30:00Z')),'2026-10-05');
-  assert.equal(dueHotspotsDate(Date.parse('2026-10-04T22:30:00Z')),null);
-  assert.equal(dueVideosDate(Date.parse('2026-10-06T16:00:00Z')),'2026-10-05');
-  assert.equal(dueVideosDate(Date.parse('2026-10-11T15:59:59Z')),'2026-10-05');
+test('videos and shops share the daily 07:00 Beijing slot, skipping unsettled Mondays',()=>{
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T22:30:00Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-04T23:00:00Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-05T22:59:59Z')),null);
+  assert.equal(dueVideosDate(Date.parse('2026-10-05T23:00:00Z')),'2026-10-06');
+  assert.equal(dueVideosDate(Date.parse('2026-10-06T23:00:00Z')),'2026-10-07');
+  assert.equal(dueVideosDate(Date.parse('2026-10-11T15:59:59Z')),'2026-10-11');
   assert.equal(dueVideosDate(Date.parse('2026-10-11T16:00:00Z')),null);
 });
 
-test('06:30 collects every saved video group once and preserves independent 07:00 schedule across restart',async()=>{
-  const {service,calls,disk}=fixture({stored:{version:1,keywords:videoQueries.map(q=>q.keyword),videoQueries,videoFilterOptions:videoCatalog,runs:[]}});
-  const now=Date.parse('2026-09-27T22:30:00Z');
+test('07:00 collects pending video groups once and preserves the independent hotspot schedule across restart',async()=>{
+  const {service,calls,disk}=fixture({stored:{...topicReadyState(),keywords:videoQueries.map(q=>q.keyword),videoQueries,videoFilterOptions:videoCatalog}});
+  const now=Date.parse('2026-09-28T23:00:00Z');
   await service.checkDailySchedule(now-1,()=>true);
   await service.checkDailySchedule(now,()=>false);
   assert.equal(calls.length,0);
   await Promise.all([service.checkDailySchedule(now,()=>true),service.checkDailySchedule(now,()=>true)]);await service.job;
   assert.deepEqual(calls,[['videos','拌饭'],['videos','收纳']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
+  assert.equal(disk().lastVideosScheduleDate,'2026-09-29');
   assert.equal(disk().lastHotspotsScheduleDate,null);
-  assert.equal(disk().runs[0].trigger,'weekly-videos');
+  assert.equal(disk().runs[0].trigger,'daily-videos');
   assert.deepEqual(disk().runs[0].groups[0].result.filters,{...videoQueries[0],publishedAt:'不限'});
   const restored=fixture({stored:disk()});
   await restored.service.checkDailySchedule(now+1000,()=>true);
-  assert.equal(restored.calls.length,0);
+  await restored.service.job;
+  assert.deepEqual(restored.calls,[['hotspots',null]]);
   await restored.service.checkDailySchedule(now+1800000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls,[['hotspots',null]]);
   await restored.service.checkDailySchedule(now+7*86400000,()=>true);await restored.service.job;
   assert.deepEqual(restored.calls.slice(1),[['videos','拌饭'],['videos','收纳']]);
 });
 
-test('existing daily video marker migrates into its week and does not collect again on later days', async () => {
+test('legacy weekly marker cannot suppress the new daily natural-week collection', async () => {
   const { service, calls } = fixture({ stored: { version: 1, keywords: ['词'], runs: [], lastVideosScheduleDate: '2026-10-07', lastHotspotsScheduleDate: '2026-10-08' } });
-  assert.equal((await service.state()).lastVideosScheduleDate, '2026-10-05');
+  assert.equal((await service.state()).lastVideosScheduleDate, '2026-10-07');
   await service.checkDailySchedule(Date.parse('2026-10-08T02:00:00Z'), () => true);
-  assert.deepEqual(calls, []);
+  await service.job;
+  assert.deepEqual(calls, [['videos','词']]);
 });
 
 test('late startup serializes videos, hotspots, BGM and the topic week check',async()=>{
@@ -519,30 +582,31 @@ test('late startup serializes videos, hotspots, BGM and the topic week check',as
   await service.checkDailySchedule(now,()=>true);await service.job;
   assert.deepEqual(calls,[['videos','晚启动关键词'],['hotspots',null],['music',null],['topics',null]]);
   assert.equal(disk().runs.length,4);
-  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
+  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
   assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
 });
 
-test('video schedule failure and cancellation do not retry that week or consume hotspot schedule',async()=>{
+test('video schedule failure and cancellation do not retry that day or consume hotspot schedule',async()=>{
   for(const cancel of [false,true]) {
     const {service,browser,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['词']);
     let release;
     browser.checkLogin=()=>new Promise(resolve=>{release=resolve;});
-    const now=Date.parse('2026-10-01T22:30:00Z');
+    const now=Date.parse('2026-10-01T23:00:00Z');
     await service.checkDailySchedule(now,()=>true);
     if(cancel)await service.cancel();
     release({status:cancel?'authenticated':'expired'});await service.job;
-    await service.checkDailySchedule(now+60000,()=>true);
     assert.equal(disk().runs[0].status,cancel?'cancelled':'failed');
-    assert.equal(calls.length,0);assert.equal(disk().runs.length,1);
-    assert.equal(disk().lastVideosScheduleDate,'2026-09-28');assert.equal(disk().lastHotspotsScheduleDate,null);
+    browser.checkLogin=async()=>({status:'authenticated'});
+    await service.checkDailySchedule(now+60000,()=>true);await service.job;
+    assert.deepEqual(calls,[['hotspots',null]]);assert.equal(disk().runs.length,2);
+    assert.equal(disk().lastVideosScheduleDate,'2026-10-02');assert.equal(disk().lastHotspotsScheduleDate,'2026-10-02');
   }
 });
 
 test('video schedule must durably record its intent before any browser I/O',async()=>{
   const {service,browser,calls}=fixture({stored:{version:1,keywords:['词'],runs:[]},write:async()=>{throw new Error('disk full');}});
   let checks=0;browser.checkLogin=async()=>{checks++;return {status:'authenticated'};};
-  await assert.rejects(service.checkDailySchedule(Date.parse('2026-10-01T22:30:00Z'),()=>true),/disk full/);
+  await assert.rejects(service.checkDailySchedule(Date.parse('2026-10-01T23:00:00Z'),()=>true),/disk full/);
   assert.equal(checks,0);assert.equal(calls.length,0);
   const state=await service.state();assert.equal(state.lastVideosScheduleDate,null);assert.equal(state.runs.length,0);
 });
@@ -569,11 +633,11 @@ test('adding or editing a keyword immediately collects only changed groups; dele
 
 test('new groups still collect immediately after the weekly schedule is used, without resetting it',async()=>{
   const {service,calls,disk}=fixture({stored:topicReadyState()});await service.saveKeywords(['旧关键词']);
-  const now=Date.parse('2026-10-01T22:30:00Z');
+  const now=Date.parse('2026-10-01T23:00:00Z');
   await service.checkDailySchedule(now,()=>true);await service.job;calls.length=0;
   await service.saveAndRefreshVideoQueries([{keyword:'旧关键词'},{keyword:'新关键词'}],{changedOnly:true});await service.job;
   assert.deepEqual(calls,[['videos','新关键词']]);
-  assert.equal(disk().lastVideosScheduleDate,'2026-09-28');
+  assert.equal(disk().lastVideosScheduleDate,'2026-10-02');
   await service.checkDailySchedule(now+1000,()=>true);assert.equal(calls.length,1);
 });
 
@@ -1024,7 +1088,7 @@ test('known provider notice is confirmed once and login then closes automaticall
 });
 
 test('login success starts a single collection automatically using saved keywords', async t => {
-  t.mock.method(Date,'now',()=>Date.parse('2026-10-05T01:00:00Z'));
+  t.mock.method(Date,'now',()=>Date.parse('2026-10-06T01:00:00Z'));
   const {service,browser,calls} = fixture({collect:async(kind,keyword,_signal,options)=>capture(kind,keyword,{...options,...(kind==='topics'?{dateRange:'2026-09-28 - 2026-10-04'}:{})})});
   await service.saveKeywords(['测试词']);
   browser.openLogin = async () => { browser.onAuthChange({status:'authenticated',message:'已登录'}); };

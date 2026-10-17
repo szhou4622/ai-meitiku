@@ -2,6 +2,7 @@
 
 import { AliyunSubtitleAutoSync, AliyunSubtitleSettings, AliyunSubtitleWorkbench, type AliyunSubtitleBridge } from "./aliyun-subtitle";
 import { FeiguaTrends, type FeiguaBridge } from "./feigua-trends";
+import type { FeiguaShopsBridge } from "./feigua-shops";
 
 import {
   AlertTriangle,
@@ -846,6 +847,7 @@ declare global {
     desktopBridge?: {
       aliyunSubtitle: AliyunSubtitleBridge;
       feigua: FeiguaBridge;
+      feiguaShops: FeiguaShopsBridge;
       licenseBootstrap: () => Promise<LicenseState>;
       licenseDiagnosticLog: () => Promise<LicenseDiagnosticSnapshot>;
       licenseCopyDiagnosticLog: () => Promise<{ ok: boolean }>;

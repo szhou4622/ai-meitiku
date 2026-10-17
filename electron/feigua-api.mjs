@@ -1,5 +1,6 @@
 import { FEIGUA_SOURCES, isFeiguaDataUrl, validateCaptureDates, isRankingMetric } from './feigua-contract.mjs';
 import { feiguaVideoLink, feiguaProductLink } from './feigua-links.mjs';
+import { COLLECTION_WEEK_LABEL } from './feigua-collection-period.mjs';
 
 // Observed from the logged-in site's own GET requests, not guessed API routes.
 export const FEIGUA_ENDPOINTS = Object.freeze({
@@ -42,7 +43,7 @@ export function validateFeiguaRequest(kind, request, context) {
   };
   requireValues({ pageIndex: 1, pageType: 1 });
   if (!/^\d+$/.test(p.pageSize) || Number(p.pageSize) < 5 || Number(p.pageSize) > 100) throw problem('接口分页范围无法核验');
-  if (context.filtersVerified !== true || context.period !== FEIGUA_SOURCES[kind].period) throw problem('页面筛选尚未核验');
+  if (context.filtersVerified !== true || context.period !== (kind === 'videos' && context.videoWeek ? COLLECTION_WEEK_LABEL : FEIGUA_SOURCES[kind].period)) throw problem('页面筛选尚未核验');
   if (kind === 'music') requireValues({ 'filter.sort': 1 });
   if (kind === 'topics') {
     requireValues({ sortField: 'UserCountIncRatioStr', order: 1, topicRankType: 0, period: 'week' });
@@ -51,7 +52,7 @@ export function validateFeiguaRequest(kind, request, context) {
   }
   if (kind === 'hotspots') requireValues({ rankType: 1, period: 'day', dateCode: validateCaptureDates(kind, context.dateRange).dateRange.replaceAll('-', '') });
   if (kind === 'videos') {
-    const dates = validateCaptureDates(kind, context.dateRange).dateRange.split(' - ');
+    const dates = validateCaptureDates(kind, context.dateRange, Date.now(), context.videoWeek).dateRange.split(' - ');
     requireValues({ 'q.keyword': context.keyword, 'q.keywordType': 0, 'q.mSearchType': 2, 'q.tagMode': 0, 'q.sort': 8, 'q.searchType': 2, 'q.dateFrom': dates[0], 'q.dateTo': dates[1] });
   }
   const categoryValues = Object.entries(p).filter(([key]) => categoryParameter(key));
