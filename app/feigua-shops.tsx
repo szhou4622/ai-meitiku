@@ -90,7 +90,7 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
   return <div className={styles.monitor}>
     {settingsContainer && createPortal(<div className={`${styles.monitor} ${styles.settingsContent}`}>
     <header className={styles.heading}><div><h2><Store size={18} />竞对店铺监控</h2><p>本周周一至昨天 · 最多 10 个店铺 · 每天北京时间 07:00 后自动更新一次</p></div>
-      {state.busy ? <button disabled={!!action} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止店铺采集</button>
+      {state.busy ? <button disabled={action === 'cancel' || action.startsWith('remove:')} onClick={() => void perform('cancel', api => api.cancel())}><Square size={14} />停止店铺操作</button>
         : <button disabled={disabled || !state.shops.length || !state.currentWeek} onClick={() => void perform('start', api => api.start())}><RefreshCw size={14} />刷新全部店铺本周数据</button>}
     </header>
     {error && <div className={styles.error} role="alert">{error}</div>}

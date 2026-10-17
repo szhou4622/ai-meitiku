@@ -122,12 +122,12 @@ test('complete dynamic pagination is required and a mismatching shop product can
   wrongShop = true; await assert.rejects(collector.collect(shop, week), /不属于/);
 });
 
-function fixture({ stored, collect, unfollow, write, auth = { status: 'authenticated' }, time = now } = {}) {
+function fixture({ stored, collect, search, unfollow, write, auth = { status: 'authenticated' }, time = now } = {}) {
   let disk = structuredClone(stored || { version: 1, shops: [shop], snapshots: [], lastRun: null, lastScheduledDate: null }), calls = 0, authCalls = 0, unfollows = 0;
   const gateway = { controller: null, operation: null, browser: { checkLogin: async () => { authCalls++; return auth; }, stop() {} },
     exclusive: async action => { if (gateway.controller || gateway.operation) throw new Error('busy'); gateway.operation = Promise.resolve().then(action); try { return await gateway.operation; } finally { gateway.operation = null; } } };
   const service = new FeiguaShopService({ userDataPath: '/unused', gateway, now: () => time,
-    collector: { search: async () => [shop], collect: async (...args) => { calls++; return collect ? collect(...args) : snapshot(args[0], args[1]); }, unfollow: async (...args) => { unfollows++; return unfollow ? unfollow(...args) : { remaining: 9 }; } },
+    collector: { search: async (...args) => search ? search(...args) : [shop], collect: async (...args) => { calls++; return collect ? collect(...args) : snapshot(args[0], args[1]); }, unfollow: async (...args) => { unfollows++; return unfollow ? unfollow(...args) : { remaining: 9 }; } },
     storage: { read: async () => structuredClone(disk), write: async data => { await write?.(data); disk = structuredClone(data); } } });
   return { service, gateway, disk: () => disk, calls: () => calls, authCalls: () => authCalls, unfollows: () => unfollows };
 }
@@ -514,4 +514,119 @@ test('unfollow observation and provider client accept only the exact single-reco
     response = { Code: -200, Status: false, Msg: '新添加的小店需满24小时方可删除', Data: null };
     assert.equal((await readShopApi({ kind: 'unfollow', params: { focusId: 123 } })).removalLocked, true);
   } finally { globalThis.document = old; }
+});
+
+test('stability: transient read failures recover with bounded retries and a fresh observed request', async () => {
+  let calls = 0; const waits = [], notices = [];
+  const browser = { requestSequence: 0, shopRequests: [], isProviderUrl: () => true };
+  browser.window = { isDestroyed: () => false, webContents: { getURL: () => 'https://dy.feigua.cn/app/', executeJavaScript: async () => {
+    browser.shopRequests.push({ kind: 'overview', params: { shopId: shop.id }, sequence: ++browser.requestSequence });
+    return ++calls < 3 ? { code: 503 } : { code: 200, success: true, data: metrics() };
+  } } };
+  const collector = new FeiguaShopCollector(browser, { retryWait: async ms => waits.push(ms), onRetry: text => notices.push(text) });
+  assert.ok(await collector.request('overview', { shopId: shop.id }));
+  assert.equal(calls, 3); assert.deepEqual(waits, [10000, 30000]); assert.equal(notices.length, 2);
+});
+
+test('stability: cancelling a shop search releases the source and rejects late results', async () => {
+  let entered, release; const started = new Promise(r => { entered = r; });
+  const f = fixture({ search: async (_query, signal) => new Promise((resolve, reject) => {
+    release = () => resolve([shop]); entered(); signal?.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'FEIGUA_CANCELLED' })), { once: true });
+  }) });
+  const pending = f.service.search('合成店铺').then(() => 'completed', e => e.code);
+  await started; await f.service.cancel(); await flush();
+  const outcome = await Promise.race([pending, Promise.resolve('still-running')]);
+  release(); await pending;
+  assert.equal(outcome, 'FEIGUA_CANCELLED'); assert.equal((await f.service.state()).busy, false);
+});
+
+test('stability: a shop launch reserves the shared browser while its initial task is being saved', async () => {
+  let entered, release, first = true; const writing = new Promise(r => { entered = r; }), gate = new Promise(r => { release = r; });
+  const f = fixture({ write: async () => { if (first) { first = false; entered(); await gate; } } });
+  const launch = f.service.start(); await writing; const reserved = !!f.gateway.operation;
+  release(); await launch; await f.service.job;
+  assert.equal(reserved, true);
+});
+
+test('stability: settings saved during a schedule write cannot erase the persisted daily marker', async () => {
+  let entered, release, first = true; const writing = new Promise(r => { entered = r; }), gate = new Promise(r => { release = r; });
+  const other = { id: 'another', name: '合成另一店铺' };
+  const f = fixture({ write: async data => { if (first && data.lastScheduledDate) { first = false; entered(); await gate; } } });
+  const scheduled = f.service.checkSchedule(now, () => true).catch(() => {}); await writing;
+  const saved = f.service.save([shop, other]); release(); await saved; await scheduled; await f.service.job;
+  assert.deepEqual(f.disk().shops, [shop, other]); assert.equal(f.disk().lastScheduledDate, '2026-10-16');
+});
+
+test('stability: terminal status write failure cannot leave an idle task displayed as running', async () => {
+  const f = fixture({ write: async data => { if (data.lastRun?.status !== 'running') throw new Error('terminal write failed'); } });
+  await f.service.start(); await f.service.job;
+  const state = await f.service.state();
+  assert.equal(state.busy, false); assert.equal(state.lastRun.status, 'failed'); assert.match(state.error, /保存失败/); assert.equal(state.snapshots.length, 1);
+});
+
+test('stability: a failed result write stops subsequent shop reads and preserves saved history', async () => {
+  let fail = true; const other = { id: 'another', name: '合成另一店铺' };
+  const f = fixture({ stored: { version: 1, shops: [shop, other], snapshots: [] }, write: async data => {
+    if (fail && data.snapshots.length) { fail = false; throw new Error('disk full'); }
+  } });
+  await f.service.start(); await f.service.job;
+  assert.equal(f.calls(), 1); assert.equal(f.disk().snapshots.length, 0); assert.equal((await f.service.state()).lastRun.status, 'failed');
+});
+
+test('stability: read retry exhaustion is bounded and writes or terminal errors are never automatically replayed', async () => {
+  for (const kind of ['overview', 'follow', 'unfollow']) {
+    let calls = 0; const waits = [];
+    const collector = new FeiguaShopCollector({}, { retryWait: async ms => waits.push(ms) });
+    collector.requestOnce = async () => { calls++; throw Object.assign(new Error('transport'), { code: 'FEIGUA_NETWORK' }); };
+    await assert.rejects(collector.request(kind, {}), { code: 'FEIGUA_NETWORK' });
+    assert.equal(calls, kind === 'overview' ? 3 : 1); assert.equal(waits.length, kind === 'overview' ? 2 : 0);
+  }
+  for (const code of ['FEIGUA_AUTH_REQUIRED', 'FEIGUA_PERMISSION', 'FEIGUA_QUOTA', 'FEIGUA_RATE_LIMIT', 'FEIGUA_SHOP_INVALID']) {
+    let calls = 0;
+    const collector = new FeiguaShopCollector({}, { retryWait: async () => assert.fail('terminal failures must not retry') });
+    collector.requestOnce = async () => { calls++; throw Object.assign(new Error('terminal'), { code }); };
+    await assert.rejects(collector.request('overview', {}), { code }); assert.equal(calls, 1);
+  }
+});
+
+test('stability: cancellation during read backoff prevents every later request', async () => {
+  const controller = new AbortController(); let calls = 0;
+  const collector = new FeiguaShopCollector({}, { retryWait: async (_ms, signal) => { assert.equal(signal, controller.signal); controller.abort(); throw new Error('aborted wait'); } });
+  collector.requestOnce = async () => { calls++; throw Object.assign(new Error('offline'), { code: 'FEIGUA_NETWORK' }); };
+  await assert.rejects(collector.request('overview', {}, controller.signal), { code: 'FEIGUA_CANCELLED' }); assert.equal(calls, 1);
+});
+
+test('stability: transport errors are classified without exporting private network fields', async () => {
+  const old = globalThis.document;
+  try {
+    for (const [failure, network] of [[{ response: { status: 503 } }, true], [{ code: 'ERR_NETWORK' }, true], [{ message: 'Failed to fetch' }, true], [{ response: { status: 401 } }, false], [{ response: { status: 403 } }, false], [{ response: { status: 429 } }, false]]) {
+      globalThis.document = { querySelector: () => ({ __vue__: { $api: { shop: { read: { url: SHOP_ENDPOINTS.overview, GET: async () => { throw { ...failure, config: { authorization: 'private-token' } }; } } } } } }) };
+      const result = await readShopApi({ kind: 'overview', params: {} });
+      assert.equal(result.network, network); assert.doesNotMatch(JSON.stringify(result), /private-token|authorization/);
+    }
+  } finally { globalThis.document = old; }
+});
+
+test('stability: a skipped browser lease rejects cleanly instead of hanging or falsely completing', { timeout: 1000 }, async () => {
+  for (const method of ['search', 'start', 'remove']) {
+    const f = fixture(); f.gateway.exclusive = async () => undefined;
+    await assert.rejects(method === 'search' ? f.service.search('合成店铺') : method === 'remove' ? f.service.remove(shop.id) : f.service.start(), { code: 'FEIGUA_CANCELLED' });
+    assert.equal((await f.service.state()).busy, false); assert.equal(f.calls(), 0); assert.equal(f.unfollows(), 0); assert.equal(f.disk().lastRun, null);
+  }
+});
+
+test('stability: failing to save initial intent releases the browser before returning an error', async () => {
+  const f = fixture({ write: async () => { throw new Error('disk full'); } });
+  await assert.rejects(f.service.start(), /disk full/); await f.service.job;
+  assert.equal(f.authCalls(), 0); assert.equal(f.calls(), 0); assert.equal(f.gateway.operation, null); assert.equal(f.gateway.controller, null);
+  assert.equal((await f.service.state()).busy, false); assert.equal(f.disk().lastRun, null);
+});
+
+test('stability: cancelled search authentication cannot publish a late login or issue a search', async () => {
+  let entered, release, searches = 0; const started = new Promise(r => { entered = r; });
+  const f = fixture({ search: async () => { searches++; return [shop]; } });
+  const oldAuth = { status: 'expired' }; f.gateway.auth = oldAuth;
+  f.gateway.browser.checkLogin = async () => { entered(); return new Promise(r => { release = r; }); };
+  const search = f.service.search('合成店铺'); await started; await f.service.cancel(); release({ status: 'authenticated' });
+  await assert.rejects(search, { code: 'FEIGUA_CANCELLED' }); assert.equal(searches, 0); assert.equal(f.gateway.auth, oldAuth);
 });

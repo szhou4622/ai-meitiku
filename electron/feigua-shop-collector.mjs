@@ -6,9 +6,24 @@ const check = signal => { if (signal?.aborted) throw shopError('已停止店铺�
 const canonical = value => JSON.stringify(Object.entries(value).map(([k, v]) => [k, String(v)]).sort(([a], [b]) => a.localeCompare(b)));
 
 export class FeiguaShopCollector {
-  constructor(browser) { this.browser = browser; this.focusIds = new Map(); }
+  constructor(browser, { retryWait = (ms, signal) => delay(ms, undefined, { signal }), onRetry = () => {} } = {}) {
+    this.browser = browser; this.focusIds = new Map(); this.retryWait = retryWait; this.onRetry = onRetry;
+  }
 
   async request(kind, params, signal) {
+    const waits = [10_000, 30_000], write = ['follow', 'unfollow'].includes(kind);
+    for (let attempt = 0; ; attempt++) {
+      check(signal);
+      try { return await this.requestOnce(kind, params, signal); }
+      catch (error) {
+        if (write || error.code !== 'FEIGUA_NETWORK' || attempt >= waits.length) throw error;
+        this.onRetry(`飞瓜网络暂不可用，${waits[attempt] / 1000} 秒后重试（${attempt + 1}/2）`);
+        try { await this.retryWait(waits[attempt], signal); } catch (failure) { check(signal); throw failure; }
+      }
+    }
+  }
+
+  async requestOnce(kind, params, signal) {
     check(signal);
     const browser = this.browser, window = browser.window;
     if (!window || window.isDestroyed() || !browser.isProviderUrl(window.webContents.getURL())) throw shopError('请先登录飞瓜', 'FEIGUA_AUTH_REQUIRED');
@@ -25,6 +40,7 @@ export class FeiguaShopCollector {
     });
     check(signal);
     if (window !== browser.window || new URL(window.webContents.getURL()).origin !== origin) throw shopError('店铺读取期间来源窗口发生变化');
+    if (result?.network || [500, 502, 503, 504].includes(result?.code)) throw shopError('飞瓜网络或服务暂不可用，请稍后重试', 'FEIGUA_NETWORK');
     const observed = (browser.shopRequests || []).filter(r => r.sequence > since && r.kind === kind).at(-1);
     if (!observed || canonical(observed.params) !== canonical(params)) throw shopError('未核验到本次店铺、日期及分页一致的真实请求');
     if (result?.code === 430) browser.requireVerification();

@@ -46,7 +46,11 @@ export async function readShopApi({ kind, params }) {
   if (models.length !== 1) return { code: 0, error: '飞瓜店铺接口客户端未就绪' };
   let response;
   try { response = method === 'POST' ? await models[0].POST({ data: params, ...(kind === 'search' ? { params: { pageType: 1 } } : {}) }) : await models[0].GET({ params }); }
-  catch (error) { return { code: Number(error?.response?.status) || 0, error: '飞瓜店铺请求未完成' }; }
+  catch (error) {
+    const status = Number(error?.response?.status || error?.status) || 0;
+    const network = [500, 502, 503, 504].includes(status) || ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', 'ERR_INTERNET_DISCONNECTED', 'ERR_CONNECTION_RESET'].includes(error?.code) || /^(Failed to fetch|Network Error)$/i.test(error?.message || '');
+    return { code: status, network, error: '飞瓜店铺请求未完成' };
+  }
   const scalar = value => typeof value === 'string' ? value.slice(0, 2000) : typeof value === 'number' || typeof value === 'boolean' || value === null ? value : null;
   const pick = (value, fields) => Object.fromEntries(fields.map(k => [k, scalar(value?.[k])]));
   const metrics = ['SalesGmvStr', 'SalesCountStr', 'GoodsCountStr', 'AwemeCountStr', 'LiveCountStr', 'BloggerCountStr', 'NewGoodsCountStr', 'UpdateGoodsCountStr', 'NewBloggerCountStr'];
