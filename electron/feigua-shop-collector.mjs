@@ -69,7 +69,9 @@ export class FeiguaShopCollector {
     if (!Number.isSafeInteger(focusId) || focusId <= 0) throw shopError('未确认该店铺的飞瓜关注记录');
     const info = await this.request('focusInfo', { focusId }, signal);
     if (info.shopId !== shop.id || typeof info.ready !== 'boolean') throw shopError('飞瓜店铺身份或数据准备状态无法核验');
-    if (!info.ready) throw shopError('已同步关注，飞瓜正在初始化该店数据；准备好后将自动采集，无需重新添加', 'FEIGUA_SHOP_INITIALIZING');
+    // This flag describes source preparation, not whether every weekly API is
+    // unavailable. Accept complete verified data even while the flag is false.
+    return info.ready;
   }
 
   async ensureFollowed(shop, period, signal, progress, allowFollow) {
@@ -97,12 +99,20 @@ export class FeiguaShopCollector {
       return actual;
     };
     // A manual follow needs a fresh search confirmation before any write.
-    // Background initialization checks use membership first and do not spend
-    // repeated public-search queries while the source is still preparing data.
-    let actual = allowFollow ? await confirmIdentity() : shop;
+    // Background reads confirm identity through membership and base data,
+    // without repeating public-search queries for an already followed shop.
+    const actual = allowFollow ? await confirmIdentity() : shop;
     await this.ensureFollowed(actual, period, signal, progress, allowFollow);
-    await this.checkReady(actual, signal);
-    if (!allowFollow) actual = await confirmIdentity();
+    const sourcePreparing = !await this.checkReady(actual, signal);
+    try { return await this.collectWeek(actual, period, signal, progress); }
+    catch (error) {
+      if (sourcePreparing && error.code === 'FEIGUA_PERMISSION') throw shopError('已同步关注，飞瓜尚未提供可完整读取的该店周数据，将自动检查并继续采集', 'FEIGUA_SHOP_INITIALIZING');
+      throw error;
+    }
+  }
+
+  async collectWeek(actual, period, signal, progress) {
+    const shop = actual;
     const params = { shopId: shop.id, fromDateCode: period.start.replaceAll('-', ''), toDateCode: period.end.replaceAll('-', ''), periodType: '10002' };
     const parts = { events: [], newGoods: [], trend: [], eventTotal: 0 };
     progress('读取周汇总');

@@ -100,7 +100,7 @@ export class FeiguaShopService {
       const done = run.shops.filter(g => g.status === 'completed').length;
       const waiting = run.shops.filter(g => g.status === 'waiting').length;
       run.status = cancelled ? 'cancelled' : done === shops.length ? 'completed' : waiting === shops.length ? 'waiting' : done || waiting ? 'partial' : 'failed';
-      run.finishedAt = new Date(this.now()).toISOString(); run.message = cancelled ? '店铺采集已停止，保留已完成结果' : `完成 ${done}/${shops.length} 个店铺${waiting ? `，${waiting} 个正在飞瓜初始化，准备好后自动采集` : ''}`;
+      run.finishedAt = new Date(this.now()).toISOString(); run.message = cancelled ? '店铺采集已停止，保留已完成结果' : `完成 ${done}/${shops.length} 个店铺${waiting ? `，${waiting} 个等待飞瓜返回完整周数据，将自动重试` : ''}`;
       await this.commit({ ...this.data, ...(cancelled ? { waitingShops: this.data.waitingShops.filter(row => !shops.some(shop => shop.id === row.id)) } : {}), lastRun: run });
     }).catch(() => { this.error = '店铺结果保存失败，已保留此前成功数据，请检查本机存储'; }).finally(() => { if (this.controller === controller) this.controller = null; this.progress = null; });
     return this.state();

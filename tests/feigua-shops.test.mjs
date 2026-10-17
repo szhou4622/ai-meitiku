@@ -316,23 +316,49 @@ test('manual starts may register confirmed stores while daily background jobs on
   assert.deepEqual(modes, [true, false]);
 });
 
-test('readiness checks use the confirmed focus ID and reject initialization, unknown state and identity mismatches', async () => {
+test('preparation checks verify identity but a false preparation flag is advisory', async () => {
   const f = registration({ followed: true }); await f.collector.ensureFollowed(shop, week, undefined, () => {}, true);
   let info = { shopId: shop.id, ready: false };
   f.collector.request = async (kind, params) => { assert.equal(kind, 'focusInfo'); assert.deepEqual(params, { focusId: 123 }); return info; };
-  await assert.rejects(f.collector.checkReady(shop), { code: 'FEIGUA_SHOP_INITIALIZING' });
+  assert.equal(await f.collector.checkReady(shop), false);
   info = { shopId: shop.id, ready: null }; await assert.rejects(f.collector.checkReady(shop), /无法核验/);
   info = { shopId: 'different', ready: true }; await assert.rejects(f.collector.checkReady(shop), /无法核验/);
-  info = { shopId: shop.id, ready: true }; await f.collector.checkReady(shop);
+  info = { shopId: shop.id, ready: true }; assert.equal(await f.collector.checkReady(shop), true);
 });
 
-test('background initialization polls do not repeat public searches or request unfinished weekly data', async () => {
-  const f = registration({ followed: true }); let searches = 0;
+test('background retries probe actual availability without public searches and preserve real permission errors', async () => {
+  const f = registration({ followed: true }); let searches = 0, weeklyCalls = 0, ready = false;
   const request = f.collector.request.bind(f.collector);
   f.collector.search = async () => { searches++; assert.fail('must not search before readiness'); };
-  f.collector.request = async (kind, params) => kind === 'focusInfo' ? { shopId: shop.id, ready: false } : request(kind, params);
+  f.collector.request = async (kind, params) => {
+    if (kind === 'focusInfo') return { shopId: shop.id, ready };
+    if (kind === 'overview') { weeklyCalls++; throw Object.assign(new Error('source denied'), { code: 'FEIGUA_PERMISSION' }); }
+    return request(kind, params);
+  };
   await assert.rejects(f.collector.collect(shop, week, undefined, () => {}, { allowFollow: false }), { code: 'FEIGUA_SHOP_INITIALIZING' });
   assert.equal(searches, 0); assert.deepEqual(f.calls.map(c => c.kind), ['focusList']);
+  assert.equal(weeklyCalls, 1);
+  ready = true;
+  await assert.rejects(f.collector.collect(shop, week, undefined, () => {}, { allowFollow: false }), { code: 'FEIGUA_PERMISSION' });
+  assert.equal(searches, 0); assert.equal(weeklyCalls, 2);
+});
+
+test('complete weekly data is captured even when the source preparation flag remains false', async () => {
+  const collector = new FeiguaShopCollector({}); const p = parts(); p.overview.NewBloggerCountStr = '2';
+  const events = [14, 15].map(day => ({ date: 20261000 + day, creatorId: `creator-${day}`, creator: '合成达人', fans: '100', changes: [{ type: 41, title: '合成视频' }] }));
+  collector.search = async () => assert.fail('background identity comes from verified membership');
+  collector.request = async kind => {
+    if (kind === 'focusList') return { total: 1, rows: [{ ...shop, focusId: 123 }] };
+    if (kind === 'focusInfo') return { shopId: shop.id, ready: false };
+    if (kind === 'overview' || kind === 'stat') return p.overview;
+    if (kind === 'days') return { total: 4, rows: p.days };
+    if (kind === 'tops') return [];
+    if (kind === 'trend') return p.trend;
+    if (kind === 'options') return { subtypes: [] };
+    assert.equal(kind, 'events'); return { total: 2, rows: events };
+  };
+  const result = await collector.collect(shop, week, undefined, () => {}, { allowFollow: false });
+  assert.equal(result.days.length, 4); assert.equal(result.events.length, 2); assert.equal(result.metrics.newCreators, '2');
 });
 
 test('initializing stores persist a waiting queue and retry without a second follow after restart', async () => {

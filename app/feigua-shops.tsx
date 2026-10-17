@@ -113,7 +113,7 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
       <nav className={styles.shops} aria-label="选择监控店铺">{state.shops.map(shop => <div key={shop.id} className={active?.id === shop.id ? styles.selected : ''}><button aria-pressed={active?.id === shop.id} onClick={() => { setSelected(shop.id); setWeek(''); setPage(1); }}>{shop.name}</button></div>)}</nav>
       <div className={styles.period}><h3>{active?.name}</h3><label>查看周数据 <select aria-label="店铺周记录" value={activeWeek} onChange={e => { setWeek(e.target.value); setPage(1); }}>{weeks.map(date => <option key={date} value={date}>{date} 起{date === state.currentWeek?.start ? '（本周）' : ''}</option>)}</select></label></div>
       {!state.currentWeek && <p>本周尚无已结束日期，周二起更新本周数据；已保存的历史周仍可查看。</p>}
-      {initializing && <div className={styles.progress} role="status">店铺已同步关注，飞瓜正在初始化数据。软件会自动检查，准备好后继续采集，无需重新添加。保持软件运行并登录飞瓜即可。</div>}
+      {initializing && <div className={styles.progress} role="status">店铺已同步关注，飞瓜暂未提供完整可读取的周数据。软件会自动重试，无需重新添加。保持软件运行并登录飞瓜即可。</div>}
       {failed && <div className={styles.error} role="status">{failed.message}。{snapshot ? '下方保留上次成功保存的周数据。' : '本周尚无已保存数据。'}</div>}
       {initializing ? <div className={styles.empty}>等待飞瓜数据就绪{snapshot ? '；已有记录保留，初始化完成后重新核验并更新。' : '，暂不显示未准备好的周明细和动态。'}</div> : !snapshot ? <div className={styles.empty}>该店本周尚未采集成功，或该历史周没有记录。</div> : <>
         <p className={styles.source}>统计日期：{snapshot.weekStart} — {snapshot.through} · 更新于 {new Date(snapshot.collectedAt).toLocaleString('zh-CN', { hour12: false })} · 数值保留飞瓜原始区间</p>
