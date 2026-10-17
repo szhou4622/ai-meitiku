@@ -2,9 +2,9 @@ name: Repository checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 官方分支]
   push:
-    branches: [main]
+    branches: [main, 官方分支]
   workflow_dispatch:
 
 permissions:
