@@ -1,12 +1,12 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { SHOP_ENDPOINTS, readShopApi } from './feigua-shop-api.mjs';
-import { normalizeShops, shopError, shopQuery, validateShopSnapshot } from './feigua-shop-contract.mjs';
+import { normalizeShops, shopError, shopQuery, validateShopSnapshot, validateShopWeek } from './feigua-shop-contract.mjs';
 
 const check = signal => { if (signal?.aborted) throw shopError('已停止店铺采集', 'FEIGUA_CANCELLED'); };
 const canonical = value => JSON.stringify(Object.entries(value).map(([k, v]) => [k, String(v)]).sort(([a], [b]) => a.localeCompare(b)));
 
 export class FeiguaShopCollector {
-  constructor(browser) { this.browser = browser; }
+  constructor(browser) { this.browser = browser; this.focusIds = new Map(); }
 
   async request(kind, params, signal) {
     check(signal);
@@ -30,7 +30,7 @@ export class FeiguaShopCollector {
     if (result?.code === 430) browser.requireVerification();
     if (result?.code === 401) throw shopError('飞瓜登录已失效，请重新登录', 'FEIGUA_AUTH_REQUIRED');
     if (result?.quota) throw shopError('飞瓜查询额度已用完，已保留原周数据', 'FEIGUA_QUOTA');
-    if (result?.code === 403) throw shopError('飞瓜拒绝访问该店周数据，请先在飞瓜关注该小店并确认账号权限', 'FEIGUA_PERMISSION');
+    if (result?.code === 403) throw shopError('飞瓜拒绝访问该店数据，请检查当前账号的访问权限', 'FEIGUA_PERMISSION');
     if (result?.code === 429) throw shopError('飞瓜请求频率受限，请稍后重试', 'FEIGUA_RATE_LIMIT');
     if (result?.code !== 200 || !result.success || result.example || result.data == null) throw shopError('飞瓜未返回可核验的真实店铺数据，已保留原结果');
     return result.data;
@@ -43,10 +43,66 @@ export class FeiguaShopCollector {
     return normalizeShops(data.rows);
   }
 
-  async collect(shop, period, signal, progress = () => {}) {
-    const matches = await this.search(shop.name, signal);
-    const actual = matches.find(item => item.id === shop.id);
-    if (!actual) throw shopError('已监控店铺的身份未能重新确认，请重新搜索该店铺');
+  async isFollowed(shop, period, signal) {
+    this.focusIds.delete(shop.id);
+    const seen = new Set(); let expected = null;
+    for (let page = 1; page <= 500; page++) {
+      const data = await this.request('focusList', { beginDateCode: period.start.replaceAll('-', ''), endDateCode: period.end.replaceAll('-', ''), groupId: 0, shopStatSort: 1, sortDirection: 1, pageIndex: page, pageSize: 10 }, signal);
+      if (!Number.isSafeInteger(data.total) || data.total < 0 || data.total > 5000 || !Array.isArray(data.rows) || data.rows.length > 10 || expected !== null && expected !== data.total) throw shopError('飞瓜关注列表无法完整核验，未新增关注');
+      expected = data.total;
+      const rows = normalizeShops(data.rows);
+      for (const row of rows) { if (seen.has(row.id)) throw shopError('飞瓜关注列表分页重复，未新增关注'); seen.add(row.id); }
+      if (seen.size > expected) throw shopError('飞瓜关注列表数量不一致，未新增关注');
+      if (rows.some(row => row.id === shop.id)) {
+        const focusId = data.rows.find(row => row.id === shop.id).focusId;
+        if (!Number.isSafeInteger(focusId) || focusId <= 0) throw shopError('飞瓜关注记录缺少有效标识，请稍后刷新重试');
+        this.focusIds.set(shop.id, focusId); return true;
+      }
+      if (seen.size === expected) return false;
+      if (rows.length !== 10) throw shopError('飞瓜关注列表分页缺失，未新增关注');
+    }
+    throw shopError('飞瓜关注列表超出可核验范围，未新增关注');
+  }
+
+  async checkReady(shop, signal) {
+    const focusId = this.focusIds.get(shop.id);
+    if (!Number.isSafeInteger(focusId) || focusId <= 0) throw shopError('未确认该店铺的飞瓜关注记录');
+    const info = await this.request('focusInfo', { focusId }, signal);
+    if (info.shopId !== shop.id || typeof info.ready !== 'boolean') throw shopError('飞瓜店铺身份或数据准备状态无法核验');
+    if (!info.ready) throw shopError('已同步关注，飞瓜正在初始化该店数据；准备好后将自动采集，无需重新添加', 'FEIGUA_SHOP_INITIALIZING');
+  }
+
+  async ensureFollowed(shop, period, signal, progress, allowFollow) {
+    progress('核对飞瓜关注状态');
+    if (await this.isFollowed(shop, period, signal)) return;
+    if (!allowFollow) throw shopError('该店尚未同步到飞瓜关注，请点击“刷新本周数据”自动同步并采集', 'FEIGUA_SHOP_NOT_FOLLOWED');
+    const capacity = await this.request('focusCount', {}, signal);
+    if (!Number.isSafeInteger(capacity.remaining) || capacity.remaining < 0) throw shopError('无法核验飞瓜剩余关注名额，未新增关注');
+    if (capacity.remaining === 0) throw shopError('当前飞瓜账号的关注小店名额已满，请先在飞瓜管理关注名额', 'FEIGUA_SHOP_FOCUS_LIMIT');
+    check(signal);
+    progress('同步关注到飞瓜');
+    // A failed/timed-out write is never blindly retried. The next manual run
+    // reads membership again before deciding whether a new write is needed.
+    await this.request('follow', { groupId: 0, shopId: shop.id }, signal);
+    check(signal);
+    if (!await this.isFollowed(shop, period, signal)) throw shopError('飞瓜关注尚未确认，请稍后刷新重试；已有店铺和周数据保留');
+  }
+
+  async collect(shop, period, signal, progress = () => {}, { allowFollow = true } = {}) {
+    normalizeShops([shop]); validateShopWeek(period);
+    const confirmIdentity = async () => {
+      const matches = await this.search(shop.name, signal);
+      const actual = matches.find(item => item.id === shop.id);
+      if (!actual) throw shopError('已监控店铺的身份未能重新确认，请重新搜索该店铺');
+      return actual;
+    };
+    // A manual follow needs a fresh search confirmation before any write.
+    // Background initialization checks use membership first and do not spend
+    // repeated public-search queries while the source is still preparing data.
+    let actual = allowFollow ? await confirmIdentity() : shop;
+    await this.ensureFollowed(actual, period, signal, progress, allowFollow);
+    await this.checkReady(actual, signal);
+    if (!allowFollow) actual = await confirmIdentity();
     const params = { shopId: shop.id, fromDateCode: period.start.replaceAll('-', ''), toDateCode: period.end.replaceAll('-', ''), periodType: '10002' };
     const parts = { events: [], newGoods: [], trend: [], eventTotal: 0 };
     progress('读取周汇总');
@@ -93,4 +149,4 @@ export class FeiguaShopCollector {
   }
 }
 
-export const shopReadPaths = Object.values(SHOP_ENDPOINTS);
+export const shopReadPaths = Object.entries(SHOP_ENDPOINTS).filter(([kind]) => kind !== 'follow').map(([, path]) => path);

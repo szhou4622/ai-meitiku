@@ -46,7 +46,7 @@ test('weekly history replaces only the same shop/week and retains fifty-two week
   assert.equal(result.filter(r => r.shop.id === shop.id).length, 52); assert.ok(result.includes(other));
   assert.equal(retainShopWeeks(result, snapshot()).filter(r => r.shop.id === shop.id && r.weekStart === week.start).length, 1);
 });
-test('only observed read-only shop endpoints export allowlisted parameters, never transport credentials', () => {
+test('only observed shop endpoints export allowlisted parameters, never transport credentials', () => {
   const origin = 'https://dy.feigua.cn';
   const body = { period: 30, sort: 0, keyword: '合成', page: 1, pageSize: 10, pageType: 1 };
   const details = { method: 'POST', url: origin + SHOP_ENDPOINTS.search, uploadData: [{ bytes: Buffer.from(JSON.stringify(body)) }] };
@@ -102,6 +102,8 @@ test('authentication, quota, permissions, rate limits and sample data never beco
 });
 test('complete dynamic pagination is required and a mismatching shop product cannot be published', async () => {
   const collector = new FeiguaShopCollector({}); collector.search = async () => [shop];
+  collector.ensureFollowed = async () => {};
+  collector.checkReady = async () => {};
   const row = { date: 20261015, productId: 'goods', product: '合成商品', changes: [{ type: 10 }] };
   let incomplete = false, wrongShop = false, duplicate = false;
   collector.request = async (kind, params) => {
@@ -195,4 +197,183 @@ test('restart marks interrupted monitoring without reissuing requests and dispos
   const f = fixture({ stored: { version: 1, shops: [shop], snapshots: [], lastRun: { status: 'running', shops: [] } } });
   assert.equal((await f.service.state()).lastRun.status, 'interrupted'); assert.equal(f.calls(), 0);
   f.service.dispose(); await assert.rejects(f.service.start());
+});
+
+function registration({ followed = false, remaining = 1, confirm = true, failAfterWrite = false } = {}) {
+  const collector = new FeiguaShopCollector({}); const calls = [];
+  collector.request = async (kind, params) => {
+    calls.push({ kind, params });
+    if (kind === 'focusList') return { total: followed ? 1 : 0, rows: followed ? [{ ...shop, focusId: 123 }] : [] };
+    if (kind === 'focusCount') return { remaining };
+    assert.equal(kind, 'follow'); assert.deepEqual(params, { groupId: 0, shopId: shop.id });
+    followed = confirm;
+    if (failAfterWrite) throw Object.assign(new Error('uncertain write'), { code: 'FEIGUA_NETWORK' });
+    return { focusId: 123 };
+  };
+  return { collector, calls };
+}
+
+test('manual collection registers a missing shop once, confirms membership, and never follows an existing shop again', async () => {
+  const f = registration();
+  await f.collector.ensureFollowed(shop, week, undefined, () => {}, true);
+  assert.deepEqual(f.calls.map(c => c.kind), ['focusList', 'focusCount', 'follow', 'focusList']);
+  await f.collector.ensureFollowed(shop, week, undefined, () => {}, true);
+  assert.equal(f.calls.filter(c => c.kind === 'follow').length, 1);
+  const existing = registration({ followed: true, remaining: 0 });
+  await existing.collector.ensureFollowed(shop, week, undefined, () => {}, true);
+  assert.deepEqual(existing.calls.map(c => c.kind), ['focusList']);
+});
+
+test('full or unknown capacity and background updates cannot create source follows', async () => {
+  for (const remaining of [0, -1, null, '1', NaN]) {
+    const f = registration({ remaining });
+    await assert.rejects(f.collector.ensureFollowed(shop, week, undefined, () => {}, true), /名额/);
+    assert.ok(!f.calls.some(c => c.kind === 'follow'));
+  }
+  const background = registration();
+  await assert.rejects(background.collector.ensureFollowed(shop, week, undefined, () => {}, false), { code: 'FEIGUA_SHOP_NOT_FOLLOWED' });
+  assert.deepEqual(background.calls.map(c => c.kind), ['focusList']);
+});
+
+test('a successful response without membership readback cannot unlock collection', async () => {
+  const f = registration({ confirm: false });
+  await assert.rejects(f.collector.ensureFollowed(shop, week, undefined, () => {}, true), /尚未确认/);
+  assert.equal(f.calls.filter(c => c.kind === 'follow').length, 1);
+});
+
+test('an uncertain follow write is not retried; the next manual run reads membership before any second write', async () => {
+  const f = registration({ failAfterWrite: true });
+  await assert.rejects(f.collector.ensureFollowed(shop, week, undefined, () => {}, true), { code: 'FEIGUA_NETWORK' });
+  assert.equal(f.calls.filter(c => c.kind === 'follow').length, 1);
+  await f.collector.ensureFollowed(shop, week, undefined, () => {}, true);
+  assert.equal(f.calls.filter(c => c.kind === 'follow').length, 1);
+});
+
+test('cancellation before a follow prevents the write and cancellation after it prevents later reads', async () => {
+  for (const phase of ['focusCount', 'follow']) {
+    const controller = new AbortController(), f = registration(); const request = f.collector.request.bind(f.collector);
+    f.collector.request = async (...args) => { const result = await request(...args); if (args[0] === phase) controller.abort(); return result; };
+    await assert.rejects(f.collector.ensureFollowed(shop, week, controller.signal, () => {}, true), { code: 'FEIGUA_CANCELLED' });
+    assert.equal(f.calls.filter(c => c.kind === 'follow').length, phase === 'focusCount' ? 0 : 1);
+    assert.equal(f.calls.at(-1).kind, phase);
+  }
+});
+
+test('focus membership requires complete, stable pagination before concluding that a shop is missing', async () => {
+  const f = registration(); const first = Array.from({ length: 10 }, (_, i) => ({ id: `another-${i}`, name: '合成其他店铺' }));
+  let mode = 'complete';
+  f.collector.request = async (kind, p) => {
+    assert.equal(kind, 'focusList');
+    return p.pageIndex === 1 ? { total: 11, rows: first } : mode === 'complete' ? { total: 11, rows: [{ ...shop, focusId: 123 }] } : mode === 'duplicate' ? { total: 11, rows: [first[0]] } : mode === 'changed' ? { total: 12, rows: [shop] } : { total: 11, rows: [] };
+  };
+  assert.equal(await f.collector.isFollowed(shop, week), true);
+  for (mode of ['duplicate', 'changed', 'missing']) await assert.rejects(f.collector.isFollowed(shop, week), /关注列表/);
+});
+
+test('shop identity and settled dates must be valid before any registration call', async () => {
+  const collector = new FeiguaShopCollector({}); let reads = 0;
+  collector.search = async () => { reads++; return [{ ...shop, id: 'different-shop' }]; };
+  collector.ensureFollowed = async () => assert.fail('unconfirmed shop must not be followed');
+  await assert.rejects(collector.collect(shop, week), /身份/);
+  await assert.rejects(collector.collect({ ...shop, id: '../unsafe' }, week));
+  await assert.rejects(collector.collect(shop, { start: week.start, end: '2099-10-17' }));
+  assert.equal(reads, 1);
+});
+
+test('follow observation accepts only the observed default-group POST and rejects arbitrary writes', () => {
+  const details = params => ({ method: 'POST', url: 'https://dy.feigua.cn' + SHOP_ENDPOINTS.follow, uploadData: [{ bytes: Buffer.from(JSON.stringify(params)) }] });
+  assert.deepEqual(observeShopRequest(details({ groupId: 0, shopId: shop.id }), 'https://dy.feigua.cn'), { kind: 'follow', params: { groupId: '0', shopId: shop.id } });
+  for (const p of [{ groupId: 1, shopId: shop.id }, { groupId: 0, shopId: '../unsafe' }, { groupId: 0, shopId: shop.id, token: 'synthetic-secret' }]) assert.equal(observeShopRequest(details(p), 'https://dy.feigua.cn'), null);
+  assert.equal(observeShopRequest({ ...details({ groupId: 0, shopId: shop.id }), method: 'GET' }, 'https://dy.feigua.cn'), null);
+  assert.equal(observeShopRequest({ ...details({ groupId: 0, shopId: shop.id }), url: 'https://dy.feigua.cn/api/v1/focus/shop/delete' }, 'https://dy.feigua.cn'), null);
+});
+
+test('provider registration uses the exact UI body and returns no unrelated provider fields', async () => {
+  const old = globalThis.document, calls = [];
+  const responses = { follow: 123, focusList: { TotalCount: 1, Items: [{ ShopId: shop.id, ShopName: shop.name, FocusId: 123, IsDemo: false, SalesGmv: 123456, Token: 'synthetic-secret' }] }, focusCount: { SurplusCount: 2, Token: 'synthetic-secret' }, focusInfo: { ShopId: shop.id, DynamicDataFetchFinish: false, Token: 'synthetic-secret' } };
+  const models = Object.fromEntries(Object.entries(SHOP_ENDPOINTS).map(([kind, url]) => [kind, { url, GET: async args => { calls.push({ kind, args }); return { Code: 200, Status: true, Data: responses[kind] }; }, POST: async args => { calls.push({ kind, args }); return { Code: 200, Status: true, Data: responses[kind] }; } }]));
+  globalThis.document = { querySelector: () => ({ __vue__: { $api: { shops: models } } }) };
+  try {
+    for (const p of [{ groupId: 1, shopId: shop.id }, { groupId: 0, shopId: 'bad/id' }, { groupId: 0, shopId: shop.id, extra: 1 }]) assert.equal((await readShopApi({ kind: 'follow', params: p })).code, 0);
+    assert.equal(calls.length, 0);
+    assert.deepEqual((await readShopApi({ kind: 'follow', params: { groupId: 0, shopId: shop.id } })).data, { focusId: 123 });
+    assert.deepEqual(calls[0], { kind: 'follow', args: { data: { groupId: 0, shopId: shop.id } } });
+    const list = await readShopApi({ kind: 'focusList', params: {} });
+    assert.deepEqual(list.data, { total: 1, rows: [{ ...shop, focusId: 123 }] }); assert.equal(list.example, false);
+    assert.deepEqual((await readShopApi({ kind: 'focusCount', params: {} })).data, { remaining: 2 });
+    assert.deepEqual((await readShopApi({ kind: 'focusInfo', params: { focusId: 123 } })).data, { shopId: shop.id, ready: false });
+    assert.doesNotMatch(JSON.stringify(list), /synthetic-secret|123456|Token|SalesGmv/);
+    responses.focusList.Items[0].IsDemo = true;
+    assert.equal((await readShopApi({ kind: 'focusList', params: {} })).example, true);
+  } finally { globalThis.document = old; }
+});
+
+test('manual starts may register confirmed stores while daily background jobs only read existing follows', async () => {
+  const modes = [];
+  const collect = async (target, period, _signal, _progress, options) => { modes.push(options.allowFollow); return snapshot(target, period); };
+  const manual = fixture({ collect }); await manual.service.start(); await manual.service.job;
+  const daily = fixture({ collect }); await daily.service.checkSchedule(now, () => true); await daily.service.job;
+  assert.deepEqual(modes, [true, false]);
+});
+
+test('readiness checks use the confirmed focus ID and reject initialization, unknown state and identity mismatches', async () => {
+  const f = registration({ followed: true }); await f.collector.ensureFollowed(shop, week, undefined, () => {}, true);
+  let info = { shopId: shop.id, ready: false };
+  f.collector.request = async (kind, params) => { assert.equal(kind, 'focusInfo'); assert.deepEqual(params, { focusId: 123 }); return info; };
+  await assert.rejects(f.collector.checkReady(shop), { code: 'FEIGUA_SHOP_INITIALIZING' });
+  info = { shopId: shop.id, ready: null }; await assert.rejects(f.collector.checkReady(shop), /无法核验/);
+  info = { shopId: 'different', ready: true }; await assert.rejects(f.collector.checkReady(shop), /无法核验/);
+  info = { shopId: shop.id, ready: true }; await f.collector.checkReady(shop);
+});
+
+test('background initialization polls do not repeat public searches or request unfinished weekly data', async () => {
+  const f = registration({ followed: true }); let searches = 0;
+  const request = f.collector.request.bind(f.collector);
+  f.collector.search = async () => { searches++; assert.fail('must not search before readiness'); };
+  f.collector.request = async (kind, params) => kind === 'focusInfo' ? { shopId: shop.id, ready: false } : request(kind, params);
+  await assert.rejects(f.collector.collect(shop, week, undefined, () => {}, { allowFollow: false }), { code: 'FEIGUA_SHOP_INITIALIZING' });
+  assert.equal(searches, 0); assert.deepEqual(f.calls.map(c => c.kind), ['focusList']);
+});
+
+test('initializing stores persist a waiting queue and retry without a second follow after restart', async () => {
+  let ready = false, attempts = 0;
+  const collect = async (target, period, _signal, _progress, options) => {
+    attempts++;
+    if (attempts > 1) assert.equal(options.allowFollow, false);
+    if (!ready) throw Object.assign(new Error('初始化中'), { code: 'FEIGUA_SHOP_INITIALIZING', publicMessage: '初始化中' });
+    return snapshot(target, period);
+  };
+  const f = fixture({ collect }); await f.service.start(); await f.service.job;
+  assert.equal(f.disk().lastRun.status, 'waiting'); assert.equal(f.disk().snapshots.length, 0);
+  assert.equal(f.disk().waitingShops[0].attempts, 1);
+  const next = Date.parse(f.disk().waitingShops[0].nextCheckAt);
+  const resumed = fixture({ stored: { ...f.disk(), lastScheduledDate: '2026-10-16' }, collect });
+  await resumed.service.checkSchedule(next - 1, () => true); assert.equal(attempts, 1);
+  await resumed.service.checkSchedule(next, () => true); await resumed.service.job;
+  assert.equal(attempts, 2); assert.equal(resumed.disk().waitingShops[0].attempts, 2);
+  ready = true;
+  await resumed.service.checkSchedule(Date.parse(resumed.disk().waitingShops[0].nextCheckAt), () => true); await resumed.service.job;
+  assert.equal(attempts, 3); assert.equal(resumed.disk().lastRun.status, 'completed'); assert.equal(resumed.disk().snapshots.length, 1); assert.deepEqual(resumed.disk().waitingShops, []);
+});
+
+test('initialization retries record intent before provider I/O, preserve snapshots and stop after removal', async () => {
+  const waitingShops = [{ id: shop.id, attempts: 1, nextCheckAt: new Date(now - 1).toISOString() }];
+  const stored = { version: 1, shops: [shop], snapshots: [snapshot()], waitingShops };
+  const failed = fixture({ stored, write: async () => { throw new Error('disk failure'); } });
+  await assert.rejects(failed.service.checkSchedule(now, () => true), /disk failure/); assert.equal(failed.calls(), 0);
+  const f = fixture({ stored }); await f.service.save([]);
+  assert.deepEqual(f.disk().waitingShops, []); assert.equal(f.disk().snapshots.length, 1);
+  await f.service.checkSchedule(now, () => true); assert.equal(f.calls(), 0);
+});
+
+test('cancel and expired login clear automatic initialization retries instead of repeatedly opening a login window', async () => {
+  const waitingShops = [{ id: shop.id, attempts: 1, nextCheckAt: new Date(now - 1).toISOString() }];
+  const stored = { version: 1, shops: [shop], snapshots: [], waitingShops };
+  const expired = fixture({ stored, auth: { status: 'expired' } });
+  await expired.service.checkSchedule(now, () => true); await expired.service.job;
+  assert.equal(expired.disk().lastRun.status, 'failed'); assert.deepEqual(expired.disk().waitingShops, []);
+  let release; const gate = new Promise(r => { release = r; });
+  const cancelled = fixture({ stored, collect: async () => { await gate; return snapshot(); } });
+  await cancelled.service.start(); await flush(); await cancelled.service.cancel(); release(); await cancelled.service.job;
+  assert.deepEqual(cancelled.disk().waitingShops, []);
 });

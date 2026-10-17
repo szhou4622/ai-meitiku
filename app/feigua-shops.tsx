@@ -10,7 +10,7 @@ type Period = { start: string; end: string };
 type Metrics = Record<string, string | null>;
 type ShopEvent = { date: string; kind: string; product: string | null; creator: string | null; fans: string | null; changes: { type: number; title: string | null; before: string | null; after: string | null }[] };
 type Snapshot = { shop: Shop; weekStart: string; through: string; collectedAt: string; metrics: Metrics; days: ({ date: string } & Metrics)[]; newGoods: { id: string; title: string; listedAt: string | null; sales: string | null; salesCount: string | null }[]; trend: { date: string; count: string }[]; events: ShopEvent[] };
-type ShopState = { shops: Shop[]; snapshots: Snapshot[]; busy: boolean; progress: string | null; currentWeek: Period | null; error: string | null; lastRun: { status: string; message: string; shops: { id: string; status: string; message?: string }[] } | null };
+type ShopState = { shops: Shop[]; snapshots: Snapshot[]; waitingShops?: { id: string; nextCheckAt: string; attempts: number }[]; busy: boolean; progress: string | null; currentWeek: Period | null; error: string | null; lastRun: { status: string; message: string; shops: { id: string; status: string; message?: string }[] } | null };
 export type FeiguaShopsBridge = {
   state: () => Promise<ShopState>;
   search: (query: string) => Promise<Shop[]>;
@@ -56,6 +56,7 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
   const activeWeek = weeks.includes(week) ? week : weeks[0] || '';
   const snapshot = state.snapshots.find(s => s.shop.id === active?.id && s.weekStart === activeWeek);
   const failed = state.lastRun?.shops.find(s => s.id === active?.id && s.status === 'failed');
+  const initializing = activeWeek === state.currentWeek?.start && state.waitingShops?.some(s => s.id === active?.id);
   const disabled = !ready || state.busy || !!action;
   const events = (snapshot?.events || []).filter(e => eventTypes.includes(e.kind) && (!filter.trim() || [e.product, e.creator, ...e.changes.map(c => c.title)].some(v => v?.includes(filter.trim()))));
   const pageCount = Math.max(1, Math.ceil(events.length / pageSize));
@@ -98,7 +99,7 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
     <section className={styles.search} aria-label="添加竞对店铺">
       <div className={styles.searchTop}><h3>监控店铺 <small>{state.shops.length}/10</small></h3><p>搜索后确认具体店铺，同名店铺按独立标识区分。</p></div>
       <form onSubmit={e => { e.preventDefault(); void search(); }}><input aria-label="店铺名称" value={query} onChange={e => { setQuery(e.target.value); setMatches([]); setSearched(false); }} maxLength={100} placeholder="输入要监控的店铺名称" disabled={disabled || state.shops.length >= 10} /><button disabled={disabled || !query.trim() || state.shops.length >= 10}><Search size={14} />{action === 'search' ? '搜索中…' : '搜索店铺'}</button></form>
-      <p>周明细与动态需具备飞瓜「关注的小店」访问权限。若提示未关注或权限不足，请先在飞瓜处理，再刷新；已有数据会保留。</p>
+      <p>添加并采集或手动刷新时，会自动同步关注到当前飞瓜账号，占用该账号的小店关注名额；已关注的店铺不会重复添加。名额或访问权限不足时保留已有数据。移除仅停止本软件监控，飞瓜关注仍保留。</p>
       {searched && !matches.length && <p>没有找到店铺，请换一个更完整的名称。</p>}
       {!!matches.length && <ul className={styles.matches}>{matches.map(shop => <li key={shop.id}><span>{shop.name}<small>店铺标识 {shop.id}</small></span><button disabled={disabled || state.shops.length >= 10 || state.shops.some(s => s.id === shop.id)} onClick={() => void add(shop)}><Plus size={13} />{state.shops.some(s => s.id === shop.id) ? '已监控' : '添加并采集'}</button></li>)}</ul>}
       {!!state.shops.length && <ul className={styles.matches} aria-label="已监控店铺设置">{state.shops.map(shop => <li key={shop.id}><strong>{shop.name}</strong><div className={styles.shopActions}><button disabled={disabled || !state.currentWeek} onClick={() => void perform('refresh', api => api.start({ ids: [shop.id] }))}>刷新本周数据</button><button disabled={disabled} aria-label={`移除监控 ${shop.name}`} title="移除监控，保留历史数据" onClick={() => void remove(shop)}><X size={13} />移除</button></div></li>)}</ul>}
@@ -112,8 +113,9 @@ export function FeiguaShopMonitoring({ settingsContainer }: { settingsContainer:
       <nav className={styles.shops} aria-label="选择监控店铺">{state.shops.map(shop => <div key={shop.id} className={active?.id === shop.id ? styles.selected : ''}><button aria-pressed={active?.id === shop.id} onClick={() => { setSelected(shop.id); setWeek(''); setPage(1); }}>{shop.name}</button></div>)}</nav>
       <div className={styles.period}><h3>{active?.name}</h3><label>查看周数据 <select aria-label="店铺周记录" value={activeWeek} onChange={e => { setWeek(e.target.value); setPage(1); }}>{weeks.map(date => <option key={date} value={date}>{date} 起{date === state.currentWeek?.start ? '（本周）' : ''}</option>)}</select></label></div>
       {!state.currentWeek && <p>本周尚无已结束日期，周二起更新本周数据；已保存的历史周仍可查看。</p>}
+      {initializing && <div className={styles.progress} role="status">店铺已同步关注，飞瓜正在初始化数据。软件会自动检查，准备好后继续采集，无需重新添加。保持软件运行并登录飞瓜即可。</div>}
       {failed && <div className={styles.error} role="status">{failed.message}。{snapshot ? '下方保留上次成功保存的周数据。' : '本周尚无已保存数据。'}</div>}
-      {!snapshot ? <div className={styles.empty}>该店本周尚未采集成功，或该历史周没有记录。</div> : <>
+      {initializing ? <div className={styles.empty}>等待飞瓜数据就绪{snapshot ? '；已有记录保留，初始化完成后重新核验并更新。' : '，暂不显示未准备好的周明细和动态。'}</div> : !snapshot ? <div className={styles.empty}>该店本周尚未采集成功，或该历史周没有记录。</div> : <>
         <p className={styles.source}>统计日期：{snapshot.weekStart} — {snapshot.through} · 更新于 {new Date(snapshot.collectedAt).toLocaleString('zh-CN', { hour12: false })} · 数值保留飞瓜原始区间</p>
         <div className={styles.metrics}>{Object.entries(fields).map(([key, label]) => <div key={key}><span>{label}</span><strong>{value(snapshot.metrics[key])}</strong></div>)}</div>
         <section className={styles.block}><h3>每日数据</h3><div className={styles.table}><table><thead><tr><th>日期</th>{Object.entries(fields).map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead><tbody>{snapshot.days.map(row => <tr key={row.date}><td>{row.date}</td>{Object.keys(fields).map(key => <td key={key}>{value(row[key])}</td>)}</tr>)}</tbody></table></div></section>

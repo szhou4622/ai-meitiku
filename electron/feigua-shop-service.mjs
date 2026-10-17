@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { FeiguaShopCollector } from './feigua-shop-collector.mjs';
 import { normalizeShops, currentShopWeek, retainShopWeeks, shopError } from './feigua-shop-contract.mjs';
 
-const initial = () => ({ version: 1, shops: [], snapshots: [], lastRun: null, lastScheduledDate: null });
+const initial = () => ({ version: 1, shops: [], snapshots: [], waitingShops: [], lastRun: null, lastScheduledDate: null });
 const failMessage = error => error.publicMessage || '店铺采集未完成，已保留上次成功结果';
 
 export class FeiguaShopService {
@@ -23,7 +23,9 @@ export class FeiguaShopService {
     const data = await this.storage.read();
     if (data.version !== 1 || !Array.isArray(data.snapshots)) throw shopError('竞对店铺历史格式无法识别，原文件已保留');
     if (data.snapshots.some(row => !row?.shop || typeof row.weekStart !== 'string' || typeof row.through !== 'string' || !row.metrics || !Array.isArray(row.days) || !Array.isArray(row.events) || !Array.isArray(row.newGoods) || !Array.isArray(row.trend))) throw shopError('竞对店铺周数据损坏，原文件已保留');
-    this.data = { version: 1, shops: normalizeShops(data.shops), snapshots: data.snapshots, lastRun: data.lastRun || null, lastScheduledDate: data.lastScheduledDate || null };
+    const shops = normalizeShops(data.shops), waiting = data.waitingShops ?? [];
+    if (!Array.isArray(waiting) || waiting.some(row => !row || typeof row.id !== 'string' || !Number.isSafeInteger(row.attempts) || row.attempts < 1 || !Number.isFinite(Date.parse(row.nextCheckAt)))) throw shopError('店铺等待状态损坏，原文件已保留');
+    this.data = { version: 1, shops, snapshots: data.snapshots, waitingShops: waiting.filter(row => shops.some(shop => shop.id === row.id)), lastRun: data.lastRun || null, lastScheduledDate: data.lastScheduledDate || null };
     if (this.data.lastRun?.status === 'running') await this.commit({ ...this.data, lastRun: { ...this.data.lastRun, status: 'interrupted', message: '上次店铺采集被中断，请重新刷新；已保存周数据保留' } });
   }
   async commit(data) {
@@ -40,7 +42,7 @@ export class FeiguaShopService {
     if (this.controller || this.configPending || this.disposed) throw shopError('店铺采集中或设置正在保存，请稍后再试');
     const next = normalizeShops(shops);
     this.configPending = true;
-    try { await this.commit({ ...this.data, shops: next }); } finally { this.configPending = false; }
+    try { await this.commit({ ...this.data, shops: next, waitingShops: this.data.waitingShops.filter(row => next.some(shop => shop.id === row.id)) }); } finally { this.configPending = false; }
     return this.state();
   }
   async search(query) {
@@ -52,7 +54,7 @@ export class FeiguaShopService {
       return this.collector.search(query);
     });
   }
-  async start({ ids } = {}) {
+  async start({ ids, allowFollow = true } = {}) {
     await this.ready;
     await this.queue;
     if (this.controller || this.gateway.controller || this.gateway.operation || this.disposed) throw shopError('正在执行采集操作，请稍后再试');
@@ -74,25 +76,32 @@ export class FeiguaShopService {
           const group = run.shops.find(g => g.id === shop.id); group.status = 'running';
           this.progress = `正在采集 ${shop.name}`;
           try {
-            const snapshot = await this.collector.collect(shop, period, controller.signal, text => { this.progress = `${shop.name} · ${text}`; });
+            const snapshot = await this.collector.collect(shop, period, controller.signal, text => { this.progress = `${shop.name} · ${text}`; }, { allowFollow: allowFollow === true });
             if (controller.signal.aborted) break;
             group.status = 'completed';
-            await this.commit({ ...this.data, snapshots: retainShopWeeks(this.data.snapshots, snapshot), lastRun: run });
+            await this.commit({ ...this.data, snapshots: retainShopWeeks(this.data.snapshots, snapshot), waitingShops: this.data.waitingShops.filter(row => row.id !== shop.id), lastRun: run });
           } catch (e) {
             if (controller.signal.aborted || e.code === 'FEIGUA_CANCELLED') break;
-            group.status = 'failed'; group.message = failMessage(e);
-            await this.commit({ ...this.data, lastRun: run });
+            const pending = this.data.waitingShops.find(row => row.id === shop.id);
+            const waiting = this.data.waitingShops.filter(row => row.id !== shop.id);
+            group.status = e.code === 'FEIGUA_SHOP_INITIALIZING' ? 'waiting' : 'failed'; group.message = failMessage(e);
+            if (group.status === 'waiting') {
+              const attempts = (pending?.attempts || 0) + 1;
+              waiting.push({ id: shop.id, attempts, nextCheckAt: new Date(this.now() + [60, 180, 300][Math.min(attempts - 1, 2)] * 1000).toISOString() });
+            }
+            await this.commit({ ...this.data, waitingShops: waiting, lastRun: run });
             if (['FEIGUA_AUTH_REQUIRED', 'FEIGUA_QUOTA', 'FEIGUA_RATE_LIMIT', 'FEIGUA_VERIFICATION_REQUIRED'].includes(e.code)) throw e;
           }
         }
       } finally { if (this.gateway.controller === controller) this.gateway.controller = null; }
-    }).catch(e => { this.error = failMessage(e); }).then(async () => {
+    }).catch(async e => { this.error = failMessage(e); await this.commit({ ...this.data, waitingShops: this.data.waitingShops.filter(row => !shops.some(shop => shop.id === row.id)) }); }).then(async () => {
       const cancelled = controller.signal.aborted;
       for (const group of run.shops) if (['running', 'pending'].includes(group.status)) { group.status = cancelled ? 'cancelled' : 'failed'; group.message = cancelled ? '已停止采集' : this.error || '本组未完成'; }
       const done = run.shops.filter(g => g.status === 'completed').length;
-      run.status = cancelled ? 'cancelled' : done === shops.length ? 'completed' : done ? 'partial' : 'failed';
-      run.finishedAt = new Date(this.now()).toISOString(); run.message = cancelled ? '店铺采集已停止，保留已完成结果' : `完成 ${done}/${shops.length} 个店铺`;
-      await this.commit({ ...this.data, lastRun: run });
+      const waiting = run.shops.filter(g => g.status === 'waiting').length;
+      run.status = cancelled ? 'cancelled' : done === shops.length ? 'completed' : waiting === shops.length ? 'waiting' : done || waiting ? 'partial' : 'failed';
+      run.finishedAt = new Date(this.now()).toISOString(); run.message = cancelled ? '店铺采集已停止，保留已完成结果' : `完成 ${done}/${shops.length} 个店铺${waiting ? `，${waiting} 个正在飞瓜初始化，准备好后自动采集` : ''}`;
+      await this.commit({ ...this.data, ...(cancelled ? { waitingShops: this.data.waitingShops.filter(row => !shops.some(shop => shop.id === row.id)) } : {}), lastRun: run });
     }).catch(() => { this.error = '店铺结果保存失败，已保留此前成功数据，请检查本机存储'; }).finally(() => { if (this.controller === controller) this.controller = null; this.progress = null; });
     return this.state();
   }
@@ -101,10 +110,17 @@ export class FeiguaShopService {
     await this.ready;
     const date = collectionUpdateDate(now);
     const week = currentShopWeek(now);
-    if (this.disposed || !canRun() || !date || !week || !this.data.shops.length || this.controller || this.gateway.controller || this.gateway.operation || this.data.lastScheduledDate === date) return;
+    if (this.disposed || !canRun() || !week || !this.data.shops.length || this.controller || this.gateway.controller || this.gateway.operation) return;
+    const due = this.data.waitingShops.filter(row => Date.parse(row.nextCheckAt) <= now);
+    if (due.length) {
+      await this.commit({ ...this.data, waitingShops: this.data.waitingShops.map(row => due.some(item => item.id === row.id) ? { ...row, nextCheckAt: new Date(now + 300_000).toISOString() } : row) });
+      if (!this.disposed) await this.start({ ids: due.map(row => row.id), allowFollow: false });
+      return;
+    }
+    if (!date || this.data.lastScheduledDate === date) return;
     const pending = this.data.shops.filter(shop => !this.data.snapshots.some(row => row.shop.id === shop.id && row.weekStart === week.start && row.through === week.end));
     await this.commit({ ...this.data, lastScheduledDate: date });
-    if (!this.disposed && pending.length) await this.start({ ids: pending.map(shop => shop.id) });
+    if (!this.disposed && pending.length) await this.start({ ids: pending.map(shop => shop.id), allowFollow: false });
   }
   startDailySchedule(canRun) {
     if (this.timer) return;
