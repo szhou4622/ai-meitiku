@@ -316,6 +316,14 @@ try {
     const unrelated=doc.createElement('div');unrelated.className='permission-wrapper';unrelated.innerHTML='<button>近180天</button><div class="purview-mask-layer"></div>';root.append(unrelated);
     assert('其他时间选项的权限限制不阻止合法近7天区间',run('video-period').verified===true&&clicks===0);
     assert('无快捷按钮的 API 上下文忽略发布时间筛选日期',run('capture-context',{kind:'videos',keyword:'合成词',period:'近7天'}).dateRange==='2026-10-01 - 2026-10-07');
+    const videoWeek={start:'2026-10-05',end:'2026-10-06'};
+    assert('周一至昨天不接受近7天日期',run('video-period',{verify:true,videoWeek}).verified===false);
+    start.value=videoWeek.start;end.value=videoWeek.end;
+    assert('周一至昨天直接核验准确日期',run('video-period',{verify:true,videoWeek}).dateRange==='2026-10-05 - 2026-10-06');
+    const weekContext=run('capture-context',{kind:'videos',keyword:'合成词',videoWeek});
+    assert('周区间上下文保留冻结日期与真实日期标签',weekContext.period==='本周周一至昨天'&&weekContext.videoWeek.end==='2026-10-06');
+    const shortcut=doc.createElement('button');shortcut.className='active';shortcut.textContent='近7天';root.append(shortcut);
+    assert('自然周不误点近7天快捷项',run('video-period',{verify:true,videoWeek}).verified===true&&clicks===0);shortcut.remove();
     start.value='2026-09-24';end.value='2026-09-30';
     assert('任意历史七天不冒充当前近7天',run('video-period',{verify:true}).verified===false);
     assert('其他筛选区的同名快捷按钮不能代替统计周期',run('video-period').calendar===true);

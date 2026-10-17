@@ -18,6 +18,18 @@ const parameters = {
 };
 const request = kind => ({kind,endpoint:FEIGUA_ENDPOINTS[kind],params:{...parameters[kind],pageIndex:'1',pageSize:'10',pageType:'1'}});
 
+test('natural-week video requests require exact source dates and cannot accept a rolling-week response',()=>{
+  const videoWeek={start:'2026-09-28',end:'2026-10-01'};
+  const context={...contexts.videos,videoWeek,period:'本周周一至昨天',dateRange:'2026-09-28 - 2026-10-01'};
+  const actual={...request('videos'),params:{...request('videos').params,'q.dateFrom':videoWeek.start,'q.dateTo':videoWeek.end}};
+  assert.equal(validateFeiguaRequest('videos',actual,context),actual);
+  const capture=captureFeiguaResponse('videos',actual,context,response());
+  const result=validateCapture('videos',context.keyword,capture,{videoWeek});
+  assert.equal(result.dateRange,context.dateRange);assert.equal(result.period,context.period);
+  assert.throws(()=>validateFeiguaRequest('videos',request('videos'),context),/不一致/);
+  assert.throws(()=>validateCapture('videos',context.keyword,{...capture,dateRange:'2026-09-26 - 2026-10-02'},{videoWeek}),/不一致/);
+});
+
 test('proxy API observation requires the pinned runtime source and exact endpoint', () => {
   const origin = 'http://192.0.2.10:13042';
   const details = {method:'GET',url:`${origin}${FEIGUA_ENDPOINTS.music}?pageIndex=1&pageSize=10&pageType=1&filter.sort=1`};

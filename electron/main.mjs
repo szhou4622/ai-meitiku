@@ -1,3 +1,4 @@
+import { FeiguaShopService } from "./feigua-shop-service.mjs";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, safeStorage, session, shell } from "electron";
 import { AliyunSubtitleService } from "./aliyun-subtitle-service.mjs";
 import { probeVideo } from "./aliyun-subtitle-client.mjs";
@@ -164,6 +165,11 @@ async function getAliyunSubtitleService() {
 
 let qianchuanService = null;
 let feiguaService = null;
+let feiguaShopService = null;
+function getFeiguaShopService() {
+  if (!feiguaShopService) feiguaShopService = new FeiguaShopService({ userDataPath: app.getPath("userData"), gateway: getFeiguaService() });
+  return feiguaShopService;
+}
 function getFeiguaService() {
   if (!feiguaService) feiguaService = new FeiguaService({
     userDataPath: app.getPath("userData"),
@@ -2657,6 +2663,15 @@ if (hasSingleInstanceLock) {
       return getFeiguaService()[method](...args);
     });
   }
+  for (const [channel, method] of Object.entries({
+    "feigua-shops-state": "state", "feigua-shops-save": "save", "feigua-shops-search": "search",
+    "feigua-shops-start": "start", "feigua-shops-cancel": "cancel", "feigua-shops-remove": "remove",
+  })) {
+    registerProtectedHandle(channel, async (event, ...args) => {
+      if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) throw new Error("竞对店铺采集只允许从媒体库主界面调用");
+      return getFeiguaShopService()[method](...args);
+    });
+  }
   registerProtectedHandle("aliyun-subtitle-save", async (_event, payload) => (await getAliyunSubtitleService()).saveConfig(payload));
   registerProtectedHandle("aliyun-subtitle-verify", async () => (await getAliyunSubtitleService()).verify());
   registerProtectedHandle("aliyun-subtitle-open", async (_event, page, mode) => openAliyunPage(page, mode));
@@ -3866,6 +3881,10 @@ if (hasSingleInstanceLock) {
           return true;
         } catch { return false; }
       });
+      getFeiguaShopService().startDailySchedule(() => {
+        try { if (!licenseService || applicationQuitRequested) return false; licenseService.assertFeature("feigua-trends"); return true; }
+        catch { return false; }
+      });
       // Strictly after the first paint. start() never throws and is not awaited.
       const factorCollection = machineIdentityService?.start();
       if (factorCollection) {
@@ -3927,6 +3946,7 @@ app.on("before-quit", (event) => {
     return;
   }
   applicationQuitRequested = true;
+  feiguaShopService?.dispose();
   feiguaService?.dispose();
   if (suddenTerminationDisabled && process.platform === "darwin" && typeof app.enableSuddenTermination === "function") {
     app.enableSuddenTermination();
